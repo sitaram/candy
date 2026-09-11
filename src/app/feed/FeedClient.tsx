@@ -225,7 +225,21 @@ export function FeedClient() {
   const intro = idx < 0;
   const cur = intro ? undefined : items[idx];
 
-  // Gesture reminder: once a minute of stillness, the card leans right, left, then lifts — no words.
+  // First content card: breathe once right after it lands, so the gesture is seen before it is needed.
+  const breathed = useRef(false);
+  useEffect(() => {
+    if (idx !== 0 || breathed.current || open) return;
+    breathed.current = true;
+    const t = setTimeout(() => {
+      if (start.current || document.hidden || window.matchMedia("(min-width: 900px)").matches) return;
+      lastTouch.current = Date.now();
+      setHinting(true);
+      setTimeout(() => setHinting(false), 3200);
+    }, 900);   // after the bounce-in settles
+    return () => clearTimeout(t);
+  }, [idx, open]);
+
+  // Then once a minute of stillness: the card leans right, left, then lifts — no words.
   const HINT_EVERY = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("hintfast") ? 4_000 : 60_000;
   useEffect(() => {
     if (!cur || open) return;

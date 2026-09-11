@@ -369,7 +369,12 @@ export function FeedClient() {
     if (!st || st.id !== e.pointerId) return;
     const dx = e.clientX - st.x, dy = e.clientY - st.y;
     start.current = null;
-    if (!st.axis && Math.hypot(dx, dy) < 8 && cur) { setDrag({ dx: 0, dy: 0, axis: null, active: false }); openDetail(cur.id); return; }
+    if (!st.axis && Math.hypot(dx, dy) < 8) {
+      setDrag({ dx: 0, dy: 0, axis: null, active: false });
+      if (cur) openDetail(cur.id);
+      else if (intro && items.length) go(0);      // tap anywhere on the splash starts
+      return;
+    }
     if (st.axis === "x" && Math.abs(dx) >= THRESH && cur) { decide(dx > 0 ? "like" : "skip", { dx, dy }); return; }
     if (st.axis === "y") {
       if (dy <= -VTHRESH && next) { go(idx + 1, dy); return; }

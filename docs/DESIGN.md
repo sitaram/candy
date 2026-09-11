@@ -26,19 +26,10 @@ GitHub knows *what* a repo is. Nobody has built the layer that knows **why it ma
 
 ## Learnings
 
-- Trending pages are "famous and pushed today." Real signal is *events* (release, license change, first HN thread) plus velocity. Pushed-in-last-2-days was the weakest tab we built.
-- The "new this week" pool is ~50 % noise: star farms, piracy, AI-slop skills. The card pass catches it (`idm_pro_tool` → interest 1, flagged), so noise is an input, not a blocker.
-- README links are a bad expansion edge alone — everything links pytorch. Require two independent members, then a relevance check.
-- Third-party trend APIs die. OSS Insight's trending endpoint has returned empty since March 2026; go to primary sources.
-- Corporate proxies break Node `fetch`. Half an hour lost; documented.
-
-## Iterations
-
-1. JSON pool + list page — saw real data, found noise and the dead API.
-2. Redis frontier + crawl loop + extractors — 18 k repos discovered in 5 s, 2 k crawled/hour.
-3. LLM cards — quality jumped; tuned scale and flag thresholds after the first 27.
-4. Read API, snapshot, background pipeline — product work decoupled from data.
-5. Collections + on-demand + voice niche — 1,851 members, 376 carded, arcane 150★ repos surfaced.
-6. Feed, ranking, user state — first personalized surface.
+- "Trending" means famous and pushed today. Real signal is events (release, license change, first HN thread) plus velocity.
+- "New this week" is ~50 % noise: star farms, piracy, AI-slop. The card pass flags it, so noise is an input, not a blocker.
+- README links alone are a bad expansion edge; everything links pytorch. Require two independent members, then a relevance check.
+- Third-party trend APIs die. OSS Insight has returned empty since March 2026. Use primary sources.
+- Redis filled up at ~800 repos: raw READMEs and release notes were half the bytes. Gzip'd and capped them (4× smaller); raw docs move to disk/S3 next.
 
 **Next:** embeddings for similarity and `ask`/`compare`, voice client, Tier-1 head enumeration with GH Archive as ground truth.

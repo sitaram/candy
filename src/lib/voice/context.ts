@@ -100,6 +100,16 @@ export const TOOLS = [
   },
   {
     type: "function",
+    name: "show_repo",
+    description: "Put a repository's card on the user's screen. Call this whenever you start talking about a repo other than the one on screen — an alternative, a related project, a find_repos result the user picked, anything you name by name — so what they see matches what they hear. Inserts the card right after the current one and pages to it; the user can swipe back. Returns the card's brief.",
+    parameters: {
+      type: "object",
+      properties: { id: { type: "string", description: "owner/name, e.g. simonw/llm. Case-insensitive. A bare name is resolved if unambiguous." } },
+      required: ["id"],
+    },
+  },
+  {
+    type: "function",
     name: "react",
     description: "Record the user's decision on the card currently on screen. 'like' = interesting (swipe right), 'skip' = not for me (swipe left), 'save' = bookmark. like/skip also advance to the next card.",
     parameters: {
@@ -152,6 +162,7 @@ Answer from the brief directly. Do not reason at length for simple lookups.
 - The current repo is fully described below; do not call get_repo for it.
 - Related repos are listed with one-line pitches; you can discuss them from that. Call get_repo only when the user wants real depth on one.
 - Call find_repos for "what else", "alternatives", "anything for <topic>". Say what you are doing in a few words while it runs ("let me look").
+- Call show_repo the moment you shift to talking about a different repo — an alternative, a related project, one result from find_repos, anything you name. The screen should always show the repo you are describing. Do not ask permission; do not announce it. If the user says "show me that" or "put it up", it is the same tool.
 - Call next_card when the user says next / move on / what else is in my feed. After it returns, give the new card the same 20-second opening.
 - Call react when the user expresses a decision: "like that", "not for me", "save it", "bookmark". Confirm in 3-5 words. like and skip move to the next card; treat that like next_card.
 - Never invent a repo or a fact. If a tool returns nothing, say the corpus does not have it yet.

@@ -38,6 +38,7 @@ GitHub knows *what* a repo is. Nobody has built the layer that knows **why it ma
 **The tool result is the voice UI.** Whatever a tool handler returns, the model says. A stale `null` from a superseded fetch became a confident "no matches" spoken over twenty results on screen. So handlers return only what is true *right now*, and the screen and the spoken summary come from the same response.
 
 **Cost is bounded.** Sessions end after 30 s of silence (8 s in search). Audio is $32 / $64 per M tokens in / out, so a 3-minute conversation is ~$0.20; the 3k-token context is cached at $0.40 / M on reconnect. `gpt-realtime-2.1-mini` is a drop-in if quality allows.
+- **The screen follows the voice.** When the model shifts to talking about another repo — an alternative, a related project, a search result — it calls `show_repo`, which puts that card on the rail right after the current one and pages to it. What you hear and what you see stay the same thing; swipe down to return.
 
 ## Search
 

@@ -7,7 +7,7 @@ import type { Action, Reaction } from "@/lib/user/state";
 import { Detail } from "./Detail";
 import { useVoice } from "./useVoice";
 import { Search } from "./Search";
-import type { SearchResult } from "@/lib/user/search";
+import type { SearchResponse, SearchResult } from "@/lib/user/search";
 import "./feed.css";
 
 type Decision = "like" | "skip";
@@ -375,7 +375,37 @@ export function FeedClient() {
     const r = await fetch(`/api/voice/brief?${q}`);
     return r.ok ? ((await r.json()) as { brief: string }).brief : null;
   }, []);
+  /** Hand a card to the rail right after the current one and page onto it. Used by search picks and voice's show_repo. */
+  const insertAndGo = useCallback((r: FeedItem) => {
+    const f: FeedItem = { ...r, explore: false };
+    setItems((q) => {
+      const at = Math.max(0, idxRef.current + 1);
+      const rest = q.filter((x) => x.id !== f.id);
+      return [...rest.slice(0, at), f, ...rest.slice(at)];
+    });
+    if (r.saved) setSaved((s) => new Set(s).add(r.id));
+    // Let the insert render, then page onto it with the usual bounce.
+    setTimeout(() => go(idxRef.current + 1), 30);
+  }, [go]);
   const voice = useVoice({
+    onShowRepo: async (raw) => {
+      const q = raw.trim().replace(/^https?:\/\/github\.com\//, "").replace(/\/+$/, "");
+      if (!q) return null;
+      // Already on the rail? Just page to it.
+      const have = itemsRef.current.findIndex((x) => x.id.toLowerCase() === q.toLowerCase());
+      if (have >= 0) { go(have); await new Promise((r) => setTimeout(r, 120)); return briefOf(itemsRef.current[have]); }
+      const r = await fetch(`/api/search?q=${encodeURIComponent(q)}&n=3`);
+      if (!r.ok) return null;
+      const res = (await r.json()) as SearchResponse;
+      const hit = (res.exact && res.results.find((x) => x.id === res.exact))
+        ?? res.results.find((x) => x.id.toLowerCase() === q.toLowerCase())
+        ?? res.results.find((x) => x.match === "name")
+        ?? (q.includes("/") ? undefined : res.results[0]);
+      if (!hit) return null;
+      insertAndGo(hit);
+      await new Promise((r) => setTimeout(r, 160));
+      return briefOf(hit);
+    },
     onNextCard: async () => {
       const to = idxRef.current + 1;
       if (to >= itemsRef.current.length) return null;
@@ -401,18 +431,7 @@ export function FeedClient() {
   /* ---- search: results hand a card to the rail, right after the current one ---- */
   const [searchOpen, setSearchOpen] = useState(false);
   const openSearch = useCallback(() => { if (voice.active) voice.stop(); setSearchOpen(true); }, [voice]);
-  const pickResult = useCallback((r: SearchResult) => {
-    const f: FeedItem = { id: r.id, item: r.item, score: r.score, fit: r.fit, why: r.why, explore: false, saved: r.saved };
-    setSearchOpen(false);
-    setItems((q) => {
-      const at = Math.max(0, idxRef.current + 1);
-      const rest = q.filter((x) => x.id !== f.id);
-      return [...rest.slice(0, at), f, ...rest.slice(at)];
-    });
-    if (r.saved) setSaved((s) => new Set(s).add(r.id));
-    // Let the insert render, then page onto it with the usual bounce.
-    setTimeout(() => go(idxRef.current + 1), 30);
-  }, [go]);
+  const pickResult = useCallback((r: SearchResult) => { setSearchOpen(false); insertAndGo(r); }, [insertAndGo]);
 
   // Swiping while talking: tell the model what's on screen now (but not for tool-driven changes, which return the brief themselves).
   const voiceCardId = useRef<string | null>(null);

@@ -142,43 +142,30 @@
 .icon-btn.bm.on { color: #e6b422; }
 
 /* splash — page −1 */
-.fcard.splash { justify-content: space-between; align-items: center; text-align: center; padding-bottom: calc(28px + env(safe-area-inset-bottom)); --hue: 268; --hue2: 205; }
-.sp-mid { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 18px; }
+.fcard.splash { justify-content: space-between; align-items: center; text-align: center; padding-bottom: calc(24px + env(safe-area-inset-bottom)); --hue: 268; --hue2: 205; }
+.sp-mid { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 14px; width: 100%; }
 .sp-brand { font-family: var(--font-display); font-weight: 900; font-size: clamp(56px, 18vw, 84px); letter-spacing: -.05em; line-height: 1; color: var(--ink); }
-.sp-line { font-size: clamp(19px, 5.4vw, 24px); font-weight: 500; letter-spacing: -.014em; color: var(--ink); }
-.sp-ops { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; margin-top: 8px; }
-.sp-ops > div { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 56px; padding: 10px 8px; border-radius: 14px; background: var(--fill); }
-.sp-ops b { font-family: var(--font-display); font-size: 20px; font-weight: 800; color: var(--ink); line-height: 1; }
-.sp-ops span { font-size: 11.5px; color: var(--ink-3); letter-spacing: .02em; }
-.sp-how { font-size: clamp(15px, 4.2vw, 17px); color: var(--ink-2); max-width: 34ch; line-height: 1.5; }
-.sp-sub { font-size: 14px; color: var(--ink-3); max-width: 28ch; line-height: 1.45; }
-.sp-sub a { color: var(--accent); text-decoration: none; font-weight: 600; }
+.sp-line { font-family: var(--font-display); font-size: clamp(21px, 6vw, 26px); font-weight: 700; letter-spacing: -.02em; color: var(--ink); }
+.sp-how { margin: 6px 0 10px; font-size: clamp(15.5px, 4.3vw, 17.5px); color: var(--ink-2); max-width: 34ch; line-height: 1.5; text-wrap: pretty; }
+.sp-how b { color: var(--ink); font-weight: 650; }
+
+.sp-ops { display: flex; flex-direction: column; gap: 8px; width: 100%; max-width: 360px; }
+.sp-row { display: flex; align-items: center; gap: 8px; }
+.sp-rowlabel { flex: 0 0 52px; text-align: right; font-size: 10.5px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-4); padding-right: 4px; }
+.sp-row > div { flex: 0 0 auto; display: flex; align-items: center; gap: 7px; padding: 8px 12px 8px 10px; border-radius: 12px; background: var(--fill); }
+.sp-row > div b { font-family: var(--font-display); font-size: 17px; font-weight: 800; color: var(--ink); line-height: 1; min-width: 14px; }
+.sp-row > div span { font-size: 13px; color: var(--ink-2); white-space: nowrap; }
+.sp-row > div.like b { color: var(--like); }
+.sp-row > div.pass b { color: var(--skip); }
+.sp-learn { font-size: 12.5px; color: var(--ink-3); font-style: italic; white-space: nowrap; margin-left: 2px; }
+
 .sp-start { background: none; border: none; color: var(--ink-2); font: inherit; font-size: 14px; font-weight: 600; letter-spacing: .04em; display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer; padding: 8px 16px; }
 .sp-arrow { font-size: 22px; animation: bob 1.4s ease-in-out infinite; }
 @keyframes bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-7px); } }
-.fcard.splash.rail .sp-start { visibility: hidden; }
+.sp-more { position: absolute; right: 22px; bottom: calc(22px + env(safe-area-inset-bottom)); font-size: 13px; color: var(--accent); text-decoration: none; font-weight: 600; white-space: nowrap; }
+.fcard.splash.rail .sp-start, .fcard.splash.rail .sp-more { visibility: hidden; }
 
-/* gesture reminder: lean right (green), lean left (red), lift (peek), settle. ~3 s, once a minute. */
-.drag-layer.breathing { animation: breathe 3s cubic-bezier(.45,.05,.35,1) both; }   /* on the layer: the card's inline transform is the drag, this composes with it */
-@keyframes breathe {
-  0%   { transform: translate(0,0) rotate(0); }
-  18%  { transform: translate(34px, 0) rotate(1.8deg); }
-  34%  { transform: translate(0,0) rotate(0); }
-  52%  { transform: translate(-34px, 0) rotate(-1.8deg); }
-  68%  { transform: translate(0,0) rotate(0); }
-  84%  { transform: translate(0,-28px); }
-  100% { transform: translate(0,0); }
-}
-.drag-layer.breathing::after { animation: breathe-glow 3s cubic-bezier(.45,.05,.35,1) both; opacity: 1 !important; }
-@keyframes breathe-glow {
-  0%, 34%, 68%, 100% { background: transparent; }
-  18% { background: linear-gradient(90deg, transparent 55%, color-mix(in srgb, var(--like) 22%, transparent)); }
-  52% { background: linear-gradient(270deg, transparent 55%, color-mix(in srgb, var(--skip) 22%, transparent)); }
-  84% { background: linear-gradient(0deg, color-mix(in srgb, var(--ink) 6%, transparent), transparent 40%); }
-}
-.drag-layer.breathing ~ .peek-strip, .stack:has(.breathing) .peek-strip { animation: breathe-peek 3s cubic-bezier(.45,.05,.35,1) both; }
-@keyframes breathe-peek { 0%, 68%, 100% { transform: translateY(0); } 84% { transform: translateY(-14px); } }
-@media (prefers-reduced-motion: reduce) { .drag-layer.breathing, .drag-layer.breathing::after, .stack:has(.breathing) .peek-strip { animation: none; } }
+@media (max-width: 360px) { .sp-learn { display: none; } .sp-rowlabel { flex-basis: 44px; } }
 
 /* swipe feedback */
 .drag-layer::after { content: ""; position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity .1s; }

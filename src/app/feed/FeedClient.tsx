@@ -151,22 +151,33 @@ function Card({
 
 /* ---------- splash: page −1 on the rail ---------- */
 function Splash({ style, onStart }: { style?: CSSProperties; onStart: () => void }) {
+  const stop = (e: React.SyntheticEvent) => e.stopPropagation();
   return (
     <section className="fcard splash" style={style}>
       <div className="sp-mid">
         <div className="sp-brand">candy</div>
         <div className="sp-line">Open source worth your time.</div>
-        <div className="sp-how">Swipe up and down through what’s new, TikTok-style. Swipe right on what you like, left on what you don’t, Tinder-style. It learns from every swipe.</div>
+        <p className="sp-how">
+          The projects moving fastest, launching, or quietly becoming the standard — picked for you and
+          explained. <b>Every card says why it’s here.</b> Ten minutes a day, and you stop finding out last.
+        </p>
         <div className="sp-ops">
-          <div><b>↑</b><span>next</span></div>
-          <div><b>↓</b><span>back</span></div>
-          <div><b>→</b><span>like</span></div>
-          <div><b>←</b><span>pass</span></div>
-          <div><b>tap</b><span>deep dive</span></div>
+          <div className="sp-row">
+            <span className="sp-rowlabel">browse</span>
+            <div><b>↑</b><span>next</span></div>
+            <div><b>↓</b><span>back</span></div>
+            <div><b>tap</b><span>deep dive</span></div>
+          </div>
+          <div className="sp-row">
+            <span className="sp-rowlabel">decide</span>
+            <div className="like"><b>→</b><span>like</span></div>
+            <div className="pass"><b>←</b><span>pass</span></div>
+            <span className="sp-learn">it learns from every one</span>
+          </div>
         </div>
-        <div className="sp-sub">Every card says why it’s here. <a href="/about" onPointerDown={(e) => e.stopPropagation()}>Read more</a></div>
       </div>
       <button className="sp-start" onClick={onStart}><span className="sp-arrow">↑</span>swipe up to start</button>
+      <a className="sp-more" href="/about" onPointerDown={stop}>how it works →</a>
     </section>
   );
 }

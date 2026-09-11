@@ -9,6 +9,17 @@ import "./feed.css";
 type Decision = "like" | "skip";
 const THRESH = 100;
 
+/** Category -> hue for the page gradient. Adjacent categories get nearby hues. */
+const HUE: Record<string, number> = {
+  "ai-llm": 268, "ai-agents": 280, "ml-infra": 255, "dev-tools": 205, cli: 195, "web-framework": 330, frontend: 340,
+  backend: 215, database: 30, "data-eng": 45, "devops-infra": 175, security: 0, networking: 185, systems: 20,
+  "languages-compilers": 300, mobile: 320, desktop: 240, "games-graphics": 355, science: 150, productivity: 95,
+  "learning-resource": 60, "awesome-list": 70, other: 230,
+};
+function hueOf(f?: FeedItem): number {
+  return f?.item.card ? HUE[f.item.card.category] ?? 230 : 230;
+}
+
 function fmt(n: number): string {
   return n >= 1000 ? `${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}k` : String(n);
 }
@@ -228,12 +239,12 @@ export function FeedClient() {
   } else if (drag.active) {
     curStyle = { transform: `translate(${drag.dx}px, ${Math.min(0, drag.dy) * 0.6}px) rotate(${drag.dx / 20}deg)`, transition: "none" };
   } else {
-    curStyle = { transform: "none", transition: "transform .22s ease-out" };
+    curStyle = {};
   }
-  const peekScale = 0.95 + 0.05 * (leaving ? 1 : pr);
+  const hue = hueOf(cur);
 
   return (
-    <div className={`feed${open ? " has-detail" : ""}`}>
+    <div className={`feed${open ? " has-detail" : ""}`} style={{ "--hue": hue, "--hue2": (hue + 40) % 360 } as CSSProperties}>
       <header className="feed-head">
         <a href="/" className="brand">candy</a>
         <span className="feed-since">
@@ -254,10 +265,19 @@ export function FeedClient() {
           {!loading && !cur && <div className="feed-empty">You’ve seen everything ranked for you today.<br /><a href="/">Browse the corpus</a> or come back tomorrow.</div>}
           {cur && (
             <div className="stack">
-              {next && <Card key={`peek-${next.id}`} f={next} peek style={{ transform: `scale(${peekScale}) translateY(${(1 - peekScale) * 160}px)` }} />}
+              {next && (
+                <div key={`peek-${next.id}`} className={`peek-strip${leaving ? " rising" : ""}`} style={{ "--p": pr, "--peekhue": hueOf(next) } as CSSProperties} aria-hidden>
+                  <div className="peek-why">{next.why[0]}</div>
+                  <div className="peek-title">
+                    <span className={`score s${next.item.card?.interest ?? 0}`}>{next.item.card?.interest}</span>
+                    {next.id}
+                  </div>
+                  <div className="peek-pitch">{next.item.card?.pitch}</div>
+                </div>
+              )}
               <div className={`drag-layer${pendingDir ? ` hint-${pendingDir}` : ""}${liftHint ? " hint-open" : ""}`} style={{ "--p": pr } as CSSProperties}
                 onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp}>
-                <Card key={cur.id} f={cur} style={curStyle} debug={debug} saved={saved.has(cur.id)}
+                <Card key={cur.id} f={cur} style={curStyle} className={leaving ? "" : "enter"} debug={debug} saved={saved.has(cur.id)}
                   onSave={() => toggleSave(cur.id)} onOpen={() => openDetail(cur.id)} onDecide={decide} />
               </div>
             </div>

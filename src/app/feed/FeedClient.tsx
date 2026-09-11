@@ -37,48 +37,110 @@ const I = {
 };
 
 /* ---------- card ---------- */
+const CAT_LABEL: Record<string, string> = {
+  "ai-llm": "AI · LLM", "ai-agents": "AI · Agents", "ml-infra": "ML Infra", "dev-tools": "Dev Tools", cli: "CLI",
+  "web-framework": "Web Framework", frontend: "Frontend", backend: "Backend", database: "Database", "data-eng": "Data Eng",
+  "devops-infra": "DevOps · Infra", security: "Security", networking: "Networking", systems: "Systems",
+  "languages-compilers": "Languages", mobile: "Mobile", desktop: "Desktop", "games-graphics": "Games · Graphics",
+  science: "Science", productivity: "Productivity", "learning-resource": "Learning", "awesome-list": "Curated List", other: "Other",
+};
+const HOOK_LABEL: Record<string, string> = {
+  "major-release": "Major release", "big-org": "Backed by a major org", viral: "Going viral", "license-change": "License changed",
+  "novel-approach": "Novel approach", "fills-gap": "Fills a gap", "new-project": "Brand new",
+};
+const MATURITY_LABEL: Record<string, string> = { experiment: "experiment", early: "early", usable: "usable", mature: "mature", legacy: "legacy" };
+
+function agoShort(iso: string): string {
+  if (!iso) return "";
+  const d = (Date.now() - Date.parse(iso)) / 86_400_000;
+  if (d < 1) return "today";
+  if (d < 2) return "1d";
+  if (d < 30) return `${Math.round(d)}d`;
+  if (d < 365) return `${Math.round(d / 30)}mo`;
+  return `${(d / 365).toFixed(d < 730 ? 1 : 0)}y`;
+}
+function splitWhy(why: string[]): { fit: string | null; rest: string[] } {
+  const fit = why.find((w) => w.startsWith("matches your interest")) ?? null;
+  return { fit: fit ? fit.replace("matches your interest in ", "") : null, rest: why.filter((w) => w !== fit && !w.startsWith("outside your usual")) };
+}
+
 function Card({
-  f, style, className, peek, debug, saved, onSave, onOpen, onDecide,
+  f, style, className, debug, saved, onSave, onOpen, onDecide,
 }: {
-  f: FeedItem; style?: CSSProperties; className?: string; peek?: boolean; debug?: boolean; saved?: boolean;
+  f: FeedItem; style?: CSSProperties; className?: string; debug?: boolean; saved?: boolean;
   onSave?: () => void; onOpen?: () => void; onDecide?: (d: Decision) => void;
 }) {
   const c = f.item.card;
   const r = f.item.repo;
+  const [owner, name] = f.id.split("/");
   const stop = (e: React.SyntheticEvent) => e.stopPropagation();
+  const { fit, rest } = splitWhy(f.why);
+  const stats: { v: string; k: string }[] = [
+    { v: `${fmt(r.stars)}`, k: "stars" },
+    r.starsPerDay >= 1 ? { v: `+${fmt(Math.round(r.starsPerDay))}`, k: "per day" } : null,
+    { v: agoShort(r.createdAt), k: "old" },
+    r.latestRelease ? { v: r.latestRelease.replace(/^v(?=\d)/, "").slice(0, 9), k: `released ${agoShort(r.latestReleaseAt)} ago` } : r.pushedAt ? { v: agoShort(r.pushedAt), k: "last push" } : null,
+  ].filter((x): x is { v: string; k: string } => !!x);
+
   return (
-    <article className={`fcard${f.explore ? " explore" : ""}${peek ? " peek" : ""} ${className ?? ""}`} style={style} aria-hidden={peek}>
-      <div className="fcard-top">
-        <div className="fcard-why">{f.why.join(" · ")}</div>
-        {!peek && (
-          <button className={`icon-btn bm${saved ? " on" : ""}`} onPointerDown={stop} onClick={(e) => { stop(e); onSave?.(); }} aria-label={saved ? "Remove bookmark" : "Bookmark"} title="Bookmark (b)">
-            {I.bookmark(!!saved)}
-          </button>
-        )}
-      </div>
-      <h2 className="fcard-title">
-        <span className={`score s${c?.interest ?? 0}`}>{c?.interest}</span>
-        <span className="fcard-id">{f.id}</span>
-      </h2>
-      <p className="fcard-pitch">{c?.pitch}</p>
-      <p className="fcard-whycare">{c?.whyCare}</p>
-      <div className="tags scroll">
-        <span className="tag cat">{c?.category}</span>
-        <span className="tag">{c?.maturity}</span>
-        {r.language && <span className="tag">{r.language}</span>}
-        <span className="tag">{fmt(r.stars)}★</span>
-        {r.starsPerDay >= 5 && <span className="tag">{Math.round(r.starsPerDay)}/day</span>}
-        {c?.tags.slice(0, 6).map((t) => <span key={t} className="tag">{t}</span>)}
-      </div>
-      <div className="fcard-spacer" />
-      {debug && <div className="fcard-dbg">score {f.score} · fit {f.fit}</div>}
-      {!peek && (
-        <div className="fcard-actions" onPointerDown={stop}>
-          <button className="act down" onClick={() => onDecide?.("skip")} aria-label="Not for me" title="Not for me (←)">{I.down}</button>
-          <button className="act open" onClick={onOpen} aria-label="Read more" title="Read more (↑ / enter)">{I.open}<small>more</small></button>
-          <button className="act up" onClick={() => onDecide?.("like")} aria-label="Interesting" title="Interesting (→)">{I.up}</button>
+    <article className={`fcard ${className ?? ""}`} style={style}>
+      <header className="c-head">
+        <span className="c-cat">{c ? CAT_LABEL[c.category] ?? c.category : ""}</span>
+        <span className="c-spacer" />
+        {c && <span className={`c-score s${c.interest}`} title="How broadly interesting, 0–10">{c.interest}<small>/10</small></span>}
+        <button className={`icon-btn bm${saved ? " on" : ""}`} onPointerDown={stop} onClick={(e) => { stop(e); onSave?.(); }} aria-label={saved ? "Remove bookmark" : "Bookmark"} title="Bookmark (b)">
+          {I.bookmark(!!saved)}
+        </button>
+      </header>
+
+      <h1 className="c-title">
+        <span className="c-owner">{owner} /</span>
+        <span className="c-name">{name}</span>
+      </h1>
+
+      <p className="c-pitch">{c?.pitch ?? r.description}</p>
+
+      {(fit || rest.length > 0 || (c && c.hook !== "none")) && (
+        <div className="c-why">
+          {f.explore && <span className="chip explore">✦ exploring</span>}
+          {fit && <span className="chip fit">◎ {fit}</span>}
+          {c && c.hook !== "none" && <span className="chip hook">{HOOK_LABEL[c.hook] ?? c.hook}</span>}
+          {rest.map((w) => <span key={w} className="chip">{w}</span>)}
         </div>
       )}
+
+      {c?.whyCare && (
+        <section className="c-section">
+          <div className="c-label">Why it matters</div>
+          <p className="c-body">{c.whyCare}</p>
+        </section>
+      )}
+
+      <div className="c-stats">
+        {stats.map((s) => (
+          <div key={s.k} className="c-stat"><div className="c-stat-v">{s.v}</div><div className="c-stat-k">{s.k}</div></div>
+        ))}
+      </div>
+
+      <div className="c-meta">
+        {r.language && <span>{r.language}</span>}
+        {c && <span>{MATURITY_LABEL[c.maturity]}</span>}
+        {r.license && <span>{r.license}</span>}
+        {c && c.audience.length > 0 && <span className="c-for">for {c.audience.slice(0, 2).join(", ")}</span>}
+      </div>
+
+      <div className="tags scroll c-tags">
+        {c?.tags.slice(0, 8).map((t) => <span key={t} className="tag">{t}</span>)}
+      </div>
+
+      <div className="fcard-spacer" />
+      {debug && <div className="fcard-dbg">score {f.score} · fit {f.fit}</div>}
+
+      <div className="fcard-actions" onPointerDown={stop}>
+        <button className="act down" onClick={() => onDecide?.("skip")} aria-label="Not for me" title="Not for me (←)">{I.down}</button>
+        <button className="act open" onClick={onOpen} aria-label="Read more" title="Read more (↑ / enter)">{I.open}<small>more</small></button>
+        <button className="act up" onClick={() => onDecide?.("like")} aria-label="Interesting" title="Interesting (→)">{I.up}</button>
+      </div>
       <div className="stamp like">YES</div>
       <div className="stamp skip">NOPE</div>
     </article>
@@ -267,11 +329,8 @@ export function FeedClient() {
             <div className="stack">
               {next && (
                 <div key={`peek-${next.id}`} className={`peek-strip${leaving ? " rising" : ""}`} style={{ "--p": pr, "--peekhue": hueOf(next) } as CSSProperties} aria-hidden>
-                  <div className="peek-why">{next.why[0]}</div>
-                  <div className="peek-title">
-                    <span className={`score s${next.item.card?.interest ?? 0}`}>{next.item.card?.interest}</span>
-                    {next.id}
-                  </div>
+                  <div className="peek-label">up next</div>
+                  <div className="peek-title">{next.id.split("/")[1]}<span className="peek-owner"> · {next.id.split("/")[0]}</span></div>
                   <div className="peek-pitch">{next.item.card?.pitch}</div>
                 </div>
               )}

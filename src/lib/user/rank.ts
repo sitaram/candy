@@ -116,7 +116,10 @@ export interface RankOpts {
  * the corpus percentiles; update CENTER/SPAN if they drift. Confidence ramps with |weight| so the
  * first swipe does not swing the whole feed.
  */
-const CENTER = 0.3, SPAN = 0.25;
+// Measured on text-embedding-3-small @512 over 842 cards: p10 .239 · p50 .346 · p90 .514 · p99 .642.
+// Nearest neighbours of a liked card reach .70–.78, so SPAN is set for p50 = 0 and cos .70 = 1: a
+// random card scores 0, the p90 card ≈ 0.5, a true neighbour ≈ 1. p10 ≈ −0.3, clamped at −0.5.
+const CENTER = 0.346, SPAN = 0.35;
 export function tasteFit(v: Float32Array | undefined, taste: Taste | null | undefined): number {
   if (!v || !taste || taste.w <= 0) return 0;
   const cos = dot(v, taste.v);

@@ -1,5 +1,6 @@
 import { corpusIds, getMentions, getRepos } from "../store/corpus";
 import { K, normId } from "../store/keys";
+import { getRaw } from "../store/raw";
 import { redis } from "../store/redis";
 import type { Repo } from "../store/types";
 import type { Card } from "./card";
@@ -95,9 +96,11 @@ export async function getCards(ids: string[]): Promise<Map<string, StoredCard>> 
 }
 
 /** Repos in corpus whose card is missing or stale (README changed), highest frontier priority first. */
-export async function needsEnrich(limit: number): Promise<Repo[]> {
+export async function needsEnrich(limit: number, onlyIds?: Set<string>): Promise<Repo[]> {
   const r = redis();
-  const ids = await corpusIds();
+  let ids = await corpusIds();
+  if (onlyIds) ids = ids.filter((id) => onlyIds.has(id));
+  if (!ids.length) return [];
   const [repos, cards, prio] = await Promise.all([getRepos(ids), getCards(ids), r.zmscore(K.frontier, ...ids)]);
   const pr = new Map(ids.map((id, i) => [id, Number(prio[i] ?? 0)]));
   return repos
@@ -116,8 +119,8 @@ export interface EnrichStats {
   outputTokens: number;
 }
 
-export async function enrich(limit: number, concurrency = 4, log = console.log): Promise<EnrichStats> {
-  const todo = await needsEnrich(limit);
+export async function enrich(limit: number, concurrency = 4, log = console.log, onlyIds?: Set<string>): Promise<EnrichStats> {
+  const todo = await needsEnrich(limit, onlyIds);
   const st: EnrichStats = { done: 0, failed: 0, inputTokens: 0, outputTokens: 0 };
   if (!todo.length) return st;
   const r = redis();
@@ -127,12 +130,12 @@ export async function enrich(limit: number, concurrency = 4, log = console.log):
       const repo = todo[i++];
       try {
         const [readme, relRaw, mentions] = await Promise.all([
-          r.get(K.raw(repo.id, "readme")),
-          r.get(K.raw(repo.id, "releases")),
+          getRaw(repo.id, "readme"),
+          getRaw(repo.id, "releases"),
           getMentions(repo.id),
         ]);
         const releases = relRaw ? (JSON.parse(relRaw) as Parameters<typeof enrichOne>[2]) : [];
-        const e = await enrichOne(repo, readme ?? "", releases, mentions);
+        const e = await enrichOne(repo, readme, releases, mentions);
         await saveCard(repo.id, e.card, {
           readmeHash: repo.readmeHash,
           model: e.model,

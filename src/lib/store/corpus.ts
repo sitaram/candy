@@ -1,5 +1,6 @@
 import { redis } from "./redis";
 import { K, normId, type EdgeType } from "./keys";
+import { boundReleases, encodeRaw, MAX_README } from "./raw";
 import { parseRepo, serializeRepo, type Discovery, type Mention, type Repo } from "./types";
 
 /** Record discoveries: bump frontier priority, log mention, note source. */
@@ -61,9 +62,17 @@ export async function saveRepo(
     // gets +17 and a 30★ repo +5. Tiny repos (<10★) get a penalty.
     p.zincrby(K.frontier, repo.stars < 10 ? -3 : Math.log2(1 + repo.stars), id);
   }
-  if (raw.readme != null) p.set(K.raw(id, "readme"), raw.readme);
-  if (raw.manifest != null) p.set(K.raw(id, "manifest"), raw.manifest);
-  if (raw.releases != null) p.set(K.raw(id, "releases"), raw.releases);
+  if (raw.readme != null) p.set(K.raw(id, "readme"), encodeRaw(raw.readme.slice(0, MAX_README)));
+  if (raw.manifest != null) p.set(K.raw(id, "manifest"), encodeRaw(raw.manifest.slice(0, 20_000)));
+  if (raw.releases != null) {
+    let rel = raw.releases;
+    try {
+      rel = JSON.stringify(boundReleases(JSON.parse(raw.releases) as { body: string | null }[]));
+    } catch {
+      /* store as-is */
+    }
+    p.set(K.raw(id, "releases"), encodeRaw(rel));
+  }
   if (repo.language) p.sadd(K.tags(id), `lang:${repo.language.toLowerCase()}`);
   for (const t of repo.topics ?? []) p.sadd(K.tags(id), `topic:${t}`);
   await p.exec();

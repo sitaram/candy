@@ -31,5 +31,9 @@ GitHub knows *what* a repo is. Nobody has built the layer that knows **why it ma
 - README links alone are a bad expansion edge; everything links pytorch. Require two independent members, then a relevance check.
 - Third-party trend APIs die. OSS Insight has returned empty since March 2026. Use primary sources.
 - Redis filled up at ~800 repos: raw READMEs and release notes were half the bytes. Gzip'd and capped them (4× smaller); raw docs move to disk/S3 next.
-
-**Next:** embeddings for similarity and `ask`/`compare`, voice client, Tier-1 head enumeration with GH Archive as ground truth.
+- The LLM over-scores anything famous. An explicit 0–10 scale with anchors in the prompt fixed it; so did requiring a second weak signal before flagging a viral repo as a star farm.
+- Schema-enforced tool-use output still drifts: a string where an array was declared, an invented enum value, ~1 in 250. Normalize every field on the way in.
+- Crawl priority and interest are different things. Popularity decides what to fetch first; the card decides what to show. Mixing them made the frontier a list of famous repos.
+- On-demand is fast enough. Fetch + extract + card is ~5 s cold, so pre-crawling the tail is unnecessary; depth can follow attention.
+- Decoupling paid off immediately. Once product code only read Redis, a snapshot made every experiment safe and the feed could be built while the crawl ran.
+- Cost is not the constraint. Cards are $0.007 each; the whole corpus so far is under $10. Rate limits and memory bound the system, not the LLM bill.

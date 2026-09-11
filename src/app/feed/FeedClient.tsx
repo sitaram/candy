@@ -36,7 +36,8 @@ const I = {
   up: <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 10v12" /><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z" /></svg>,
   down: <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 14V2" /><path d="M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22a3.13 3.13 0 0 1-3-3.88Z" /></svg>,
   bookmark: (filled: boolean) => <svg viewBox="0 0 24 24" width="22" height="22" fill={filled ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z" /></svg>,
-  open: <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m18 15-6-6-6 6" /></svg>,
+  // "maximize": two diagonal corner arrows — reads as "open this up"
+  open: <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 3h6v6" /><path d="m21 3-7 7" /><path d="M9 21H3v-6" /><path d="m3 21 7-7" /></svg>,
 };
 
 /* ---------- card ---------- */
@@ -136,7 +137,7 @@ function Card({
 
       <div className="fcard-actions" onPointerDown={stop}>
         <button className="act down" onClick={() => onDecide?.("skip")} aria-label="Not for me" title="Not for me (←)">{I.down}</button>
-        <button className="act dive" onClick={onOpen} aria-label="Deep dive" title="Deep dive (enter, or tap the card)">{I.open}<span>deep dive</span></button>
+        <button className="act dive" onClick={onOpen} aria-label="Deep dive" title="Deep dive (enter, or tap the card)">{I.open}</button>
         <button className="act up" onClick={() => onDecide?.("like")} aria-label="Interesting" title="Interesting (→)">{I.up}</button>
       </div>
       <div className="stamp like">YES</div>
@@ -443,7 +444,10 @@ export function FeedClient() {
 
         {open && (
           <div className="detail-host">
-            <div className="scrim" onClick={closeDetail} />
+            {/* pointerdown, not click: a tap on the card opens the sheet on pointerup, and the browser's
+                synthesized click then lands on this scrim (mounted under the still-lifted finger). A finger
+                that is already up never produces a new pointerdown, so this cannot close what it just opened. */}
+            <div className="scrim" onPointerDown={closeDetail} />
             <Detail id={open} onClose={closeDetail} onOpen={openDetail} />
           </div>
         )}

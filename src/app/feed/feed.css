@@ -97,7 +97,6 @@
 .c-cat { font-size: 12px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: hsl(var(--hue) 55% var(--kicker-l)); }
 .c-spacer { flex: 1; }
 .c-reacted { font-size: 14px; width: 26px; height: 26px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; background: var(--fill-2); }
-.c-score { font-family: var(--font-display); font-weight: 800; font-size: 13px; width: 26px; height: 26px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; background: var(--like); color: var(--bg); }
 
 .c-title { font-family: var(--font-display); margin: 0 0 16px; line-height: 1; letter-spacing: -.035em; display: flex; flex-direction: column; min-width: 0; }
 .c-owner { font-size: clamp(14px, 4vw, 17px); font-weight: 500; color: var(--ink-3); letter-spacing: -.01em; margin-bottom: 6px; }

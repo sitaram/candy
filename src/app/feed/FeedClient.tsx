@@ -102,7 +102,6 @@ function Card({
         <span className="c-cat">{c ? CAT_LABEL[c.category] ?? c.category : ""}</span>
         <span className="c-spacer" />
         {reaction && <span className={`c-reacted ${reaction}`}>{reaction === "like" ? "👍" : "👎"}</span>}
-        {c && c.interest >= 8 && <span className="c-score" title="Broadly notable">{c.interest}</span>}
         <button className={`icon-btn bm${saved ? " on" : ""}`} onPointerDown={stop} onClick={(e) => { stop(e); onSave?.(); }} aria-label={saved ? "Remove bookmark" : "Bookmark"} title="Bookmark (b)">
           {I.bookmark(!!saved)}
         </button>

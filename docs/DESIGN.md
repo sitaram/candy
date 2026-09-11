@@ -33,7 +33,11 @@ GitHub knows *what* a repo is. Nobody has built the layer that knows **why it ma
 
 **It opens, you steer.** No "would you like a summary?" — the model gives a ≤20-second take (what it is, why it's here, the one interesting thing) and offers a choice. Then it is a conversation: questions about this repo, the alternatives it named, "what else like this", or "next" to move through the feed by voice. Swipes keep working under the conversation; a page change injects the new card's brief so the model tracks the screen.
 
-**Tools are the corpus API.** Four function tools, no LLM on the path, < 150 ms: `get_repo` (everything about any repo), `find_repos` (search), `next_card`, `react` (like / skip / save by voice). Same read API the feed uses — voice is a thin client, as designed.
+**Tools are the corpus API.** Function tools, no LLM on the path, < 150 ms: `get_repo` (everything about any repo), `find_repos`, `next_card`, `react` (like / skip / save by voice); `search` and `open_result` in search mode. Same read API the feed uses — voice is a thin client, as designed.
+
+**The tool result is the voice UI.** Whatever a tool handler returns, the model says. A stale `null` from a superseded fetch became a confident "no matches" spoken over twenty results on screen. So handlers return only what is true *right now*, and the screen and the spoken summary come from the same response.
+
+**Cost is bounded.** Sessions end after 30 s of silence (8 s in search). Audio is $32 / $64 per M tokens in / out, so a 3-minute conversation is ~$0.20; the 3k-token context is cached at $0.40 / M on reconnect. `gpt-realtime-2.1-mini` is a drop-in if quality allows.
 
 ## Search
 
@@ -41,9 +45,9 @@ GitHub knows *what* a repo is. Nobody has built the layer that knows **why it ma
 
 **Results open into the rail.** Tapping a result inserts that card right after the one you were on and pages to it with the usual bounce; swipe down and you are back where you were. Feed, search, and voice all land on the same card surface — there is no separate results page to navigate out of.
 
-**Voice search is the same session, different instructions.** The bars in the search box open the same Realtime transport as the card conversation, in *search mode*: it waits for you to speak, calls one tool — `search(query)` — whose argument fills the box and renders the results, then says one sentence ("Six matches — Pipecat is the strongest, a Python framework for real-time voice agents"). Refinements are a new search; "open the second one" is `open_result`. Eight seconds of silence ends it; the results stay. No separate dictation model: the box is simply where the model's understanding of what you said lands.
+**Voice search is the same session, different instructions.** The bars in the search box open the same Realtime transport as the card conversation, in *search mode*: it waits for you to speak, calls one tool — `search(query)` — whose argument fills the box and renders the results, then says one sentence ("Six matches — Pipecat is the strongest, a Python framework for real-time voice agents"). Refinements are a new search; "open the second one" is `open_result`. Eight seconds of silence ends it; the results stay. No separate dictation model: what you said shows as a preview line, but the box is written only by the model's `search(query)` — one writer, so one search per utterance.
 
-**Cost is bounded.** Sessions end after 30 s of silence. Audio is $32 / $64 per M tokens in / out, so a 3-minute conversation is ~$0.20; the 3k-token context is cached at $0.40 / M on reconnect. `gpt-realtime-2.1-mini` is a drop-in if quality allows.
+**The embedding is a candidate generator, not a ranker.** Measured on 16 intent queries: hit@20 is 12/12 for every answer that exists in the corpus, but MRR is 0.58 — cosine finds the right neighbourhood and has no opinion inside it. Thirty voice-agent cards sit within 0.03 of each other because they share one LLM-written register; "rust web framework" returns webpack because `Language:` and `Ecosystem:` tokens outweigh function. So cosine order is never shown. Relevance is *semantic finds, lexical confirms* (0.7 · cosine + 0.3 · keyword hits on tags, language, pitch), then `relevance² × quality^0.35 × (1 + 0.5 · fit)` — relevance dominates, the card's interest score breaks ties, the user's profile reorders near-equals. Pipecat goes from #37 raw to #6 fused. The remaining ceiling is coverage: 4 of the 16 queries had no correct answer in the corpus at all.
 
 ## Key decisions and tradeoffs
 
@@ -68,4 +72,6 @@ GitHub knows *what* a repo is. Nobody has built the layer that knows **why it ma
 - Crawl priority and interest are different things. Popularity decides what to fetch first; the card decides what to show.
 - Six reactions visibly re-rank the feed. Cold start is short because the card's tags are already clean.
 - Reaction semantics matter more than the ranking formula. "Save" as a fourth swipe direction competed with "like"; making bookmark a non-dismissing tap fixed both the UI and the training signal.
+- A small general embedder clusters by vocabulary, not by function or quality. Fine for taste (a user who likes "Rust CLIs" is a vocabulary cluster); wrong for search order. Fuse it with keywords and the interest score, and consider a second, search-facing embedding text without the language and ecosystem lines.
+- Two writers to one input box is a bug waiting to happen. Voice transcript and tool argument both wanted the search field; the debounce on one superseded the fetch of the other. Give every piece of UI state exactly one writer.
 - Show the reason, not the score. "Matches your interest in mcp, vs code" is what the user needs, and it doubles as a check that the model is learning the right thing.

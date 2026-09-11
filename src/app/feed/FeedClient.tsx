@@ -245,6 +245,10 @@ export function FeedClient() {
   const intro = idx < 0;
   const cur = intro ? undefined : items[idx];
 
+  // Splash renders immediately; the feed loads behind it. A start gesture before it lands is honored on arrival.
+  const wantStart = useRef(false);
+  useEffect(() => { if (wantStart.current && intro && items.length) { wantStart.current = false; go(0); } }, [items.length, intro]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // First content card: breathe once right after it lands, so the gesture is seen before it is needed.
   const breathed = useRef(false);
   useEffect(() => {
@@ -471,12 +475,13 @@ export function FeedClient() {
     if (!st.axis && Math.hypot(dx, dy) < 8) {
       setDrag({ dx: 0, dy: 0, axis: null, active: false });
       if (cur) openDetail(cur.id);
-      else if (intro && items.length) go(0);      // tap anywhere on the splash starts
+      else if (intro) { if (items.length) go(0); else wantStart.current = true; }      // tap anywhere on the splash starts
       return;
     }
     if (st.axis === "x" && Math.abs(dx) >= THRESH && cur) { decide(dx > 0 ? "like" : "skip", { dx, dy }); return; }
     if (st.axis === "y") {
       if (dy <= -VTHRESH && next) { go(idx + 1, dy); return; }
+      if (dy <= -VTHRESH && intro && !items.length) { wantStart.current = true; }   // swiped before the feed landed
       if (dy >= VTHRESH && idx >= 0) { go(idx - 1, dy); return; }
       // not far enough: glide back to rest from where the finger left it
       setDrag({ dx: 0, dy: 0, axis: null, active: false });
@@ -543,9 +548,9 @@ export function FeedClient() {
 
       <div className="deck-wrap">
         <div className="deck">
-          {loading && <div className="feed-empty">loading…</div>}
+          {loading && !intro && <div className="feed-empty">loading…</div>}
           {!loading && !intro && !cur && <div className="feed-empty">You’ve seen everything ranked for you today.<br /><a href="/browse">Browse the corpus</a> or come back tomorrow.</div>}
-          {!loading && (cur || intro) && (
+          {(cur || intro) && (
             <div className="stack" ref={stackRef}>
               {idx === 0 && <Splash style={prevStyle} onStart={() => {}} />}
               {prev && <Card key={prev.id} f={prev} style={prevStyle} className="rail" saved={saved.has(prev.id)} reaction={reacted.current.get(prev.id)} />}
@@ -577,7 +582,7 @@ export function FeedClient() {
                     onSave={() => toggleSave(cur.id)} onOpen={() => openDetail(cur.id)}
                     onVoice={toggleVoice} onSearch={openSearch} voice={{ state: voice.state, level: voice.level }} />
                 ) : (
-                  <Splash style={curStyle} onStart={() => go(0)} />
+                  <Splash style={curStyle} onStart={() => { if (items.length) go(0); else wantStart.current = true; }} />
                 )}
               </div>
               {ghost && (

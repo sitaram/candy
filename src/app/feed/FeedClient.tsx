@@ -75,70 +75,55 @@ function Card({
   const [owner, name] = f.id.split("/");
   const stop = (e: React.SyntheticEvent) => e.stopPropagation();
   const { fit, rest } = splitWhy(f.why);
-  const stats: { v: string; k: string }[] = [
-    { v: `${fmt(r.stars)}`, k: "stars" },
-    r.starsPerDay >= 1 ? { v: `+${fmt(Math.round(r.starsPerDay))}`, k: "per day" } : null,
-    { v: agoShort(r.createdAt), k: "old" },
-    r.latestRelease ? { v: r.latestRelease.replace(/^v(?=\d)/, "").slice(0, 9), k: `released ${agoShort(r.latestReleaseAt)} ago` } : r.pushedAt ? { v: agoShort(r.pushedAt), k: "last push" } : null,
-  ].filter((x): x is { v: string; k: string } => !!x);
+
+  // At most two reasons: fit first, then the single strongest other signal.
+  const social = rest.find((w) => w.startsWith("on "));
+  const hook = c && c.hook !== "none" && c.hook !== "big-org" ? HOOK_LABEL[c.hook] : null;
+  const second = hook ?? social ?? null;
+
+  // One quiet line of facts. Owner already says "from github"; release age says "active".
+  const facts: string[] = [`${fmt(r.stars)} stars`];
+  if (r.starsPerDay >= 10) facts.push(`+${fmt(Math.round(r.starsPerDay))}/day`);
+  if (r.latestRelease) facts.push(`${r.latestRelease.replace(/^v(?=\d)/, "")} · ${agoShort(r.latestReleaseAt)} ago`);
+  else if (r.pushedAt) facts.push(`pushed ${agoShort(r.pushedAt)} ago`);
+  if (r.language) facts.push(r.language);
 
   return (
     <article className={`fcard ${className ?? ""}`} style={style}>
       <header className="c-head">
         <span className="c-cat">{c ? CAT_LABEL[c.category] ?? c.category : ""}</span>
         <span className="c-spacer" />
-        {c && <span className={`c-score s${c.interest}`} title="How broadly interesting, 0–10">{c.interest}<small>/10</small></span>}
+        {c && c.interest >= 8 && <span className="c-score" title="Broadly notable">{c.interest}</span>}
         <button className={`icon-btn bm${saved ? " on" : ""}`} onPointerDown={stop} onClick={(e) => { stop(e); onSave?.(); }} aria-label={saved ? "Remove bookmark" : "Bookmark"} title="Bookmark (b)">
           {I.bookmark(!!saved)}
         </button>
       </header>
 
       <h1 className="c-title">
-        <span className="c-owner">{owner} /</span>
+        <span className="c-owner">{owner}</span>
         <span className="c-name">{name}</span>
       </h1>
 
       <p className="c-pitch">{c?.pitch ?? r.description}</p>
 
-      {(fit || rest.length > 0 || (c && c.hook !== "none")) && (
+      {(fit || second || f.explore) && (
         <div className="c-why">
           {f.explore && <span className="chip explore">✦ exploring</span>}
-          {fit && <span className="chip fit">◎ {fit}</span>}
-          {c && c.hook !== "none" && <span className="chip hook">{HOOK_LABEL[c.hook] ?? c.hook}</span>}
-          {rest.map((w) => <span key={w} className="chip">{w}</span>)}
+          {fit && <span className="chip fit">{fit}</span>}
+          {second && <span className="chip">{second}</span>}
         </div>
       )}
 
-      {c?.whyCare && (
-        <section className="c-section">
-          <div className="c-label">Why it matters</div>
-          <p className="c-body">{c.whyCare}</p>
-        </section>
-      )}
-
-      <div className="c-stats">
-        {stats.map((s) => (
-          <div key={s.k} className="c-stat"><div className="c-stat-v">{s.v}</div><div className="c-stat-k">{s.k}</div></div>
-        ))}
-      </div>
-
-      <div className="c-meta">
-        {r.language && <span>{r.language}</span>}
-        {c && <span>{MATURITY_LABEL[c.maturity]}</span>}
-        {r.license && <span>{r.license}</span>}
-        {c && c.audience.length > 0 && <span className="c-for">for {c.audience.slice(0, 2).join(", ")}</span>}
-      </div>
-
-      <div className="tags scroll c-tags">
-        {c?.tags.slice(0, 8).map((t) => <span key={t} className="tag">{t}</span>)}
-      </div>
+      {c?.whyCare && <p className="c-body">{c.whyCare}</p>}
 
       <div className="fcard-spacer" />
+
+      <div className="c-facts">{facts.join("  ·  ")}</div>
       {debug && <div className="fcard-dbg">score {f.score} · fit {f.fit}</div>}
 
       <div className="fcard-actions" onPointerDown={stop}>
         <button className="act down" onClick={() => onDecide?.("skip")} aria-label="Not for me" title="Not for me (←)">{I.down}</button>
-        <button className="act open" onClick={onOpen} aria-label="Read more" title="Read more (↑ / enter)">{I.open}<small>more</small></button>
+        <button className="act open" onClick={onOpen} aria-label="Read more" title="Read more (↑ / enter)">{I.open}</button>
         <button className="act up" onClick={() => onDecide?.("like")} aria-label="Interesting" title="Interesting (→)">{I.up}</button>
       </div>
       <div className="stamp like">YES</div>
@@ -330,7 +315,7 @@ export function FeedClient() {
               {next && (
                 <div key={`peek-${next.id}`} className={`peek-strip${leaving ? " rising" : ""}`} style={{ "--p": pr, "--peekhue": hueOf(next) } as CSSProperties} aria-hidden>
                   <div className="peek-label">up next</div>
-                  <div className="peek-title">{next.id.split("/")[1]}<span className="peek-owner"> · {next.id.split("/")[0]}</span></div>
+                  <div className="peek-title">{next.id.split("/")[1]}</div>
                   <div className="peek-pitch">{next.item.card?.pitch}</div>
                 </div>
               )}

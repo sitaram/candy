@@ -1,5 +1,6 @@
-:root { color-scheme: dark; }
+:root { color-scheme: light dark; }
 body { margin: 0; font: 15px/1.45 system-ui, sans-serif; background: #0e0e10; color: #e8e8ea; }
+body:has(.feed) { background: var(--bg, #0e0e10); }
 main { max-width: 720px; margin: 0 auto; padding: 24px 16px 80px; }
 h1 { font-size: 20px; margin: 0 0 4px; }
 .meta { color: #8a8a90; font-size: 13px; margin-bottom: 20px; }

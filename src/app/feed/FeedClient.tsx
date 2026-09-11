@@ -52,7 +52,6 @@ const HOOK_LABEL: Record<string, string> = {
   "major-release": "Major release", "big-org": "Backed by a major org", viral: "Going viral", "license-change": "License changed",
   "novel-approach": "Novel approach", "fills-gap": "Fills a gap", "new-project": "Brand new",
 };
-const MATURITY_LABEL: Record<string, string> = { experiment: "experiment", early: "early", usable: "usable", mature: "mature", legacy: "legacy" };
 
 function agoShort(iso: string): string {
   if (!iso) return "";
@@ -85,13 +84,14 @@ function Card({
   const hook = c && c.hook !== "none" && c.hook !== "big-org" ? HOOK_LABEL[c.hook] : null;
   const second = hook ?? social ?? null;
 
-  // Four-up snapshot: popularity, momentum, age, activity. No boxes, just numbers.
+  // Four-up snapshot: popularity, momentum, age, activity. Labels short enough never to wrap.
+  const rel = r.latestReleaseAt ? agoShort(r.latestReleaseAt) : "";
   const stats: { v: string; k: string }[] = [
     { v: fmt(r.stars), k: "stars" },
     { v: r.starsPerDay >= 1 ? `+${fmt(Math.round(r.starsPerDay))}` : "—", k: "per day" },
     { v: agoShort(r.createdAt), k: "old" },
     r.latestRelease
-      ? { v: r.latestRelease.replace(/^v(?=\d)/, "").slice(0, 8), k: agoShort(r.latestReleaseAt) === "today" ? "released today" : `${agoShort(r.latestReleaseAt)} ago` }
+      ? { v: r.latestRelease.replace(/^v(?=\d)/, "").slice(0, 8), k: rel === "today" ? "today" : `${rel} ago` }
       : { v: agoShort(r.pushedAt), k: "last push" },
   ];
 
@@ -99,7 +99,7 @@ function Card({
   return (
     <article className={`fcard ${className ?? ""}`} style={{ ...style, "--hue": hue, "--hue2": (hue + 40) % 360 } as CSSProperties}>
       <header className="c-head">
-        <span className="c-cat">{c ? CAT_LABEL[c.category] ?? c.category : ""}</span>
+        <span className="c-cat">{c ? CAT_LABEL[c.category] ?? c.category : ""}{r.language && <span className="c-lang"> · {r.language}</span>}</span>
         <span className="c-spacer" />
         {reaction && <span className={`c-reacted ${reaction}`}>{reaction === "like" ? "👍" : "👎"}</span>}
         <button className={`icon-btn bm${saved ? " on" : ""}`} onPointerDown={stop} onClick={(e) => { stop(e); onSave?.(); }} aria-label={saved ? "Remove bookmark" : "Bookmark"} title="Bookmark (b)">
@@ -130,7 +130,6 @@ function Card({
         {stats.map((st) => (
           <div key={st.k} className="c-stat"><div className="c-stat-v">{st.v}</div><div className="c-stat-k">{st.k}</div></div>
         ))}
-        {r.language && <div className="c-stat"><div className="c-stat-v lang">{r.language}</div><div className="c-stat-k">{c ? MATURITY_LABEL[c.maturity] : ""}</div></div>}
       </div>
       {debug && <div className="fcard-dbg">score {f.score} · fit {f.fit}</div>}
 

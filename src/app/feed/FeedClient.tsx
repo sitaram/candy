@@ -167,6 +167,7 @@ function Splash({ style, onStart }: { style?: CSSProperties; onStart: () => void
       <div className="sp-mid">
         <div className="sp-brand">candy</div>
         <div className="sp-line">Open source worth your time.</div>
+        <p className="sp-what">A daily feed of open-source projects, one card at a time.</p>
         <p className="sp-how">
           What’s moving, launching, or quietly becoming the standard — picked for you, and each card
           says why. Ten minutes a day keeps you ahead of the field.

@@ -10,7 +10,7 @@
 import type Redis from "ioredis";
 import type { Item } from "../corpus/api";
 import { redis } from "../store/redis";
-import { nudgeTaste } from "../embed";
+import { EK, nudgeTaste } from "../embed";
 
 export type Reaction = "like" | "skip" | "save" | "dive";
 /** Reversals. `unsave` removes a bookmark; `undo` reverts the last like/skip and un-sees the item. */
@@ -158,14 +158,28 @@ export interface Me {
   topTerms: { term: string; w: number }[];
   avoidTerms: { term: string; w: number }[];
   saved: string[];
+  /** like/skip/dive history, newest first, with the time it happened */
+  liked: { id: string; at: number }[];
+  skipped: { id: string; at: number }[];
+  dived: { id: string; at: number }[];
   seen: number;
   lastVisit: number;
+  firstSeen: number;
+  tasteWeight: number;
 }
 
 export async function me(uid: string): Promise<Me> {
   const r = redis();
-  const [meta, profile, saved, seen] = await Promise.all([r.hgetall(UK.meta(uid)), getProfile(uid), r.zrevrange(UK.saved(uid), 0, 49), r.zcard(UK.seen(uid))]);
+  const [meta, profile, saved, seen, react, seenTs, tw] = await Promise.all([
+    r.hgetall(UK.meta(uid)), getProfile(uid), r.zrevrange(UK.saved(uid), 0, 49), r.zcard(UK.seen(uid)),
+    r.hgetall(UK.react(uid)), r.zrange(UK.seen(uid), "0", "-1", "WITHSCORES"), r.get(EK.tastew(uid)),
+  ]);
+  const at = new Map<string, number>();
+  for (let i = 0; i < seenTs.length; i += 2) at.set(seenTs[i], Number(seenTs[i + 1]));
+  const hist = (kind: Reaction) =>
+    Object.entries(react).filter(([, k]) => k === kind).map(([id]) => ({ id, at: at.get(id) ?? 0 })).sort((a, b) => b.at - a.at);
   const sorted = Array.from(profile, ([term, w]) => ({ term, w })).sort((a, b) => b.w - a.w);
+  const first = seenTs.length ? Math.min(...Array.from(at.values())) : 0;
   return {
     uid,
     reactions: Number(meta.reactions ?? 0),
@@ -173,7 +187,30 @@ export async function me(uid: string): Promise<Me> {
     topTerms: sorted.filter((x) => x.w > 0).slice(0, 15),
     avoidTerms: sorted.filter((x) => x.w < 0).slice(-8).reverse(),
     saved,
+    liked: hist("like"),
+    skipped: hist("skip"),
+    dived: hist("dive"),
     seen,
     lastVisit: Number(meta.lastVisit ?? 0),
+    firstSeen: first,
+    tasteWeight: Number(tw ?? 0),
   };
+}
+
+/**
+ * Forget what the feed has learned: likes, passes, dives, the term profile, and the taste vector.
+ * Reacted items are un-seen so they can come back; plain browse-seen items stay seen.
+ * Saved items are never touched — they are the user's, not the model's.
+ */
+export async function resetTaste(uid: string): Promise<{ forgot: number }> {
+  const r = redis();
+  const react = await r.hgetall(UK.react(uid));
+  const ids = Object.keys(react);
+  const p = r.pipeline();
+  if (ids.length) p.zrem(UK.seen(uid), ...ids);
+  p.del(UK.react(uid), UK.profile(uid), EK.taste(uid), EK.tastew(uid));
+  p.hdel(UK.meta(uid), "reactions", "n_like", "n_skip", "n_dive", "profileUpdatedAt");
+  p.hincrby(UK.meta(uid), "resets", 1);
+  await p.exec();
+  return { forgot: ids.length };
 }

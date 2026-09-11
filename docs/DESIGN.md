@@ -27,6 +27,16 @@ GitHub knows *what* a repo is. Nobody has built the layer that knows **why it ma
 - **Two swipe grammars on one deck.** Up/down pages through cards like TikTok — browse, go back, no judgment. Left/right decides like Tinder — like or pass, and the next card rises. Nobody combines them: TikTok has no "no", Tinder has no "back". Together, browsing is free and deciding is cheap.
 - **Every swipe is a training example — into two models at once.** A *term profile* (tags, ecosystem, category, language) that is cheap and explains itself: "matches your interest in rust, cli." And a *taste vector*: each card is embedded once, the user is a running weighted mean of what they liked minus what they passed, and fit is cosine. Terms supply the reason; the embedding supplies the score. This is what lets it tell "small sharp CLI tools" from "Rust" — a distinction no tag captures.
 
+## Voice
+
+**The card is the context.** Tap the bars on a card and you are talking to a guide that already knows it. The server builds the whole context per card — the full brief (pitch, why-care, hooks, audience, stats, release, mentions, README excerpt), *why it is in your feed*, the six most similar repos with one-line pitches, and a compact profile — and bakes it into the session as `instructions` when it mints the ephemeral client secret. The browser opens WebRTC to OpenAI directly (`gpt-realtime-2.1`, speech-to-speech); the API key never leaves the server.
+
+**It opens, you steer.** No "would you like a summary?" — the model gives a ≤20-second take (what it is, why it's here, the one interesting thing) and offers a choice. Then it is a conversation: questions about this repo, the alternatives it named, "what else like this", or "next" to move through the feed by voice. Swipes keep working under the conversation; a page change injects the new card's brief so the model tracks the screen.
+
+**Tools are the corpus API.** Four function tools, no LLM on the path, < 150 ms: `get_repo` (everything about any repo), `find_repos` (search), `next_card`, `react` (like / skip / save by voice). Same read API the feed uses — voice is a thin client, as designed.
+
+**Cost is bounded.** Sessions end after 30 s of silence. Audio is $32 / $64 per M tokens in / out, so a 3-minute conversation is ~$0.20; the 3k-token context is cached at $0.40 / M on reconnect. `gpt-realtime-2.1-mini` is a drop-in if quality allows.
+
 ## Key decisions and tradeoffs
 
 | Decision | Why | Cost |

@@ -165,7 +165,12 @@ export function useVoice(handlers: VoiceHandlers) {
         method: "POST", body: offer.sdp,
         headers: { Authorization: `Bearer ${sess.secret}`, "Content-Type": "application/sdp" },
       });
-      if (!sdp.ok) throw new Error(`realtime ${sdp.status}`);
+      if (!sdp.ok) {
+        const body = await sdp.text().catch(() => "");
+        let msg = `realtime ${sdp.status}`;
+        try { msg = (JSON.parse(body) as { error?: { message?: string } }).error?.message ?? msg; } catch { if (body) msg = `${msg}: ${body.slice(0, 160)}`; }
+        throw new Error(msg);
+      }
       await p.setRemoteDescription({ type: "answer", sdp: await sdp.text() });
     } catch (e) {
       stop((e as Error).message === "Permission denied" || (e as Error).name === "NotAllowedError" ? "microphone blocked" : (e as Error).message);

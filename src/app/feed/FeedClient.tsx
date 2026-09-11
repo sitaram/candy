@@ -5,6 +5,7 @@ import { flushSync } from "react-dom";
 import type { Feed, FeedItem } from "@/lib/user/feed";
 import type { Action, Reaction } from "@/lib/user/state";
 import { Detail } from "./Detail";
+import { useVoice } from "./useVoice";
 import "./feed.css";
 
 type Decision = "like" | "skip";
@@ -68,10 +69,10 @@ function splitWhy(why: string[]): { fit: string | null; rest: string[] } {
 }
 
 function Card({
-  f, style, className, debug, saved, reaction, onSave, onOpen, onVoice,
+  f, style, className, debug, saved, reaction, onSave, onOpen, onVoice, voice,
 }: {
   f: FeedItem; style?: CSSProperties; className?: string; debug?: boolean; saved?: boolean; reaction?: Decision;
-  onSave?: () => void; onOpen?: () => void; onVoice?: () => void;
+  onSave?: () => void; onOpen?: () => void; onVoice?: () => void; voice?: { state: string; level: number };
 }) {
   const c = f.item.card;
   const r = f.item.repo;
@@ -141,7 +142,10 @@ function Card({
 
       <div className="fcard-actions" onPointerDown={stop}>
         <button className="act dive" onClick={onOpen} aria-label="Deep dive" title="Deep dive (enter, or tap the card)">{I.open}</button>
-        <button className="act voice" onClick={(e) => { e.stopPropagation(); onVoice?.(); }} aria-label="Talk about this (coming soon)" title="Talk about this — coming soon">{I.voice}</button>
+        <button className={`act voice${voice && voice.state !== "idle" ? ` on ${voice.state}` : ""}`} style={{ "--lvl": voice?.level ?? 0 } as CSSProperties}
+          onClick={(e) => { e.stopPropagation(); onVoice?.(); }} aria-label={voice && voice.state !== "idle" ? "End conversation" : "Talk about this"} title="Talk about this (v)">
+          {voice && voice.state !== "idle" ? <span className="bars" aria-hidden><i /><i /><i /><i /><i /></span> : I.voice}
+        </button>
       </div>
       <div className="stamp like">YES</div>
       <div className="stamp skip">NOPE</div>
@@ -167,6 +171,7 @@ function Splash({ style, onStart }: { style?: CSSProperties; onStart: () => void
             <div><b>↑</b><span>next</span></div>
             <div><b>↓</b><span>back</span></div>
             <div><b>tap</b><span>deep dive</span></div>
+          <div><b>talk</b><span>voice</span></div>
           </div>
           <div className="sp-row">
             <span className="sp-rowlabel">decide</span>
@@ -200,7 +205,6 @@ export function FeedClient() {
   const [debug, setDebug] = useState(false);
   const [vh, setVh] = useState(800);
   const [hinting, setHinting] = useState(false);
-  const [voiceNote, setVoiceNote] = useState(false);
   const lastTouch = useRef(Date.now());
   const peekDown = useRef<{ x: number; y: number } | null>(null);
   const seenRef = useRef<Set<string>>(new Set());
@@ -364,6 +368,50 @@ export function FeedClient() {
     void post(id, was ? "unsave" : "save");
   }, [saved]);
 
+  /* ---- voice: realtime conversation about the card on screen ---- */
+  const idxRef = useRef(idx); idxRef.current = idx;
+  const itemsRef = useRef(items); itemsRef.current = items;
+  const briefOf = useCallback(async (f: FeedItem | undefined) => {
+    if (!f) return null;
+    const q = new URLSearchParams({ id: f.id }); for (const w of f.why) q.append("why", w);
+    const r = await fetch(`/api/voice/brief?${q}`);
+    return r.ok ? ((await r.json()) as { brief: string }).brief : null;
+  }, []);
+  const voice = useVoice({
+    onNextCard: async () => {
+      const to = idxRef.current + 1;
+      if (to >= itemsRef.current.length) return null;
+      go(to);
+      await new Promise((r) => setTimeout(r, 120));
+      return briefOf(itemsRef.current[to]);
+    },
+    onReact: async (kind) => {
+      const f = itemsRef.current[idxRef.current];
+      if (!f) return "No card on screen.";
+      if (kind === "save") { if (!saved.has(f.id)) toggleSave(f.id); return `Saved ${f.id.split("/")[1]}.`; }
+      decide(kind);
+      await new Promise((r) => setTimeout(r, 450));
+      const nxt = itemsRef.current[idxRef.current];
+      const b = await briefOf(nxt);
+      return `${kind === "like" ? "Liked" : "Skipped"} ${f.id.split("/")[1]}.${b ? `\n${b}` : "\nNo more cards."}`;
+    },
+  });
+  const toggleVoice = useCallback(() => {
+    if (voice.active) voice.stop();
+    else if (cur) void voice.start(cur.id, cur.why);
+  }, [voice, cur]);
+  // Swiping while talking: tell the model what's on screen now (but not for tool-driven changes, which return the brief themselves).
+  const voiceCardId = useRef<string | null>(null);
+  useEffect(() => {
+    if (!voice.active || !cur) { voiceCardId.current = cur?.id ?? null; return; }
+    if (voiceCardId.current === null) { voiceCardId.current = cur.id; return; }   // session just started on this card
+    if (voiceCardId.current === cur.id) return;
+    voiceCardId.current = cur.id;
+    const t = setTimeout(async () => { const b = await briefOf(cur); if (b) voice.inject(b, false); }, 300);
+    return () => clearTimeout(t);
+  }, [cur, voice.active, voice, briefOf]);
+  useEffect(() => { if (!voice.active) voiceCardId.current = null; }, [voice.active]);
+
   /* ---- pointer: lock to an axis after a few px; x decides, y pages ---- */
   const onDown = (e: RPointerEvent<HTMLDivElement>) => {
     lastTouch.current = Date.now();
@@ -415,13 +463,14 @@ export function FeedClient() {
       else if (e.key === "ArrowDown" || e.key === "k") go(idx - 1);
       else if (e.key === "Enter" && cur) openDetail(cur.id);
       else if (e.key === "b" && cur) toggleSave(cur.id);
+      else if (e.key === "v" && cur) toggleVoice();
       else if (e.key === "z" && undo) doUndo();
       else return;
       e.preventDefault();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [cur, idx, open, undo, decide, go, openDetail, closeDetail, toggleSave, doUndo]);
+  }, [cur, idx, open, undo, decide, go, openDetail, closeDetail, toggleSave, doUndo, toggleVoice]);
 
   /* ---- layout: three cards on a vertical rail, current one also follows x ---- */
   const dX = drag.active && drag.axis === "x" ? drag.dx : 0;
@@ -492,7 +541,7 @@ export function FeedClient() {
                 {cur ? (
                   <Card key={cur.id} f={cur} style={curStyle} debug={debug} saved={saved.has(cur.id)} reaction={reacted.current.get(cur.id)}
                     onSave={() => toggleSave(cur.id)} onOpen={() => openDetail(cur.id)}
-                    onVoice={() => { setVoiceNote(true); setTimeout(() => setVoiceNote(false), 2200); }} />
+                    onVoice={toggleVoice} voice={{ state: voice.state, level: voice.level }} />
                 ) : (
                   <Splash style={curStyle} onStart={() => go(0)} />
                 )}
@@ -504,14 +553,15 @@ export function FeedClient() {
               )}
             </div>
           )}
-          {voiceNote && !undo && <div className="toast">Voice is next. For now, tap the card to read.</div>}
+          {voice.error && <div className="toast err">{voice.error}<button onClick={() => voice.stop()}>ok</button></div>}
+          {voice.active && voice.transcript && !undo && <div className="toast voice">{voice.transcript}</div>}
           {undo && (
             <div className="toast">
               {undo.kind === "like" ? "Marked interesting" : "Skipped"} <b>{undo.item.id.split("/")[1]}</b>
               <button onClick={doUndo}>undo</button>
             </div>
           )}
-          <div className="keyhints">← pass · → like · ↑ ↓ browse · enter deep dive · b bookmark · z undo</div>
+          <div className="keyhints">← pass · → like · ↑ ↓ browse · enter deep dive · v voice · b bookmark · z undo</div>
         </div>
 
         {open && (

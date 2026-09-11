@@ -1,3 +1,4 @@
+import { getCards } from "@/lib/enrich";
 import { corpusIds, getRepos, stats } from "@/lib/store/corpus";
 import { K } from "@/lib/store/keys";
 import { redis } from "@/lib/store/redis";
@@ -5,7 +6,8 @@ import type { Repo } from "@/lib/store/types";
 
 export const dynamic = "force-dynamic";
 
-type Sort = "priority" | "velocity" | "released" | "stars";
+type Sort = "interest" | "velocity" | "released" | "priority" | "stars";
+const SORTS: Sort[] = ["interest", "velocity", "released", "priority", "stars"];
 
 function fmt(n?: number): string {
   if (!n) return "";
@@ -15,23 +17,35 @@ function fmt(n?: number): string {
 function ago(iso: string): string {
   if (!iso) return "";
   const h = (Date.now() - Date.parse(iso)) / 36e5;
-  if (h < 24) return `${Math.round(h)}h ago`;
-  if (h < 24 * 30) return `${Math.round(h / 24)}d ago`;
-  return `${Math.round(h / 24 / 30)}mo ago`;
+  if (h < 24) return `${Math.round(h)}h`;
+  if (h < 24 * 30) return `${Math.round(h / 24)}d`;
+  return `${Math.round(h / 24 / 30)}mo`;
 }
 
-export default async function Home({ searchParams }: { searchParams: Promise<{ sort?: string }> }) {
-  const { sort: s } = await searchParams;
-  const sort = (["priority", "velocity", "released", "stars"].includes(s ?? "") ? s : "priority") as Sort;
+export default async function Home({ searchParams }: { searchParams: Promise<{ sort?: string; cards?: string }> }) {
+  const sp = await searchParams;
+  const sort = (SORTS.includes(sp.sort as Sort) ? sp.sort : "interest") as Sort;
+  const onlyCards = sp.cards !== "0";
 
   const ids = await corpusIds();
-  const [repos, prio, st] = await Promise.all([getRepos(ids), redis().zmscore(K.frontier, ...(ids.length ? ids : ["-"])), stats()]);
+  const r = redis();
+  const [repos, cards, prio, st] = await Promise.all([
+    getRepos(ids),
+    getCards(ids),
+    r.zmscore(K.frontier, ...(ids.length ? ids : ["-"])),
+    stats(),
+  ]);
   const prioById = new Map(ids.map((id, i) => [id, Number(prio[i] ?? 0)]));
-  const tagsRes = await redis().pipeline(ids.map((id) => ["smembers", K.tags(id)])).exec();
-  const tagsById = new Map(ids.map((id, i) => [id, ((tagsRes?.[i]?.[1] as string[]) ?? []).filter((t) => t.startsWith("src:") || t.startsWith("awesome:"))]));
+  const tagsRes = await r.pipeline(ids.map((id) => ["smembers", K.tags(id)])).exec();
+  const srcById = new Map(
+    ids.map((id, i) => [id, ((tagsRes?.[i]?.[1] as string[]) ?? []).filter((t) => t.startsWith("src:")).map((t) => t.slice(4))]),
+  );
 
-  const sorted = [...repos].sort((a, b) => {
+  const shown = onlyCards ? repos.filter((x) => cards.has(x.id)) : repos;
+  const sorted = [...shown].sort((a, b) => {
     switch (sort) {
+      case "interest":
+        return (cards.get(b.id)?.interest ?? -1) - (cards.get(a.id)?.interest ?? -1) || b.starsPerDay - a.starsPerDay;
       case "velocity":
         return b.starsPerDay - a.starsPerDay;
       case "released":
@@ -43,48 +57,62 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ s
     }
   });
 
-  const sorts: Sort[] = ["priority", "velocity", "released", "stars"];
-
   return (
     <main>
       <h1>candy</h1>
       <div className="meta">
-        corpus {st.corpus} · frontier {st.frontier} · discovered {st.discovered}
-        {!st.corpus && " — run `pnpm discover` then `pnpm crawl`"}
+        corpus {st.corpus} · cards {cards.size} · frontier {st.frontier}
+        {" · "}
+        <a href={`/?sort=${sort}&cards=${onlyCards ? "0" : "1"}`}>{onlyCards ? "show uncarded" : "cards only"}</a>
       </div>
       <nav className="tabs">
-        {sorts.map((x) => (
-          <a key={x} href={`/?sort=${x}`} className={x === sort ? "on" : ""}>
+        {SORTS.map((x) => (
+          <a key={x} href={`/?sort=${x}&cards=${onlyCards ? "1" : "0"}`} className={x === sort ? "on" : ""}>
             {x}
           </a>
         ))}
       </nav>
-      {sorted.map((it: Repo) => (
-        <a key={it.id} className="card" href={it.url} target="_blank" rel="noreferrer">
-          <div className="row">
-            <span className="title">{it.id}</span>
-            <span className="stars">
-              {fmt(it.stars)}
-              {it.starsPerDay >= 1 && ` · ${Math.round(it.starsPerDay)}/day`}
-            </span>
-          </div>
-          {it.description && <div className="desc">{it.description}</div>}
-          <div className="tags">
-            <span className="tag src">p {(prioById.get(it.id) ?? 0).toFixed(1)}</span>
-            {(tagsById.get(it.id) ?? []).map((t) => (
-              <span key={t} className="tag src">{t.replace("awesome:", "★ ").replace("src:", "")}</span>
-            ))}
-            {it.language && <span className="tag">{it.language}</span>}
-            {it.license && <span className="tag">{it.license}</span>}
-            {it.latestRelease && <span className="tag">{it.latestRelease} · {ago(it.latestReleaseAt)}</span>}
-            {it.pushedAt && <span className="tag">pushed {ago(it.pushedAt)}</span>}
-            {it.depCount > 0 && <span className="tag">{it.depCount} deps</span>}
-            {it.topics.slice(0, 4).map((tp) => (
-              <span key={tp} className="tag">{tp}</span>
-            ))}
-          </div>
-        </a>
-      ))}
+      {sorted.map((it: Repo) => {
+        const c = cards.get(it.id);
+        return (
+          <a key={it.id} className={`card${c?.flags.length ? " flagged" : ""}`} href={it.url} target="_blank" rel="noreferrer">
+            <div className="row">
+              <span className="title">
+                {c && <span className={`score s${c.interest}`}>{c.interest}</span>}
+                {it.id}
+              </span>
+              <span className="stars">
+                {fmt(it.stars)}
+                {it.starsPerDay >= 1 && ` · ${Math.round(it.starsPerDay)}/d`}
+              </span>
+            </div>
+            {c ? (
+              <>
+                <div className="pitch">{c.pitch}</div>
+                <div className="why">{c.whyCare}</div>
+              </>
+            ) : (
+              it.description && <div className="desc">{it.description}</div>
+            )}
+            <div className="tags">
+              {c && <span className="tag cat">{c.category}</span>}
+              {c && c.hook !== "none" && <span className="tag hook">{c.hook}</span>}
+              {c && <span className="tag">{c.maturity}</span>}
+              {c?.flags.map((f) => (
+                <span key={f} className="tag flag">⚑ {f}</span>
+              ))}
+              {(srcById.get(it.id) ?? []).map((s) => (
+                <span key={s} className="tag src">{s}</span>
+              ))}
+              {it.language && <span className="tag">{it.language}</span>}
+              {it.latestRelease && <span className="tag">{it.latestRelease} · {ago(it.latestReleaseAt)}</span>}
+              {c?.tags.slice(0, 5).map((t) => (
+                <span key={t} className="tag">{t}</span>
+              ))}
+            </div>
+          </a>
+        );
+      })}
     </main>
   );
 }

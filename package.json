@@ -10,9 +10,11 @@
     "typecheck": "tsc --noEmit",
     "discover": "node --env-file-if-exists=.env.local --import tsx scripts/discover.mts",
     "crawl": "node --env-file-if-exists=.env.local --import tsx scripts/crawl.mts",
-    "stats": "node --env-file-if-exists=.env.local --import tsx scripts/stats.mts"
+    "stats": "node --env-file-if-exists=.env.local --import tsx scripts/stats.mts",
+    "enrich": "node --env-file-if-exists=.env.local --import tsx scripts/enrich.mts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.124.0",
     "ioredis": "^6.0.0",
     "next": "^15",
     "react": "^19",

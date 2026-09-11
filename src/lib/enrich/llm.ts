@@ -96,6 +96,7 @@ export function normalizeCard(raw: Record<string, unknown>): Card {
     return [];
   };
   const str = (v: unknown, d = ""): string => (typeof v === "string" ? v : d);
+  const oneOf = <T extends string>(v: unknown, allowed: readonly T[], d: T): T => (allowed.includes(v as T) ? (v as T) : d);
   const num = (v: unknown, d = 0): number => (typeof v === "number" && Number.isFinite(v) ? v : Number(v) || d);
   const flags = arr(raw.flags).filter((f): f is Card["flags"][number] =>
     ["spam-suspect", "star-farm-suspect", "no-substance", "non-english", "abandoned", "fork-of-known", "ai-slop"].includes(f),
@@ -108,11 +109,11 @@ export function normalizeCard(raw: Record<string, unknown>): Card {
     tags: arr(raw.tags).map((t) => t.toLowerCase()),
     audience: arr(raw.audience),
     ecosystem: arr(raw.ecosystem).map((t) => t.toLowerCase()),
-    maturity: str(raw.maturity, "usable") as Card["maturity"],
-    kind: str(raw.kind, "other") as Card["kind"],
+    maturity: oneOf(raw.maturity, ["experiment", "early", "usable", "mature", "legacy"] as const, "usable"),
+    kind: oneOf(raw.kind, ["library", "framework", "app", "cli", "service", "model", "dataset", "list", "tutorial", "config", "plugin", "other"] as const, "other"),
     alternatives: arr(raw.alternatives),
     buildsOn: arr(raw.buildsOn),
-    hook: str(raw.hook, "none") as Card["hook"],
+    hook: oneOf(raw.hook, ["new-project", "major-release", "big-org", "viral", "license-change", "novel-approach", "fills-gap", "none"] as const, "none"),
     interest: Math.max(0, Math.min(10, Math.round(num(raw.interest)))),
     flags,
     lang: str(raw.lang, "en"),

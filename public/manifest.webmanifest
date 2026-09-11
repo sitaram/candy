@@ -2,7 +2,7 @@
   "name": "candy",
   "short_name": "candy",
   "description": "Keep up with open source in 10 minutes a day.",
-  "start_url": "/feed",
+  "start_url": "/",
   "display": "standalone",
   "background_color": "#0e0e10",
   "theme_color": "#0e0e10",

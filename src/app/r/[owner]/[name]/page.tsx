@@ -25,7 +25,7 @@ export default async function RepoPage({ params }: { params: Promise<{ owner: st
 
   return (
     <main>
-      <div className="meta"><a href="/">← candy</a></div>
+      <div className="meta"><a href="/">← candy</a> · <a href="/browse">browse</a></div>
       <h1>
         {c && <span className={`score s${c.interest}`}>{c.interest}</span>}
         <a href={r.url} target="_blank" rel="noreferrer">{r.id}</a>

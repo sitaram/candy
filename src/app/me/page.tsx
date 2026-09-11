@@ -12,7 +12,7 @@ export default async function MePage() {
 
   return (
     <main>
-      <div className="meta"><a href="/feed">← feed</a> · <a href="/">browse</a></div>
+      <div className="meta"><a href="/">← feed</a> · <a href="/browse">browse</a></div>
       <h1>you</h1>
       <div className="meta">
         {m.reactions} reactions · {m.counts.like} liked · {m.counts.save} saved · {m.counts.dive} dives · {m.counts.skip} skipped · {m.seen} seen
@@ -20,7 +20,7 @@ export default async function MePage() {
 
       <h3>Interests (learned)</h3>
       {m.topTerms.length === 0 ? (
-        <p className="kv">Nothing yet. React in the <a href="/feed">feed</a>.</p>
+        <p className="kv">Nothing yet. React in the <a href="/">feed</a>.</p>
       ) : (
         <div className="tags">
           {m.topTerms.map((t) => (

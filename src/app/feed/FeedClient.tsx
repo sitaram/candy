@@ -402,7 +402,7 @@ export function FeedClient() {
       <div className="deck-wrap">
         <div className="deck">
           {loading && <div className="feed-empty">loading…</div>}
-          {!loading && !intro && !cur && <div className="feed-empty">You’ve seen everything ranked for you today.<br /><a href="/">Browse the corpus</a> or come back tomorrow.</div>}
+          {!loading && !intro && !cur && <div className="feed-empty">You’ve seen everything ranked for you today.<br /><a href="/browse">Browse the corpus</a> or come back tomorrow.</div>}
           {!loading && (cur || intro) && (
             <div className="stack" ref={stackRef}>
               {idx === 0 && <Splash style={prevStyle} onStart={() => {}} />}

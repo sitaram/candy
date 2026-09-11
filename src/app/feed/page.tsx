@@ -1,7 +1,6 @@
-import { FeedClient } from "./FeedClient";
+import { redirect } from "next/navigation";
 
-export const dynamic = "force-dynamic";
-
-export default function FeedPage() {
-  return <FeedClient />;
+/** The feed now lives at /. Keep old links working. */
+export default function FeedRedirect() {
+  redirect("/");
 }

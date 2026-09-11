@@ -6,10 +6,13 @@
 
 ## What is novel
 
-- **The product is the corpus, not the UI.** A shared knowledge base of repos, crawled once and served to every user and every interface. Feed, voice, and future newsletters are thin clients over one read API.
-- **Structured cards, not summaries.** An LLM reads each repo once and emits typed metadata: pitch, why-care, voice script, category, maturity, hook (major release / big org / viral / license change), alternatives, interest 0–10, spam flags. Ranking, explanation, and voice all read the same fields. Nothing is generated on the hot path.
-- **Coverage by tier.** Head exhaustively, niches on expansion, tail on demand. A niche (e.g. *voice*) is seeded from topics and awesome lists, expanded two hops through links and named alternatives, and stored as a collection. Anything anyone asks about is fetched and carded in ~5 s and stays forever.
-- **Explainable ranking.** `score = interest × fit × recency × social`, each term a stored field, so every card carries a human-readable `why[]` — which is also the voice script.
+GitHub knows *what* a repo is. Nobody has built the layer that knows **why it matters, to whom, and what it relates to** — and that layer is the product.
+
+- **Signal fusion across sources that never meet.** GitHub search and topics; the repo itself (README, manifest, releases, license); social (Hacker News, Lobsters, points and comment counts); curated (8 newsletters, 20+ awesome lists); and the crawl's own graph (README links). Each source is a weak, biased signal; a repo seen by three of them is a strong one. Trending pages have one source. We have six, with provenance kept per item.
+- **Interestingness as first-class, typed metadata.** Not a summary — a schema of *reasons*: momentum (stars/day from snapshots), event (major release, license change, first HN thread), provenance (big org, known author), novelty vs. neighbors, maturity, audience, and spam/star-farm/AI-slop flags. An LLM extracts these once per repo into a fixed schema; every downstream surface ranks and explains from the same fields. The signals a human uses to judge "worth my time" become columns.
+- **A graph, not a list.** Edges from five independent mechanisms: dependencies (manifests), README links, LLM-named alternatives and builds-on, awesome-list co-membership, HN co-mention. This is what makes "alternatives to this," "what else is like this," and niche exploration answerable — and what connects a 150★ repo to the 5k★ repos that depend on it.
+- **Coverage by tier.** Head exhaustively, niches on expansion, tail on demand. A niche (e.g. *voice*) is seeded from topics and awesome lists, expanded through the graph, and kept as a collection. Anything anyone asks about is fetched, extracted, and carded in ~5 s and stays forever. Depth follows attention.
+- **Crawl once, serve everyone; explain everything.** One corpus, many interfaces (feed, voice, newsletter). Ranking is `interest × fit × recency × social` over stored fields, so every item carries a `why[]` — and that explanation *is* the voice script.
 
 ## Key decisions and tradeoffs
 

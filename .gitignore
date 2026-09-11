@@ -43,5 +43,5 @@ next-env.d.ts
 .env*.local
 
 # candy
-/data/*.json
+/data/
 /logs

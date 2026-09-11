@@ -8,9 +8,20 @@
 
 GitHub knows *what* a repo is. Nobody has built the layer that knows **why it matters, to whom, and what it relates to** — and that layer is the product.
 
-- **Signal fusion.** Six sources that never meet: GitHub search and topics, the repo itself (README, manifest, releases), Hacker News and Lobsters, 8 newsletters, 20+ awesome lists, and the crawl's own link graph. Each is a weak, biased signal; a repo seen by three of them is a strong one. Trending pages have one source. Today 30 % of the corpus is multi-source and 13 % has a live human endorsement (HN, newsletter); the machine sources still outnumber the human ones 6:1, so widening means more *humans*, not more GitHub.
+- **Signal fusion.** Six sources that never meet, each a weak, biased signal; a repo seen by three of them is a strong one. Trending pages have one source. What the crawl has actually pulled, as of this writing:
+
+  | Source | Objects fetched | What it contributes |
+  |---|---|---|
+  | GitHub search (2 rolling queries) + 19 topic pages | 21,935 repos discovered, 865 fetched with README, manifest, and 4,761 releases | The universe: momentum, age, activity |
+  | Hacker News (front page, Show HN, best) | 70 stories linking to repos in the corpus | Live peer endorsement; a first-thread event |
+  | 8 newsletters (Changelog, TLDR, Console, GitHub blog, dev.to, …) | 87 issues mentioning corpus repos | Editorial curation, weekly cadence |
+  | 20 Awesome lists + 5 niche lists | 275 corpus repos placed in a human-made taxonomy | Slow, high-precision "this is the canon" signal |
+  | Lobsters | 2 | Wired, tiny; kept for the tail |
+  | The crawl itself | 3,524 README→repo links between corpus repos | Related-project graph; the tail finds itself |
+
+  Result: 842 carded repos, 30 % of them multi-source, 13 % with a live human endorsement. Machine sources outnumber human ones 6:1, so widening means more *humans* (more newsletters, Reddit via RSS), not more GitHub.
 - **Interestingness as typed metadata.** Not a summary — a schema of *reasons*: momentum, event (release, license change, first HN thread), provenance (big org, known author), novelty, maturity, audience, spam flags. Extracted once per repo; every surface ranks and explains from the same fields. The signals a human uses to judge "worth my time" become columns.
-- **A graph, not a list.** Five independent edge types: dependencies, README links, named alternatives, awesome-list co-membership, HN co-mention. Makes "alternatives to this" answerable, and connects a 150★ repo to the 5k★ repos that depend on it.
+- **A graph, not a list.** README links are materialized today (3,524 edges); named alternatives live on the card and are resolved at read time. Dependency edges, awesome-list co-membership, and HN co-mention are the next three, in that order. The point is to make "alternatives to this" and "what depends on this" answerable, so a 150★ repo connects to the 5k★ repos that use it.
 - **Coverage by tier.** Head exhaustively, niches on expansion, tail on demand. A niche like *voice* is seeded from topics and awesome lists and grown through the graph. Anything anyone asks about is carded in ~5 s and stays forever. Depth follows attention.
 - **Crawl once, serve everyone, explain everything.** One corpus; feed, voice, and newsletter are thin clients. Ranking is `interest × fit × recency × social` over stored fields, so every item carries a `why[]` — which *is* the voice script.
 - **Two swipe grammars on one deck.** Up/down pages through cards like TikTok — browse, go back, no judgment. Left/right decides like Tinder — like or pass, and the next card rises. Nobody combines them: TikTok has no "no", Tinder has no "back". Together, browsing is free and deciding is cheap.

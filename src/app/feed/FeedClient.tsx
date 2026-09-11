@@ -163,7 +163,7 @@ function Splash({ style, onStart }: { style?: CSSProperties; onStart: () => void
         <div className="sp-line">Open source worth your time.</div>
         <p className="sp-how">
           What’s moving, launching, or quietly becoming the standard — picked for you, and each card
-          says why. Ten minutes a day, and you stop finding out last.
+          says why. Ten minutes a day keeps you ahead of the field.
         </p>
         <div className="sp-grid">
           <div><b>↑ ↓</b><span>browse</span></div>
@@ -171,12 +171,9 @@ function Splash({ style, onStart }: { style?: CSSProperties; onStart: () => void
           <div><b>tap</b><span>deep dive</span></div>
           <div><b>talk</b><span>ask about it</span></div>
         </div>
-        <div className="sp-learn">It learns from every swipe.</div>
+        <div className="sp-learn">It learns from every swipe. <a className="sp-more" href="/about" onPointerDown={stop}>How it works →</a></div>
       </div>
-      <div className="sp-foot">
-        <button className="sp-start" onClick={onStart}><span className="sp-arrow">↑</span>swipe up to start</button>
-        <a className="sp-more" href="/about" onPointerDown={stop}>how it works →</a>
-      </div>
+      <button className="sp-start" onClick={onStart}><span className="sp-arrow">↑</span>swipe up to start</button>
     </section>
   );
 }

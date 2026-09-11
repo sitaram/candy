@@ -142,7 +142,7 @@
 .icon-btn.bm.on { color: #e6b422; }
 
 /* splash — page −1 */
-.fcard.splash { justify-content: space-between; align-items: center; text-align: center; padding-bottom: calc(18px + env(safe-area-inset-bottom)); --hue: 268; --hue2: 205; }
+.fcard.splash { justify-content: space-between; align-items: center; text-align: center; padding-bottom: calc(24px + env(safe-area-inset-bottom)); --hue: 268; --hue2: 205; }
 .sp-mid { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 14px; width: 100%; max-width: 380px; padding-bottom: 6vh; }
 .sp-brand { font-family: var(--font-display); font-weight: 900; font-size: clamp(56px, 18vw, 84px); letter-spacing: -.05em; line-height: 1; color: var(--ink); }
 .sp-line { font-family: var(--font-display); font-size: clamp(20px, 5.6vw, 25px); font-weight: 700; letter-spacing: -.02em; color: var(--ink); margin-top: -4px; }
@@ -156,13 +156,13 @@
 .sp-grid b .pk { color: var(--skip); }
 .sp-grid span { font-size: 12.5px; color: var(--ink-3); white-space: nowrap; }
 .sp-learn { font-size: 13px; color: var(--ink-3); margin-top: 2px; }
+.sp-learn .sp-more { margin-left: 4px; padding: 0; }
 
-.sp-foot { display: flex; flex-direction: column; align-items: center; gap: 6px; }
-.sp-start { background: none; border: none; color: var(--ink-2); font: inherit; font-size: 14px; font-weight: 600; letter-spacing: .04em; display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer; padding: 8px 16px 4px; }
+.sp-start { background: none; border: none; color: var(--ink-2); font: inherit; font-size: 14px; font-weight: 600; letter-spacing: .04em; display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer; padding: 8px 16px; }
 .sp-arrow { font-size: 22px; animation: bob 1.4s ease-in-out infinite; }
 @keyframes bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-7px); } }
-.sp-more { font-size: 13px; color: var(--accent); text-decoration: none; font-weight: 600; white-space: nowrap; padding: 4px 8px; }
-.fcard.splash.rail .sp-foot { visibility: hidden; }
+.sp-more { font-size: 13px; color: var(--accent); text-decoration: none; font-weight: 600; white-space: nowrap; }
+.fcard.splash.rail .sp-start { visibility: hidden; }
 
 /* swipe feedback */
 .drag-layer::after { content: ""; position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity .1s; }

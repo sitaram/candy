@@ -162,27 +162,21 @@ function Splash({ style, onStart }: { style?: CSSProperties; onStart: () => void
         <div className="sp-brand">candy</div>
         <div className="sp-line">Open source worth your time.</div>
         <p className="sp-how">
-          The projects moving fastest, launching, or quietly becoming the standard — picked for you and
-          explained. <b>Every card says why it’s here.</b> Ten minutes a day, and you stop finding out last.
+          What’s moving, launching, or quietly becoming the standard — picked for you, and each card
+          says why. Ten minutes a day, and you stop finding out last.
         </p>
-        <div className="sp-ops">
-          <div className="sp-row">
-            <span className="sp-rowlabel">browse</span>
-            <div><b>↑</b><span>next</span></div>
-            <div><b>↓</b><span>back</span></div>
-            <div><b>tap</b><span>deep dive</span></div>
-          <div><b>talk</b><span>voice</span></div>
-          </div>
-          <div className="sp-row">
-            <span className="sp-rowlabel">decide</span>
-            <div className="like"><b>→</b><span>like</span></div>
-            <div className="pass"><b>←</b><span>pass</span></div>
-            <span className="sp-learn">it learns from every one</span>
-          </div>
+        <div className="sp-grid">
+          <div><b>↑ ↓</b><span>browse</span></div>
+          <div><b><i className="lk">→</i> <i className="pk">←</i></b><span>like · pass</span></div>
+          <div><b>tap</b><span>deep dive</span></div>
+          <div><b>talk</b><span>ask about it</span></div>
         </div>
+        <div className="sp-learn">It learns from every swipe.</div>
       </div>
-      <button className="sp-start" onClick={onStart}><span className="sp-arrow">↑</span>swipe up to start</button>
-      <a className="sp-more" href="/about" onPointerDown={stop}>how it works →</a>
+      <div className="sp-foot">
+        <button className="sp-start" onClick={onStart}><span className="sp-arrow">↑</span>swipe up to start</button>
+        <a className="sp-more" href="/about" onPointerDown={stop}>how it works →</a>
+      </div>
     </section>
   );
 }

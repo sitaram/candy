@@ -6,13 +6,14 @@
  * u:{uid}:tastew    STRING   total |weight| behind the taste vector
  *
  * The term-vector profile stays the source of *reasons*; this is the source of *score*.
- * text-embedding-3-small: 1536 dims, ~$0.02 per 1M tokens — a card is ~120 tokens.
+ * voyage-3-lite: 512 dims, 200M free tokens, then $0.02 per 1M — a card is ~120 tokens.
+ * Documents are embedded with input_type "document"; a future query path should use "query".
  */
 import { redis } from "../store/redis";
 import type { Item } from "../corpus/api";
 
-export const DIM = 1536;
-const MODEL = "text-embedding-3-small";
+export const DIM = 512;
+const MODEL = "voyage-3-lite";
 
 export const EK = {
   emb: (id: string) => `emb:${id}`,
@@ -34,13 +35,13 @@ export function cardText(it: Item): string {
   ].filter(Boolean).join("\n");
 }
 
-export async function embedTexts(texts: string[]): Promise<Float32Array[]> {
-  const key = process.env.OPENAI_API_KEY;
-  if (!key) throw new Error("OPENAI_API_KEY missing");
-  const res = await fetch("https://api.openai.com/v1/embeddings", {
+export async function embedTexts(texts: string[], inputType: "document" | "query" = "document"): Promise<Float32Array[]> {
+  const key = process.env.VOYAGE_API_KEY;
+  if (!key) throw new Error("VOYAGE_API_KEY missing");
+  const res = await fetch("https://api.voyageai.com/v1/embeddings", {
     method: "POST",
     headers: { "content-type": "application/json", authorization: `Bearer ${key}` },
-    body: JSON.stringify({ model: MODEL, input: texts, encoding_format: "float" }),
+    body: JSON.stringify({ model: MODEL, input: texts, input_type: inputType, truncation: true }),
   });
   if (!res.ok) throw new Error(`embeddings ${res.status}: ${(await res.text()).slice(0, 200)}`);
   const j = (await res.json()) as { data: { index: number; embedding: number[] }[] };

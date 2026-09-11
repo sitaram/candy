@@ -111,14 +111,16 @@ export interface RankOpts {
 }
 
 /**
- * Taste fit from embeddings, in [-0.5, 1]. Cosine between unit vectors is ~[0.15, 0.6] for
- * card text, so center at the corpus mean-ish (0.3) and scale. Confidence ramps with |weight|
- * so the first swipe does not swing the whole feed.
+ * Taste fit from embeddings, in [-0.5, 1]. Cosine between unrelated cards is not 0 — it sits at
+ * the corpus median — so center there and scale so the p99 pair reads ~1. `pnpm embed` prints
+ * the corpus percentiles; update CENTER/SPAN if they drift. Confidence ramps with |weight| so the
+ * first swipe does not swing the whole feed.
  */
+const CENTER = 0.3, SPAN = 0.25;
 export function tasteFit(v: Float32Array | undefined, taste: Taste | null | undefined): number {
   if (!v || !taste || taste.w <= 0) return 0;
   const cos = dot(v, taste.v);
-  const centered = (cos - 0.3) * 4;            // 0.3 → 0, 0.55 → 1, 0.175 → -0.5
+  const centered = (cos - CENTER) / SPAN;
   const conf = Math.min(1, taste.w / 6);        // full weight after ~6 reactions
   return Math.max(-0.5, Math.min(1, centered)) * conf;
 }

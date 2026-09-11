@@ -8,13 +8,13 @@
 
 GitHub knows *what* a repo is. Nobody has built the layer that knows **why it matters, to whom, and what it relates to** — and that layer is the product.
 
-- **Signal fusion.** Six sources that never meet: GitHub search and topics, the repo itself (README, manifest, releases), Hacker News and Lobsters, 8 newsletters, 20+ awesome lists, and the crawl's own link graph. Each is a weak, biased signal; a repo seen by three of them is a strong one. Trending pages have one source.
+- **Signal fusion.** Six sources that never meet: GitHub search and topics, the repo itself (README, manifest, releases), Hacker News and Lobsters, 8 newsletters, 20+ awesome lists, and the crawl's own link graph. Each is a weak, biased signal; a repo seen by three of them is a strong one. Trending pages have one source. Today 30 % of the corpus is multi-source and 13 % has a live human endorsement (HN, newsletter); the machine sources still outnumber the human ones 6:1, so widening means more *humans*, not more GitHub.
 - **Interestingness as typed metadata.** Not a summary — a schema of *reasons*: momentum, event (release, license change, first HN thread), provenance (big org, known author), novelty, maturity, audience, spam flags. Extracted once per repo; every surface ranks and explains from the same fields. The signals a human uses to judge "worth my time" become columns.
 - **A graph, not a list.** Five independent edge types: dependencies, README links, named alternatives, awesome-list co-membership, HN co-mention. Makes "alternatives to this" answerable, and connects a 150★ repo to the 5k★ repos that depend on it.
 - **Coverage by tier.** Head exhaustively, niches on expansion, tail on demand. A niche like *voice* is seeded from topics and awesome lists and grown through the graph. Anything anyone asks about is carded in ~5 s and stays forever. Depth follows attention.
 - **Crawl once, serve everyone, explain everything.** One corpus; feed, voice, and newsletter are thin clients. Ranking is `interest × fit × recency × social` over stored fields, so every item carries a `why[]` — which *is* the voice script.
 - **Two swipe grammars on one deck.** Up/down pages through cards like TikTok — browse, go back, no judgment. Left/right decides like Tinder — like or pass, and the next card rises. Nobody combines them: TikTok has no "no", Tinder has no "back". Together, browsing is free and deciding is cheap.
-- **Every swipe is a training example.** A thumbs decision updates the user's interest vector immediately, the next card is re-ranked against it, and the reason on that card ("matches your interest in rust, cli") is the model explaining itself. The profile is a weighted term vector over the card's own tags, so ranking and learning share one vocabulary.
+- **Every swipe is a training example — into two models at once.** A *term profile* (tags, ecosystem, category, language) that is cheap and explains itself: "matches your interest in rust, cli." And a *taste vector*: each card is embedded once, the user is a running weighted mean of what they liked minus what they passed, and fit is cosine. Terms supply the reason; the embedding supplies the score. This is what lets it tell "small sharp CLI tools" from "Rust" — a distinction no tag captures.
 
 ## Key decisions and tradeoffs
 
@@ -25,7 +25,7 @@ GitHub knows *what* a repo is. Nobody has built the layer that knows **why it ma
 | Haiku for cards, tool-use schema | $0.007/repo, schema-enforced output | Over-scores famous repos; fixed with an explicit scale in the prompt |
 | GitHub + HN + Lobsters + RSS + awesome lists as sources | All free, no scraping, complementary signals | GitHub-only universe; Hugging Face and registries are gaps |
 | Anonymous cookie user, no auth | Personalization from the first swipe | Real accounts later |
-| Term-vector profile, not embeddings | Explainable, instant, zero cost, works at 500 items | Coarse similarity; swap for embeddings behind the same `fit()` |
+| Terms *and* embeddings, blended 40/60 | Terms explain, vectors discriminate; embedding a card costs $0.000002 | Two models to keep honest; the blend weight is a guess until there is data |
 
 ## Learnings
 

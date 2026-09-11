@@ -1,4 +1,5 @@
 import { allItems, getItem, type Item } from "../corpus/api";
+import { getEmbeddings, getTaste } from "../embed";
 import { rank, type Ranked } from "./rank";
 import { getProfile, getSeen, isSaved, react as reactState, touchVisit, undo as undoState, unsave as unsaveState, type Action, UK } from "./state";
 import { redis } from "../store/redis";
@@ -27,9 +28,11 @@ export interface SinceLastVisit {
 }
 
 export async function feed(uid: string, n = 30, exclude: string[] = []): Promise<Feed> {
-  const [items, profile, seen, visit] = await Promise.all([allItems(), getProfile(uid), getSeen(uid), touchVisit(uid)]);
+  const [items, profile, seen, visit, taste] = await Promise.all([allItems(), getProfile(uid), getSeen(uid), touchVisit(uid), getTaste(uid)]);
   const ex = new Set([...seen, ...exclude]);
-  const ranked: Ranked[] = rank(items, profile, { n, exclude: ex });
+  // Only pull vectors when there is a taste to compare against (cold users rank on terms + base).
+  const vectors = taste && taste.w > 0 ? await getEmbeddings(items.filter((it) => it.card && !ex.has(it.repo.id)).map((it) => it.repo.id)) : undefined;
+  const ranked: Ranked[] = rank(items, profile, { n, exclude: ex, taste, vectors });
   const [since, saved] = await Promise.all([
     sinceLastVisit(uid, items, visit.lastVisit, profile.size ? profile : null),
     isSaved(uid, ranked.map((r) => r.item.repo.id)),

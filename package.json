@@ -16,7 +16,8 @@
     "pipeline": "node --env-file-if-exists=.env.local --import tsx scripts/pipeline.mts",
     "enrich:sample": "node --env-file-if-exists=.env.local --import tsx scripts/enrich-sample.mts",
     "niche": "node --env-file-if-exists=.env.local --import tsx scripts/niche.mts",
-    "compact": "node --env-file-if-exists=.env.local --import tsx scripts/compact.mts"
+    "compact": "node --env-file-if-exists=.env.local --import tsx scripts/compact.mts",
+    "embed": "node --env-file-if-exists=.env.local --import tsx scripts/embed.mts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.124.0",

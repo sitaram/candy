@@ -10,6 +10,7 @@
 import type Redis from "ioredis";
 import type { Item } from "../corpus/api";
 import { redis } from "../store/redis";
+import { nudgeTaste } from "../embed";
 
 export type Reaction = "like" | "skip" | "save" | "dive";
 /** Reversals. `unsave` removes a bookmark; `undo` reverts the last like/skip and un-sees the item. */
@@ -102,7 +103,7 @@ export async function react(uid: string, item: Item, kind: Reaction): Promise<vo
   writeProfile(p, uid, profile, now);
   p.hincrby(UK.meta(uid), "reactions", 1);
   p.hincrby(UK.meta(uid), `n_${kind}`, 1);
-  await p.exec();
+  await Promise.all([p.exec(), nudgeTaste(uid, id, DELTA[kind])]);
 }
 
 /** Remove a bookmark and reverse its profile contribution. */
@@ -115,7 +116,7 @@ export async function unsave(uid: string, item: Item): Promise<void> {
   p.zrem(UK.saved(uid), item.repo.id);
   writeProfile(p, uid, profile, now);
   p.hincrby(UK.meta(uid), "n_save", -1);
-  await p.exec();
+  await Promise.all([p.exec(), nudgeTaste(uid, item.repo.id, -DELTA.save)]);
 }
 
 /** Revert a like/skip: un-see the item, reverse the profile delta. */
@@ -133,7 +134,7 @@ export async function undo(uid: string, item: Item): Promise<boolean> {
   writeProfile(p, uid, profile, now);
   p.hincrby(UK.meta(uid), "reactions", -1);
   p.hincrby(UK.meta(uid), `n_${prev}`, -1);
-  await p.exec();
+  await Promise.all([p.exec(), nudgeTaste(uid, id, -DELTA[prev])]);
   return true;
 }
 

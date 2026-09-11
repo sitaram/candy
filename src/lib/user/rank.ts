@@ -5,6 +5,7 @@
  */
 import type { Item } from "../corpus/api";
 import { itemTerms, type Profile } from "./state";
+import { dot, type Taste } from "../embed";
 
 export interface Ranked {
   item: Item;
@@ -104,6 +105,22 @@ export interface RankOpts {
   n: number;
   exploreRatio?: number; // default 0.2
   exclude?: Set<string>;
+  /** Embedding side: the user's taste vector and the corpus vectors. Optional; falls back to terms alone. */
+  taste?: Taste | null;
+  vectors?: Map<string, Float32Array>;
+}
+
+/**
+ * Taste fit from embeddings, in [-0.5, 1]. Cosine between unit vectors is ~[0.15, 0.6] for
+ * card text, so center at the corpus mean-ish (0.3) and scale. Confidence ramps with |weight|
+ * so the first swipe does not swing the whole feed.
+ */
+export function tasteFit(v: Float32Array | undefined, taste: Taste | null | undefined): number {
+  if (!v || !taste || taste.w <= 0) return 0;
+  const cos = dot(v, taste.v);
+  const centered = (cos - 0.3) * 4;            // 0.3 → 0, 0.55 → 1, 0.175 → -0.5
+  const conf = Math.min(1, taste.w / 6);        // full weight after ~6 reactions
+  return Math.max(-0.5, Math.min(1, centered)) * conf;
 }
 
 export function rank(items: Item[], profile: Profile, opts: RankOpts): Ranked[] {
@@ -115,9 +132,13 @@ export function rank(items: Item[], profile: Profile, opts: RankOpts): Ranked[] 
     if (it.card.flags.some((f) => f === "spam-suspect" || f === "no-substance" || f === "star-farm-suspect")) continue;
     const b = baseScore(it);
     const f = fitScore(it, profile);
+    const t = tasteFit(opts.vectors?.get(it.repo.id), opts.taste);
+    // Blend: terms explain, embedding scores. When the embedding is confident it carries 60%.
+    const fit = opts.taste && opts.taste.w > 0 ? 0.4 * f.fit + 0.6 * t : f.fit;
     const why = [...b.why];
     if (f.matched.length) why.unshift(`matches your interest in ${Array.from(new Set(f.matched)).slice(0, 2).join(", ")}`);
-    cands.push({ item: it, score: b.score * (1 + f.fit), fit: f.fit, why: why.slice(0, 3), explore: false });
+    else if (t > 0.35) why.unshift("close to things you liked");
+    cands.push({ item: it, score: b.score * (1 + fit), fit, why: why.slice(0, 3), explore: false });
   }
 
   // Greedy diversity pick. Penalize repeating categories and tag clusters.

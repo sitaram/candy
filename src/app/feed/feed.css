@@ -74,11 +74,11 @@
 .drag-layer .fcard { box-shadow: 0 -18px 60px rgba(0,0,0,.35); }
 .drag-layer { position: relative; display: flex; cursor: grab; user-select: none; -webkit-user-select: none; touch-action: none; min-height: 0; min-width: 0; width: 100%; z-index: 2; }
 .drag-layer:active { cursor: grabbing; }
-.drag-layer.ghost { pointer-events: none; z-index: 3; }
+.drag-layer.ghost { pointer-events: none; z-index: 4; }
 /* prev/next cards sit on a vertical rail above/below the current one */
 .fcard.rail { z-index: 1; pointer-events: none; }
 .fcard.rail::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 1px; background: var(--line); }
-.peek-strip { z-index: 2; }
+.peek-strip { z-index: 3; }   /* above the current card (it lives in the card's bottom padding), below the fly-out ghost */
 
 /* ---- card ---- */
 .fcard {

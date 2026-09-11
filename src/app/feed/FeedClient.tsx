@@ -1,13 +1,16 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type PointerEvent as RPointerEvent } from "react";
+import { flushSync } from "react-dom";
 import type { Feed, FeedItem } from "@/lib/user/feed";
 import type { Action, Reaction } from "@/lib/user/state";
 import { Detail } from "./Detail";
 import "./feed.css";
 
 type Decision = "like" | "skip";
-const THRESH = 100;
+const THRESH = 100;      // px to commit a horizontal decision
+const VTHRESH = 90;      // px to commit a vertical page
+const AXIS_LOCK = 10;    // px before we pick an axis
 
 /** Category -> hue for the page gradient. Adjacent categories get nearby hues. */
 const HUE: Record<string, number> = {
@@ -65,9 +68,9 @@ function splitWhy(why: string[]): { fit: string | null; rest: string[] } {
 }
 
 function Card({
-  f, style, className, debug, saved, onSave, onOpen, onDecide,
+  f, style, className, debug, saved, reaction, onSave, onOpen, onDecide,
 }: {
-  f: FeedItem; style?: CSSProperties; className?: string; debug?: boolean; saved?: boolean;
+  f: FeedItem; style?: CSSProperties; className?: string; debug?: boolean; saved?: boolean; reaction?: Decision;
   onSave?: () => void; onOpen?: () => void; onDecide?: (d: Decision) => void;
 }) {
   const c = f.item.card;
@@ -87,7 +90,7 @@ function Card({
     { v: r.starsPerDay >= 1 ? `+${fmt(Math.round(r.starsPerDay))}` : "—", k: "per day" },
     { v: agoShort(r.createdAt), k: "old" },
     r.latestRelease
-      ? { v: r.latestRelease.replace(/^v(?=\d)/, "").slice(0, 8), k: `${agoShort(r.latestReleaseAt)} ago` }
+      ? { v: r.latestRelease.replace(/^v(?=\d)/, "").slice(0, 8), k: agoShort(r.latestReleaseAt) === "today" ? "released today" : `${agoShort(r.latestReleaseAt)} ago` }
       : { v: agoShort(r.pushedAt), k: "last push" },
   ];
 
@@ -96,6 +99,7 @@ function Card({
       <header className="c-head">
         <span className="c-cat">{c ? CAT_LABEL[c.category] ?? c.category : ""}</span>
         <span className="c-spacer" />
+        {reaction && <span className={`c-reacted ${reaction}`}>{reaction === "like" ? "👍" : "👎"}</span>}
         {c && c.interest >= 8 && <span className="c-score" title="Broadly notable">{c.interest}</span>}
         <button className={`icon-btn bm${saved ? " on" : ""}`} onPointerDown={stop} onClick={(e) => { stop(e); onSave?.(); }} aria-label={saved ? "Remove bookmark" : "Bookmark"} title="Bookmark (b)">
           {I.bookmark(!!saved)}
@@ -142,42 +146,45 @@ function Card({
 
 /* ---------- deck ---------- */
 export function FeedClient() {
-  const [queue, setQueue] = useState<FeedItem[]>([]);
+  const [items, setItems] = useState<FeedItem[]>([]);
+  const [idx, setIdx] = useState(0);
   const [since, setSince] = useState<Feed["since"] | null>(null);
   const [profileSize, setProfileSize] = useState(0);
   const [loading, setLoading] = useState(true);
   const [count, setCount] = useState({ like: 0, skip: 0 });
-  const [drag, setDrag] = useState({ dx: 0, dy: 0, active: false });
-  const [leaving, setLeaving] = useState<Decision | null>(null);
+  const [drag, setDrag] = useState<{ dx: number; dy: number; axis: "x" | "y" | null; active: boolean }>({ dx: 0, dy: 0, axis: null, active: false });
+  const [settle, setSettle] = useState(0);          // vertical page offset in px, animates to 0
+  const [animating, setAnimating] = useState(false);
+  const [ghost, setGhost] = useState<{ item: FeedItem; kind: Decision; style: CSSProperties } | null>(null);
   const [saved, setSaved] = useState<Set<string>>(new Set());
   const [open, setOpen] = useState<string | null>(null);
-  const [undo, setUndo] = useState<{ item: FeedItem; kind: Decision } | null>(null);
+  const [undo, setUndo] = useState<{ item: FeedItem; kind: Decision; at: number } | null>(null);
   const [debug, setDebug] = useState(false);
-  const [entering, setEntering] = useState(false);
+  const [vh, setVh] = useState(800);
   const seenRef = useRef<Set<string>>(new Set());
+  const reacted = useRef<Map<string, Decision>>(new Map());
   const fetching = useRef(false);
-  const start = useRef<{ x: number; y: number; id: number } | null>(null);
+  const start = useRef<{ x: number; y: number; id: number; axis: "x" | "y" | null } | null>(null);
+  const busy = useRef(false);   // true while a page/decision animation runs
   const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const stackRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => setDebug(new URLSearchParams(window.location.search).has("debug")), []);
-
-  // Bounce the new top card in whenever the id at the top changes.
-  const topId = queue[0]?.id;
   useEffect(() => {
-    if (!topId) return;
-    setEntering(true);
-    const t = setTimeout(() => setEntering(false), 650);
-    return () => clearTimeout(t);
-  }, [topId]);
+    const m = () => setVh(stackRef.current?.clientHeight || window.innerHeight);
+    m();
+    window.addEventListener("resize", m);
+    return () => window.removeEventListener("resize", m);
+  }, [loading]);
 
   const load = useCallback(async (initial = false) => {
     if (fetching.current) return;
     fetching.current = true;
     const ex = Array.from(seenRef.current).map((id) => `exclude=${encodeURIComponent(id)}`).join("&");
     const f = (await (await fetch(`/api/feed?n=30${ex ? "&" + ex : ""}`)).json()) as Feed;
-    setQueue((q) => {
+    setItems((q) => {
       const have = new Set(q.map((x) => x.id));
-      return [...q, ...f.items.filter((it) => !seenRef.current.has(it.id) && !have.has(it.id))];
+      return [...q, ...f.items.filter((it) => !have.has(it.id))];
     });
     setSaved((s) => {
       const n = new Set(s);
@@ -189,8 +196,19 @@ export function FeedClient() {
     setLoading(false);
     fetching.current = false;
   }, []);
-
   useEffect(() => { void load(true); }, [load]);
+
+  const cur = items[idx];
+  const prev = idx > 0 ? items[idx - 1] : undefined;
+  const next = items[idx + 1];
+
+  // Dwelling on a card marks it seen (so it is excluded from future fetches). No reaction is sent.
+  useEffect(() => {
+    if (!cur) return;
+    const t = setTimeout(() => { seenRef.current.add(cur.id); }, 600);
+    return () => clearTimeout(t);
+  }, [cur]);
+  useEffect(() => { if (!loading && items.length - idx <= 8) void load(); }, [idx, items.length, loading, load]);
 
   /* detail open/close mirrors history so back-swipe closes the sheet */
   const openDetail = useCallback((id: string) => {
@@ -199,89 +217,122 @@ export function FeedClient() {
     setOpen(id);
     void post(id, "dive");
   }, [open]);
-  const closeDetail = useCallback(() => {
-    if (open) history.back();
-  }, [open]);
+  const closeDetail = useCallback(() => { if (open) history.back(); }, [open]);
   useEffect(() => {
     const onPop = () => setOpen((history.state as { detail?: string } | null)?.detail ?? null);
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
   }, []);
 
-  const decide = useCallback((kind: Decision) => {
-    const cur = queue[0];
-    if (!cur || leaving) return;
+  /* ---- motion primitives ---- */
+
+  /** Animate the vertical pager from a starting px offset to 0. */
+  const settleFrom = useCallback((fromPx: number) => {
+    busy.current = true;
+    flushSync(() => { setAnimating(false); setSettle(fromPx); });
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      setAnimating(true);
+      setSettle(0);
+      setTimeout(() => { setAnimating(false); busy.current = false; }, 380);
+    }));
+  }, []);
+
+  /** Move to another page; the new current card slides in from the side it was on. */
+  const go = useCallback((to: number, fromDragDy = 0) => {
+    if (to < 0 || to >= items.length || busy.current) return;
+    const dir = to > idx ? 1 : -1;               // +1 = advancing (next rises from below)
+    setIdx(to);
+    setDrag({ dx: 0, dy: 0, axis: null, active: false });
+    // New card is currently at dir*vh; drag already moved it by fromDragDy. Start there, go to 0.
+    settleFrom(dir * vh + fromDragDy);
+  }, [items.length, animating, idx, vh, settleFrom]);
+
+  /** Horizontal decision: fly the current card out, next rises in. */
+  const decide = useCallback((kind: Decision, fromDrag?: { dx: number; dy: number }) => {
+    if (!cur || busy.current) return;
     seenRef.current.add(cur.id);
+    reacted.current.set(cur.id, kind);
     setCount((c) => ({ ...c, [kind]: c[kind] + 1 }));
     void post(cur.id, kind);
-    setLeaving(kind);
-    setTimeout(() => {
-      setQueue((q) => q.slice(1));
-      setLeaving(null);
-      setDrag({ dx: 0, dy: 0, active: false });
-    }, 280);
+    const startT = fromDrag ? `translate(${fromDrag.dx}px, ${fromDrag.dy * 0.2}px) rotate(${fromDrag.dx / 20}deg)` : "translate(0,0)";
+    const endT = kind === "like" ? "translate(120vw,-6vh) rotate(14deg)" : "translate(-120vw,-6vh) rotate(-14deg)";
+    // Ghost = the card flying out. Next rises via go(); if there is no next, the ghost alone carries the gesture.
+    const hasNext = idx + 1 < items.length;
+    busy.current = true;
+    flushSync(() => {
+      setGhost({ item: cur, kind, style: { transform: startT, transition: "none" } });
+      setDrag({ dx: 0, dy: 0, axis: null, active: false });
+      if (hasNext) { setAnimating(false); setIdx(idx + 1); setSettle(vh); }
+    });
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      setGhost((g) => g && { ...g, style: { transform: endT, opacity: 0, transition: "transform .32s cubic-bezier(.2,.7,.3,1), opacity .32s" } });
+      if (hasNext) { setAnimating(true); setSettle(0); }
+      setTimeout(() => { setGhost(null); setAnimating(false); busy.current = false; }, 380);
+    }));
     if (undoTimer.current) clearTimeout(undoTimer.current);
-    setUndo({ item: cur, kind });
-    undoTimer.current = setTimeout(() => setUndo(null), 5000);
-    if (queue.length < 8) void load();
-  }, [queue, leaving, load]);
+    setUndo({ item: cur, kind, at: idx });
+    undoTimer.current = setTimeout(() => setUndo(null), 6000);
+  }, [cur, idx, items.length, vh]);
 
   const doUndo = useCallback(() => {
     if (!undo) return;
-    const { item, kind } = undo;
+    const { item, kind, at } = undo;
     setUndo(null);
     seenRef.current.delete(item.id);
+    reacted.current.delete(item.id);
     setCount((c) => ({ ...c, [kind]: Math.max(0, c[kind] - 1) }));
-    setQueue((q) => [item, ...q.filter((x) => x.id !== item.id)]);
     void post(item.id, "undo");
-  }, [undo]);
+    if (at !== idx) go(at);
+  }, [undo, idx, go]);
 
   const toggleSave = useCallback((id: string) => {
     const was = saved.has(id);
-    setSaved((s) => {
-      const n = new Set(s);
-      if (was) n.delete(id); else n.add(id);
-      return n;
-    });
+    setSaved((s) => { const n = new Set(s); if (was) n.delete(id); else n.add(id); return n; });
     void post(id, was ? "unsave" : "save");
   }, [saved]);
 
-  /* pointer drag: horizontal decides, upward opens */
+  /* ---- pointer: lock to an axis after a few px; x decides, y pages ---- */
   const onDown = (e: RPointerEvent<HTMLDivElement>) => {
-    if (leaving || !queue[0] || open) return;
-    start.current = { x: e.clientX, y: e.clientY, id: e.pointerId };
+    if (!cur || open) return;
+    // A touch during a settle animation snaps it to rest instead of being dropped; the finger takes over.
+    if (busy.current) { busy.current = false; setAnimating(false); setSettle(0); }
+    start.current = { x: e.clientX, y: e.clientY, id: e.pointerId, axis: null };
     e.currentTarget.setPointerCapture(e.pointerId);
-    setDrag({ dx: 0, dy: 0, active: true });
+    setDrag({ dx: 0, dy: 0, axis: null, active: true });
   };
   const onMove = (e: RPointerEvent<HTMLDivElement>) => {
-    if (!start.current || start.current.id !== e.pointerId) return;
-    setDrag({ dx: e.clientX - start.current.x, dy: e.clientY - start.current.y, active: true });
+    const st = start.current;
+    if (!st || st.id !== e.pointerId) return;
+    const dx = e.clientX - st.x, dy = e.clientY - st.y;
+    if (!st.axis && Math.hypot(dx, dy) > AXIS_LOCK) st.axis = Math.abs(dx) > Math.abs(dy) ? "x" : "y";
+    setDrag({ dx, dy, axis: st.axis, active: true });
   };
   const onUp = (e: RPointerEvent<HTMLDivElement>) => {
-    if (!start.current || start.current.id !== e.pointerId) return;
-    const dx = e.clientX - start.current.x;
-    const dy = e.clientY - start.current.y;
+    const st = start.current;
+    if (!st || st.id !== e.pointerId) return;
+    const dx = e.clientX - st.x, dy = e.clientY - st.y;
     start.current = null;
-    if (Math.abs(dx) >= THRESH && Math.abs(dx) > Math.abs(dy)) {
-      setDrag({ dx, dy, active: false });
-      decide(dx > 0 ? "like" : "skip");
-    } else if (dy <= -THRESH && Math.abs(dy) > Math.abs(dx)) {
-      setDrag({ dx: 0, dy: 0, active: false });
-      if (queue[0]) openDetail(queue[0].id);
-    } else setDrag({ dx: 0, dy: 0, active: false });
+    if (st.axis === "x" && Math.abs(dx) >= THRESH) { decide(dx > 0 ? "like" : "skip", { dx, dy }); return; }
+    if (st.axis === "y") {
+      if (dy <= -VTHRESH && next) { go(idx + 1, dy); return; }
+      if (dy >= VTHRESH && prev) { go(idx - 1, dy); return; }
+      // not far enough: glide back to rest from where the finger left it
+      setDrag({ dx: 0, dy: 0, axis: null, active: false });
+      settleFrom(dy);
+      return;
+    }
+    setDrag({ dx: 0, dy: 0, axis: null, active: false });
   };
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
-      if (open) {
-        if (e.key === "Escape" || e.key === "ArrowDown") closeDetail();
-        return;
-      }
-      const cur = queue[0];
+      if (open) { if (e.key === "Escape") closeDetail(); return; }
       if (e.key === "ArrowLeft") decide("skip");
       else if (e.key === "ArrowRight") decide("like");
-      else if ((e.key === "ArrowUp" || e.key === "Enter") && cur) openDetail(cur.id);
+      else if (e.key === "ArrowUp" || e.key === "j") go(idx + 1);
+      else if (e.key === "ArrowDown" || e.key === "k") go(idx - 1);
+      else if (e.key === "Enter" && cur) openDetail(cur.id);
       else if (e.key === "b" && cur) toggleSave(cur.id);
       else if (e.key === "z" && undo) doUndo();
       else return;
@@ -289,23 +340,24 @@ export function FeedClient() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [queue, open, undo, decide, openDetail, closeDetail, toggleSave, doUndo]);
+  }, [cur, idx, open, undo, decide, go, openDetail, closeDetail, toggleSave, doUndo]);
 
-  const cur = queue[0];
-  const next = queue[1];
-  const px = drag.active ? drag.dx : 0;
-  const pr = Math.min(1, Math.abs(px) / THRESH);
-  const pendingDir: Decision | null = drag.active && Math.abs(drag.dx) > 12 && Math.abs(drag.dx) > Math.abs(drag.dy) ? (drag.dx > 0 ? "like" : "skip") : null;
-  const liftHint = drag.active && drag.dy < -12 && Math.abs(drag.dy) > Math.abs(drag.dx);
+  /* ---- layout: three cards on a vertical rail, current one also follows x ---- */
+  const dX = drag.active && drag.axis === "x" ? drag.dx : 0;
+  const dY = drag.active && drag.axis === "y" ? drag.dy : 0;
+  // Vertical rail position of the current card (px). settle animates toward 0 after a page.
+  const railY = dY + settle;
+  const ease = animating ? "transform .38s cubic-bezier(.22,.9,.3,1)" : "none";
+  const pr = Math.min(1, Math.abs(dX) / THRESH);
+  const pendingDir: Decision | null = drag.axis === "x" && Math.abs(dX) > 12 ? (dX > 0 ? "like" : "skip") : null;
+  const peekFade = Math.max(0, 1 - Math.max(0, -railY) / 120);   // strip fades as the next card rises
 
-  let curStyle: CSSProperties;
-  if (leaving) {
-    curStyle = { transform: leaving === "like" ? "translate(120vw,-6vh) rotate(14deg)" : "translate(-120vw,-6vh) rotate(-14deg)", opacity: 0, transition: "transform .28s cubic-bezier(.2,.7,.3,1), opacity .28s" };
-  } else if (drag.active) {
-    curStyle = { transform: `translate(${drag.dx}px, ${Math.min(0, drag.dy) * 0.6}px) rotate(${drag.dx / 20}deg)`, transition: "none" };
-  } else {
-    curStyle = {};
-  }
+  const curStyle: CSSProperties = {
+    transform: `translate(${dX}px, ${railY}px) rotate(${dX / 20}deg)`,
+    transition: drag.active ? "none" : animating ? ease : "transform .25s cubic-bezier(.22,.9,.3,1)",
+  };
+  const nextStyle: CSSProperties = { transform: `translateY(${vh + railY}px)`, transition: ease };
+  const prevStyle: CSSProperties = { transform: `translateY(${-vh + railY}px)`, transition: ease };
   const hue = hueOf(cur);
 
   return (
@@ -329,28 +381,35 @@ export function FeedClient() {
           {loading && <div className="feed-empty">loading…</div>}
           {!loading && !cur && <div className="feed-empty">You’ve seen everything ranked for you today.<br /><a href="/">Browse the corpus</a> or come back tomorrow.</div>}
           {cur && (
-            <div className="stack">
-              {next && (
-                <div key={`peek-${next.id}`} className={`peek-strip${leaving ? " rising" : ""}`} style={{ "--p": pr, "--peekhue": hueOf(next) } as CSSProperties} aria-hidden>
+            <div className="stack" ref={stackRef}>
+              {prev && <Card key={prev.id} f={prev} style={prevStyle} className="rail" saved={saved.has(prev.id)} reaction={reacted.current.get(prev.id)} />}
+              {next && <Card key={next.id} f={next} style={nextStyle} className="rail" saved={saved.has(next.id)} reaction={reacted.current.get(next.id)} />}
+              {next && !ghost && (
+                <div className="peek-strip" style={{ opacity: peekFade, "--peekhue": hueOf(next) } as CSSProperties} aria-hidden>
                   <div className="peek-label">up next · {next.item.card ? CAT_LABEL[next.item.card.category] ?? next.item.card.category : ""}</div>
                   <div className="peek-title">{next.id.split("/")[1]}</div>
                   <div className="peek-pitch">{next.item.card?.pitch}</div>
                 </div>
               )}
-              <div className={`drag-layer${pendingDir ? ` hint-${pendingDir}` : ""}${liftHint ? " hint-open" : ""}`} style={{ "--p": pr } as CSSProperties}
+              <div className={`drag-layer${pendingDir ? ` hint-${pendingDir}` : ""}`} style={{ "--p": pr } as CSSProperties}
                 onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp}>
-                <Card key={cur.id} f={cur} style={curStyle} className={entering && !leaving && !drag.active ? "enter" : ""} debug={debug} saved={saved.has(cur.id)}
-                  onSave={() => toggleSave(cur.id)} onOpen={() => openDetail(cur.id)} onDecide={decide} />
+                <Card key={cur.id} f={cur} style={curStyle} debug={debug} saved={saved.has(cur.id)} reaction={reacted.current.get(cur.id)}
+                  onSave={() => toggleSave(cur.id)} onOpen={() => openDetail(cur.id)} onDecide={(k) => decide(k)} />
               </div>
+              {ghost && (
+                <div className={`drag-layer ghost hint-${ghost.kind}`} style={{ "--p": 1 } as CSSProperties} aria-hidden>
+                  <Card f={ghost.item} style={ghost.style} saved={saved.has(ghost.item.id)} />
+                </div>
+              )}
             </div>
           )}
-          {undo && !leaving && (
+          {undo && (
             <div className="toast">
               {undo.kind === "like" ? "Marked interesting" : "Skipped"} <b>{undo.item.id.split("/")[1]}</b>
               <button onClick={doUndo}>undo</button>
             </div>
           )}
-          <div className="keyhints">← not for me · → interesting · ↑ read · b bookmark · z undo</div>
+          <div className="keyhints">← not for me · → interesting · ↑↓ browse · enter read · b bookmark · z undo</div>
         </div>
 
         {open && (

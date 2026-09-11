@@ -75,8 +75,14 @@
 .deck { flex: 1; min-width: 0; width: 100%; box-sizing: border-box; display: flex; flex-direction: column; position: relative; }
 .stack { position: relative; flex: 1; min-height: 0; min-width: 0; width: 100%; display: grid; grid-template-columns: minmax(0, 1fr); overflow: hidden; }
 .stack > * { grid-area: 1 / 1; min-height: 0; min-width: 0; width: 100%; }
-.drag-layer { position: relative; display: flex; cursor: grab; user-select: none; -webkit-user-select: none; touch-action: none; min-height: 0; min-width: 0; width: 100%; }
+.drag-layer { position: relative; display: flex; cursor: grab; user-select: none; -webkit-user-select: none; touch-action: none; min-height: 0; min-width: 0; width: 100%; z-index: 2; }
 .drag-layer:active { cursor: grabbing; }
+.drag-layer.ghost { pointer-events: none; z-index: 3; }
+/* prev/next cards sit on a vertical rail above/below the current one */
+.fcard.rail { z-index: 1; pointer-events: none; }
+.fcard.rail::before { content: ""; position: absolute; left: 24px; right: 24px; top: 0; height: 1px; background: var(--line); }
+.stack .fcard { background: linear-gradient(180deg, transparent, transparent); }
+.peek-strip { z-index: 2; }
 
 /* ---- card ---- */
 .fcard {
@@ -84,14 +90,13 @@
   display: flex; flex-direction: column;
   padding: 14px 24px calc(var(--peek-h) + 12px + env(safe-area-inset-bottom));
   will-change: transform; overflow: hidden;
-  transition: transform .22s ease-out;
+  background: transparent;
 }
-.fcard.enter { animation: card-in .62s cubic-bezier(.3, 1.45, .5, 1) both; transition: none; }
-@keyframes card-in { 0% { transform: translateY(calc(var(--peek-h) + 24px)) scale(.965); opacity: .6; } 100% { transform: translateY(0) scale(1); opacity: 1; } }
 
 .c-head { display: flex; align-items: center; gap: 10px; margin-bottom: 22px; }
 .c-cat { font-size: 12px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: hsl(var(--hue) 55% var(--kicker-l)); }
 .c-spacer { flex: 1; }
+.c-reacted { font-size: 14px; width: 26px; height: 26px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; background: var(--fill-2); }
 .c-score { font-family: var(--font-display); font-weight: 800; font-size: 13px; width: 26px; height: 26px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; background: var(--like); color: var(--bg); }
 
 .c-title { font-family: var(--font-display); margin: 0 0 16px; line-height: 1; letter-spacing: -.035em; display: flex; flex-direction: column; min-width: 0; }
@@ -155,13 +160,10 @@
   background: color-mix(in srgb, var(--bg-2) 70%, hsl(var(--peekhue) 40% var(--wash-l)));
   border-top: 1px solid var(--line);
   border-radius: 24px 24px 0 0;
-  transform: translateY(calc(var(--peek-h) * .28 * (1 - var(--p))));
   box-shadow: 0 -12px 40px rgba(0,0,0,.18);
-  transition: transform .15s ease-out;
+  transition: opacity .08s linear;
   pointer-events: none; overflow: hidden;
 }
-.peek-strip.rising { animation: peek-rise .3s ease-in forwards; }
-@keyframes peek-rise { to { transform: translateY(-16px); } }
 .peek-label { font-size: 10.5px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-4); }
 .peek-title { font-family: var(--font-display); font-weight: 800; font-size: 19px; letter-spacing: -.02em; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--ink); }
 .peek-pitch { color: var(--ink-3); font-size: 13.5px; line-height: 1.35; margin-top: 3px; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
@@ -221,15 +223,12 @@
   .feed-head { max-width: 1180px; width: 100%; margin: 0 auto; padding: 18px 24px 10px; box-sizing: border-box; }
   .deck-wrap { max-width: 1180px; width: 100%; margin: 0 auto; gap: 24px; padding: 0 24px 24px; box-sizing: border-box; }
   .deck { flex: 0 0 560px; padding: 0; }
-  .stack { max-height: 720px; overflow: visible; }
-  .fcard { padding: 28px 32px 26px; background: color-mix(in srgb, var(--bg-2) 82%, transparent); border: 1px solid var(--line); border-radius: 28px; box-shadow: 0 24px 70px rgba(0,0,0,.25); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); }
-  .fcard.enter { animation-name: card-in-desk; }
-  @keyframes card-in-desk { 0% { transform: translateY(30px) scale(.97); opacity: .5; } 100% { transform: none; opacity: 1; } }
+  .stack { max-height: 720px; overflow: hidden; border-radius: 28px; }
+  .fcard { padding: 28px 32px 26px !important; background: color-mix(in srgb, var(--bg-2) 82%, transparent); border: 1px solid var(--line); border-radius: 28px; box-shadow: 0 24px 70px rgba(0,0,0,.25); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); }
   .c-name { font-size: 42px; }
   .c-pitch { font-size: 22px; }
   .c-body { font-size: 16.5px; -webkit-line-clamp: 7; }
-  .peek-strip { left: 18px; right: 18px; bottom: -12px; height: 44px; border-radius: 0 0 26px 26px; padding: 0; background: color-mix(in srgb, var(--bg-2) 50%, transparent); border: 1px solid var(--line); border-top: none; }
-  .peek-strip > * { display: none; }
+  .peek-strip { display: none; }
   .keyhints { display: block; text-align: center; font-size: 12px; color: var(--ink-4); margin-top: 14px; }
   .toast { bottom: 120px; }
   .detail-host { position: static; flex: 1; min-width: 0; z-index: auto; display: block; }

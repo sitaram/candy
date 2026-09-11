@@ -7,10 +7,13 @@
  * u:{uid}:profile  HASH term -> weight  derived interest vector over card terms
  * u:{uid}:meta     HASH                 profileUpdatedAt, lastVisit, reactions, seedSource
  */
+import type Redis from "ioredis";
 import type { Item } from "../corpus/api";
 import { redis } from "../store/redis";
 
 export type Reaction = "like" | "skip" | "save" | "dive";
+/** Reversals. `unsave` removes a bookmark; `undo` reverts the last like/skip and un-sees the item. */
+export type Action = Reaction | "unsave" | "undo";
 
 const DELTA: Record<Reaction, number> = { like: 1, save: 2, dive: 1.5, skip: -0.5 };
 const DECAY_PER_DAY = 0.98;
@@ -60,36 +63,84 @@ export async function markSeen(uid: string, ids: string[]): Promise<void> {
   await redis().zadd(UK.seen(uid), "NX", ...args);
 }
 
+async function decayedProfile(uid: string, now: number): Promise<Profile> {
+  const r = redis();
+  const last = Number((await r.hget(UK.meta(uid), "profileUpdatedAt")) ?? 0);
+  const profile = await getProfile(uid);
+  if (last && profile.size) {
+    const f = Math.pow(DECAY_PER_DAY, (now - last) / 86_400_000);
+    for (const [k, v] of profile) profile.set(k, v * f);
+  }
+  return profile;
+}
+
+function applyDelta(profile: Profile, item: Item, delta: number): void {
+  for (const { term, w } of itemTerms(item)) profile.set(term, (profile.get(term) ?? 0) + delta * w);
+  for (const [k, v] of profile) if (Math.abs(v) < 0.05) profile.delete(k);
+}
+
+function writeProfile(p: ReturnType<Redis["pipeline"]>, uid: string, profile: Profile, now: number): void {
+  p.del(UK.profile(uid));
+  if (profile.size) p.hset(UK.profile(uid), Object.fromEntries(Array.from(profile, ([k, v]) => [k, v.toFixed(4)])));
+  p.hset(UK.meta(uid), { profileUpdatedAt: now, lastVisit: now });
+}
+
 /** Record a reaction and update the profile. Fast: one pipeline. */
 export async function react(uid: string, item: Item, kind: Reaction): Promise<void> {
   const r = redis();
   const id = item.repo.id;
   const now = Date.now();
-
-  // Lazy decay of the whole profile since last update.
-  const meta = await r.hgetall(UK.meta(uid));
-  const last = Number(meta.profileUpdatedAt ?? 0);
-  const profile = await getProfile(uid);
-  if (last && profile.size) {
-    const days = (now - last) / 86_400_000;
-    const f = Math.pow(DECAY_PER_DAY, days);
-    for (const [k, v] of profile) profile.set(k, v * f);
-  }
-  const delta = DELTA[kind];
-  for (const { term, w } of itemTerms(item)) profile.set(term, (profile.get(term) ?? 0) + delta * w);
-  // Prune tiny weights so the hash stays small.
-  for (const [k, v] of profile) if (Math.abs(v) < 0.05) profile.delete(k);
+  const profile = await decayedProfile(uid, now);
+  applyDelta(profile, item, DELTA[kind]);
 
   const p = r.pipeline();
-  p.zadd(UK.seen(uid), now, id);
-  p.hset(UK.react(uid), id, kind);
-  if (kind === "save") p.zadd(UK.saved(uid), now, id);
-  p.del(UK.profile(uid));
-  if (profile.size) p.hset(UK.profile(uid), Object.fromEntries(Array.from(profile, ([k, v]) => [k, v.toFixed(4)])));
-  p.hset(UK.meta(uid), { profileUpdatedAt: now, lastVisit: now });
+  // Bookmarking does not dismiss the card, so it must not mark it seen.
+  if (kind !== "save") {
+    p.zadd(UK.seen(uid), now, id);
+    p.hset(UK.react(uid), id, kind);
+  } else p.zadd(UK.saved(uid), now, id);
+  writeProfile(p, uid, profile, now);
   p.hincrby(UK.meta(uid), "reactions", 1);
   p.hincrby(UK.meta(uid), `n_${kind}`, 1);
   await p.exec();
+}
+
+/** Remove a bookmark and reverse its profile contribution. */
+export async function unsave(uid: string, item: Item): Promise<void> {
+  const r = redis();
+  const now = Date.now();
+  const profile = await decayedProfile(uid, now);
+  applyDelta(profile, item, -DELTA.save);
+  const p = r.pipeline();
+  p.zrem(UK.saved(uid), item.repo.id);
+  writeProfile(p, uid, profile, now);
+  p.hincrby(UK.meta(uid), "n_save", -1);
+  await p.exec();
+}
+
+/** Revert a like/skip: un-see the item, reverse the profile delta. */
+export async function undo(uid: string, item: Item): Promise<boolean> {
+  const r = redis();
+  const id = item.repo.id;
+  const prev = (await r.hget(UK.react(uid), id)) as Reaction | null;
+  if (prev !== "like" && prev !== "skip") return false;
+  const now = Date.now();
+  const profile = await decayedProfile(uid, now);
+  applyDelta(profile, item, -DELTA[prev]);
+  const p = r.pipeline();
+  p.zrem(UK.seen(uid), id);
+  p.hdel(UK.react(uid), id);
+  writeProfile(p, uid, profile, now);
+  p.hincrby(UK.meta(uid), "reactions", -1);
+  p.hincrby(UK.meta(uid), `n_${prev}`, -1);
+  await p.exec();
+  return true;
+}
+
+export async function isSaved(uid: string, ids: string[]): Promise<Set<string>> {
+  if (!ids.length) return new Set();
+  const scores = await redis().zmscore(UK.saved(uid), ...ids);
+  return new Set(ids.filter((_, i) => scores[i] != null));
 }
 
 export async function touchVisit(uid: string): Promise<{ lastVisit: number }> {

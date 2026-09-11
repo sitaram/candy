@@ -1,6 +1,6 @@
 import { allItems, getItem, type Item } from "../corpus/api";
 import { rank, type Ranked } from "./rank";
-import { getProfile, getSeen, react as reactState, touchVisit, type Reaction, UK } from "./state";
+import { getProfile, getSeen, isSaved, react as reactState, touchVisit, undo as undoState, unsave as unsaveState, type Action, UK } from "./state";
 import { redis } from "../store/redis";
 
 export interface FeedItem {
@@ -9,6 +9,7 @@ export interface FeedItem {
   fit: number;
   why: string[];
   explore: boolean;
+  saved: boolean;
   item: Item;
 }
 
@@ -29,9 +30,20 @@ export async function feed(uid: string, n = 30, exclude: string[] = []): Promise
   const [items, profile, seen, visit] = await Promise.all([allItems(), getProfile(uid), getSeen(uid), touchVisit(uid)]);
   const ex = new Set([...seen, ...exclude]);
   const ranked: Ranked[] = rank(items, profile, { n, exclude: ex });
-  const since = await sinceLastVisit(uid, items, visit.lastVisit, profile.size ? profile : null);
+  const [since, saved] = await Promise.all([
+    sinceLastVisit(uid, items, visit.lastVisit, profile.size ? profile : null),
+    isSaved(uid, ranked.map((r) => r.item.repo.id)),
+  ]);
   return {
-    items: ranked.map((r) => ({ id: r.item.repo.id, score: Math.round(r.score * 100) / 100, fit: Math.round(r.fit * 100) / 100, why: r.why, explore: r.explore, item: r.item })),
+    items: ranked.map((r) => ({
+      id: r.item.repo.id,
+      score: Math.round(r.score * 100) / 100,
+      fit: Math.round(r.fit * 100) / 100,
+      why: r.why,
+      explore: r.explore,
+      saved: saved.has(r.item.repo.id),
+      item: r.item,
+    })),
     since,
     profileSize: profile.size,
   };
@@ -54,9 +66,11 @@ async function sinceLastVisit(uid: string, items: Item[], lastVisit: number, pro
   return { lastVisit, newInCorpus: fresh.length, newInYourAreas, releasesOnSaved };
 }
 
-export async function react(uid: string, id: string, kind: Reaction): Promise<boolean> {
+export async function act(uid: string, id: string, kind: Action): Promise<boolean> {
   const item = await getItem(id);
   if (!item) return false;
-  await reactState(uid, item, kind);
+  if (kind === "unsave") await unsaveState(uid, item);
+  else if (kind === "undo") return undoState(uid, item);
+  else await reactState(uid, item, kind);
   return true;
 }

@@ -518,7 +518,6 @@ export function FeedClient() {
             </>
           ) : profileSize === 0 ? "swipe a few and it learns" : ""}
         </span>
-        <a href="/about" className="feed-me" title="What is this?">?</a>
         <a href="/me" className="feed-me">{count.like + count.skip > 0 ? `${count.like} 👍 · ${count.skip} 👎` : "me"}</a>
       </header>
 

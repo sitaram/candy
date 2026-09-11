@@ -41,12 +41,15 @@ export function Search({ open, onClose, onPick }: { open: boolean; onClose: () =
   const [q, setQ] = useState("");
   const [res, setRes] = useState<SearchResponse | null>(null);
   const [busy, setBusy] = useState(false);
+  const [heard, setHeard] = useState("");   // what the user said, until the model's query lands
   const inputRef = useRef<HTMLInputElement>(null);
   const seq = useRef(0);
+  const ranFor = useRef<string | null>(null);   // last query handed to run(); the debounce skips it
   const resRef = useRef<SearchResponse | null>(null); resRef.current = res;
 
   const run = useCallback(async (query: string): Promise<SearchResponse | null> => {
     const my = ++seq.current;
+    ranFor.current = query;
     if (query.trim().length < 2) { setRes(null); return null; }
     setBusy(true);
     try {
@@ -60,9 +63,12 @@ export function Search({ open, onClose, onPick }: { open: boolean; onClose: () =
     }
   }, []);
 
-  // Typing: debounce 220 ms.
+  // Typing: debounce 220 ms. Skipped when run() was already called for this exact q (voice tool
+  // call), otherwise the debounced run would supersede the tool's own fetch and it would report
+  // "no results" while the screen showed twenty.
   useEffect(() => {
     if (!open) return;
+    if (ranFor.current === q) return;
     const t = setTimeout(() => void run(q), 220);
     return () => clearTimeout(t);
   }, [q, open, run]);
@@ -70,14 +76,15 @@ export function Search({ open, onClose, onPick }: { open: boolean; onClose: () =
   // Focus on open; reset on close.
   useEffect(() => {
     if (open) setTimeout(() => inputRef.current?.focus(), 60);
-    else { setQ(""); setRes(null); }
+    else { setQ(""); setRes(null); setHeard(""); ranFor.current = null; }
   }, [open]);
 
   /* ---- voice: same transport, search mode ---- */
   const voice = useVoice({
     silenceMs: 8_000,
-    onUserTranscript: (t) => { if (t) setQ(t); },
+    onUserTranscript: (t) => { if (t) setHeard(t); },
     onSearch: async (query) => {
+      setHeard("");
       setQ(query);
       inputRef.current?.blur();          // keyboard down; results take the screen
       const j = await run(query);
@@ -123,6 +130,7 @@ export function Search({ open, onClose, onPick }: { open: boolean; onClose: () =
         </div>
 
         {voice.error && <div className="s-note err">{voice.error}</div>}
+        {listening && heard && !voice.transcript && <div className="s-note heard">“{heard}”</div>}
         {listening && voice.transcript && <div className="s-note">{voice.transcript}</div>}
 
         <div className="s-body">

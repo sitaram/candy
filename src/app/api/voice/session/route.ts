@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { feed } from "@/lib/user/feed";
 import { me } from "@/lib/user/state";
 import { getUid } from "@/lib/user/uid";
-import { buildContext, TOOLS } from "@/lib/voice/context";
+import { buildContext, buildSearchContext, SEARCH_TOOLS, TOOLS } from "@/lib/voice/context";
 
 export const dynamic = "force-dynamic";
 
@@ -19,18 +19,29 @@ export async function POST(req: Request) {
   const key = process.env.OPENAI_API_KEY;
   if (!key) return Response.json({ error: "voice not configured" }, { status: 503 });
   const uid = await getUid();
-  const body = (await req.json().catch(() => ({}))) as { id?: string; why?: string[] };
-  if (!body.id) return Response.json({ error: "id required" }, { status: 400 });
+  const body = (await req.json().catch(() => ({}))) as { mode?: "card" | "search"; id?: string; why?: string[]; query?: string };
+  const mode = body.mode ?? "card";
 
-  // Re-derive the FeedItem for this card (score/why) so the model knows why it's in the feed.
-  const [f, meInfo] = await Promise.all([feed(uid, 60), me(uid).catch(() => null)]);
-  const cur = f.items.find((x) => x.id === body.id) ?? null;
-  const { getItem } = await import("@/lib/corpus/api");
-  const item = cur?.item ?? (await getItem(body.id));
-  if (!item) return Response.json({ error: "unknown repo" }, { status: 404 });
-  const feedItem = cur ?? { id: body.id, item, score: 0, fit: 0, why: body.why ?? [], explore: false, saved: false };
-
-  const ctx = await buildContext(feedItem, meInfo);
+  let instructions: string;
+  let tools: readonly unknown[];
+  let transcribeInput = false;
+  if (mode === "search") {
+    const meInfo = await me(uid).catch(() => null);
+    instructions = buildSearchContext(meInfo, body.query);
+    tools = SEARCH_TOOLS;
+    transcribeInput = true;   // the search box shows what the user said
+  } else {
+    if (!body.id) return Response.json({ error: "id required" }, { status: 400 });
+    // Re-derive the FeedItem for this card (score/why) so the model knows why it's in the feed.
+    const [f, meInfo] = await Promise.all([feed(uid, 60), me(uid).catch(() => null)]);
+    const cur = f.items.find((x) => x.id === body.id) ?? null;
+    const { getItem } = await import("@/lib/corpus/api");
+    const item = cur?.item ?? (await getItem(body.id));
+    if (!item) return Response.json({ error: "unknown repo" }, { status: 404 });
+    const feedItem = cur ?? { id: body.id, item, score: 0, fit: 0, why: body.why ?? [], explore: false, saved: false };
+    instructions = (await buildContext(feedItem, meInfo)).instructions;
+    tools = TOOLS;
+  }
 
   const r = await fetch("https://api.openai.com/v1/realtime/client_secrets", {
     method: "POST",
@@ -44,11 +55,17 @@ export async function POST(req: Request) {
       session: {
         type: "realtime",
         model: MODEL,
-        instructions: ctx.instructions,
-        tools: TOOLS,
+        instructions,
+        tools,
         tool_choice: "auto",
         audio: {
-          input: { turn_detection: { type: "semantic_vad", eagerness: "medium", create_response: true, interrupt_response: true } },
+          input: {
+            turn_detection: { type: "semantic_vad", eagerness: "medium", create_response: true, interrupt_response: true },
+            // Best-effort: shows the user's words in the box as they speak. The search box is
+            // authoritative from the model's search(query) call, so a key without a transcribe
+            // model still works — you just don't see your own words until the query lands.
+            ...(transcribeInput ? { transcription: { model: process.env.REALTIME_TRANSCRIBE ?? "gpt-4o-mini-transcribe" } } : {}),
+          },
           output: { voice: VOICE, speed: 1.05 },
         },
         max_output_tokens: 700,

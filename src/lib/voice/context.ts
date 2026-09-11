@@ -174,6 +174,66 @@ ${simBrief}`;
   return { instructions, cardBrief };
 }
 
+/* ---------------- search mode ---------------- */
+
+export const SEARCH_TOOLS = [
+  {
+    type: "function",
+    name: "search",
+    description: "Run the user's request as a search over the candy corpus (open-source repos). Call this as soon as you understand what they want — a repo name, a topic, or a description of something they want to build. The results appear on the user's screen; you get them back as briefs. Refinements ('just the Rust ones', 'smaller projects') are a new search with the refined query.",
+    parameters: {
+      type: "object",
+      properties: { query: { type: "string", description: "The search, in the user's words, lightly cleaned. Keep intent: 'voice agent framework python real time', not 'voice'." } },
+      required: ["query"],
+    },
+  },
+  {
+    type: "function",
+    name: "open_result",
+    description: "Open one of the results on screen as a card. Use when the user says open it / show me the second one / the Pipecat one.",
+    parameters: {
+      type: "object",
+      properties: { which: { type: "string", description: "1-based position ('2'), or a repo name from the results ('pipecat')." } },
+      required: ["which"],
+    },
+  },
+] as const;
+
+/** Instructions for a session started from the search box. */
+export function buildSearchContext(meInfo: Me | null, initialQuery?: string): string {
+  const profile = meInfo && meInfo.topTerms.length
+    ? `Interests (learned from swipes, strongest first): ${meInfo.topTerms.slice(0, 10).map((t) => t.term).join(", ")}.`
+    : "New user; no learned interests yet.";
+  return `# Role and Objective
+You are candy's search. The user opened a search box on their phone and tapped the voice button. They will say what they are looking for — a repo by name, a topic, or something they want to build. Turn it into a search, read them the shape of the results, and help them pick. Everything you say is spoken aloud.
+
+# Personality and Tone
+Quick, plain, helpful. No preamble, no "sure", no "great question".
+
+# Flow
+1. Listen. Do not speak first.
+2. As soon as you understand the request, call search(query). Do not ask clarifying questions before the first search; search first, refine after.
+3. When results return, say ONE sentence: how many good options and the strongest one with a five-word reason. Example: "Six matches — Pipecat is the strongest, a Python framework for real-time voice agents." Then stop.
+4. If they refine ("just TypeScript", "something smaller", "not that one"), call search again with the refined query and give one sentence again.
+5. If they say open / show me / the second one / the <name> one, call open_result. Confirm in two or three words.
+6. If they ask about a result, answer from the brief in at most two sentences.
+
+# Verbosity
+One sentence after a search. Two at most for a question. Never read more than two repo names aloud.
+
+# Rules
+- Never invent a repo. If search returns nothing, say so in one sentence and suggest different words.
+- Say repo names naturally ("pipecat", not "pipecat-ai slash pipecat").
+- If audio is unclear, ask them to say it again, once.
+- If they say done, stop, or thanks: say "okay" and stop.
+
+# User
+${profile}
+${initialQuery ? `
+# Already in the box
+"${initialQuery}" — they may be refining this.` : ""}`;
+}
+
 /** Brief injected when the on-screen card changes mid-conversation. */
 export async function cardChangeBrief(next: FeedItem): Promise<string> {
   const [detail, sims] = await Promise.all([getItemDetail(next.id), similar(next.id, 4)]);

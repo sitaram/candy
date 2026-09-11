@@ -35,6 +35,14 @@ GitHub knows *what* a repo is. Nobody has built the layer that knows **why it ma
 
 **Tools are the corpus API.** Four function tools, no LLM on the path, < 150 ms: `get_repo` (everything about any repo), `find_repos` (search), `next_card`, `react` (like / skip / save by voice). Same read API the feed uses — voice is a thin client, as designed.
 
+## Search
+
+**The feed with a query.** Three retrievers over one corpus — name (prefix on `owner/name`), keyword (tags, category, pitch, why-care), and semantic (embed the query with the same model as the cards, cosine against every card) — merged and then scored with the same personal ranker the feed uses. So "voice agent framework" ranks Python-first for one user and TypeScript-first for another, and every row says why: *exact match*, *close to what you described*, *matches your interest in rust*. One `/api/search` returns the same `FeedItem` shape as `/api/feed`.
+
+**Results open into the rail.** Tapping a result inserts that card right after the one you were on and pages to it with the usual bounce; swipe down and you are back where you were. Feed, search, and voice all land on the same card surface — there is no separate results page to navigate out of.
+
+**Voice search is the same session, different instructions.** The bars in the search box open the same Realtime transport as the card conversation, in *search mode*: it waits for you to speak, calls one tool — `search(query)` — whose argument fills the box and renders the results, then says one sentence ("Six matches — Pipecat is the strongest, a Python framework for real-time voice agents"). Refinements are a new search; "open the second one" is `open_result`. Eight seconds of silence ends it; the results stay. No separate dictation model: the box is simply where the model's understanding of what you said lands.
+
 **Cost is bounded.** Sessions end after 30 s of silence. Audio is $32 / $64 per M tokens in / out, so a 3-minute conversation is ~$0.20; the 3k-token context is cached at $0.40 / M on reconnect. `gpt-realtime-2.1-mini` is a drop-in if quality allows.
 
 ## Key decisions and tradeoffs

@@ -6,6 +6,8 @@ import type { Feed, FeedItem } from "@/lib/user/feed";
 import type { Action, Reaction } from "@/lib/user/state";
 import { Detail } from "./Detail";
 import { useVoice } from "./useVoice";
+import { Search } from "./Search";
+import type { SearchResult } from "@/lib/user/search";
 import "./feed.css";
 
 type Decision = "like" | "skip";
@@ -37,6 +39,7 @@ const I = {
   bookmark: (filled: boolean) => <svg viewBox="0 0 24 24" width="22" height="22" fill={filled ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z" /></svg>,
   // live-voice bars — the glyph Siri / ChatGPT Voice / Gemini Live use for a real-time conversation
   voice: <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M4 10v4" /><path d="M8 7v10" /><path d="M12 4v16" /><path d="M16 7v10" /><path d="M20 10v4" /></svg>,
+  search: <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>,
   // "maximize": two diagonal corner arrows — reads as "open this up"
   open: <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 3h6v6" /><path d="m21 3-7 7" /><path d="M9 21H3v-6" /><path d="m3 21 7-7" /></svg>,
 };
@@ -69,10 +72,10 @@ function splitWhy(why: string[]): { fit: string | null; rest: string[] } {
 }
 
 function Card({
-  f, style, className, debug, saved, reaction, onSave, onOpen, onVoice, voice,
+  f, style, className, debug, saved, reaction, onSave, onOpen, onVoice, onSearch, voice,
 }: {
   f: FeedItem; style?: CSSProperties; className?: string; debug?: boolean; saved?: boolean; reaction?: Decision;
-  onSave?: () => void; onOpen?: () => void; onVoice?: () => void; voice?: { state: string; level: number };
+  onSave?: () => void; onOpen?: () => void; onVoice?: () => void; onSearch?: () => void; voice?: { state: string; level: number };
 }) {
   const c = f.item.card;
   const r = f.item.repo;
@@ -111,6 +114,9 @@ function Card({
         <span className="c-cat">{c ? CAT_LABEL[c.category] ?? c.category : ""}{r.language && <span className="c-lang"> · {r.language}</span>}</span>
         <span className="c-spacer" />
         {reaction && <span className={`c-reacted ${reaction}`}>{reaction === "like" ? "👍" : "👎"}</span>}
+        {onSearch && (
+          <button className="icon-btn" onPointerDown={stop} onClick={(e) => { stop(e); onSearch(); }} aria-label="Search" title="Search (/)">{I.search}</button>
+        )}
         <button className={`icon-btn bm${saved ? " on" : ""}`} onPointerDown={stop} onClick={(e) => { stop(e); onSave?.(); }} aria-label={saved ? "Remove bookmark" : "Bookmark"} title="Bookmark (b)">
           {I.bookmark(!!saved)}
         </button>
@@ -389,8 +395,24 @@ export function FeedClient() {
   });
   const toggleVoice = useCallback(() => {
     if (voice.active) voice.stop();
-    else if (cur) void voice.start(cur.id, cur.why);
+    else if (cur) void voice.start({ mode: "card", id: cur.id, why: cur.why });
   }, [voice, cur]);
+  /* ---- search: results hand a card to the rail, right after the current one ---- */
+  const [searchOpen, setSearchOpen] = useState(false);
+  const openSearch = useCallback(() => { if (voice.active) voice.stop(); setSearchOpen(true); }, [voice]);
+  const pickResult = useCallback((r: SearchResult) => {
+    const f: FeedItem = { id: r.id, item: r.item, score: r.score, fit: r.fit, why: r.why, explore: false, saved: r.saved };
+    setSearchOpen(false);
+    setItems((q) => {
+      const at = Math.max(0, idxRef.current + 1);
+      const rest = q.filter((x) => x.id !== f.id);
+      return [...rest.slice(0, at), f, ...rest.slice(at)];
+    });
+    if (r.saved) setSaved((s) => new Set(s).add(r.id));
+    // Let the insert render, then page onto it with the usual bounce.
+    setTimeout(() => go(idxRef.current + 1), 30);
+  }, [go]);
+
   // Swiping while talking: tell the model what's on screen now (but not for tool-driven changes, which return the brief themselves).
   const voiceCardId = useRef<string | null>(null);
   useEffect(() => {
@@ -407,7 +429,7 @@ export function FeedClient() {
   const onDown = (e: RPointerEvent<HTMLDivElement>) => {
     lastTouch.current = Date.now();
     setHinting(false);
-    if ((!cur && !intro) || open) return;
+    if ((!cur && !intro) || open || searchOpen) return;
     // A touch during a settle animation snaps it to rest instead of being dropped; the finger takes over.
     if (busy.current) { busy.current = false; setAnimating(false); setSettle(0); }
     start.current = { x: e.clientX, y: e.clientY, id: e.pointerId, axis: null };
@@ -447,7 +469,9 @@ export function FeedClient() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (searchOpen) return;
       if (open) { if (e.key === "Escape") closeDetail(); return; }
+      if (e.key === "/" && cur) { openSearch(); e.preventDefault(); return; }
       if (e.key === "ArrowLeft") decide("skip");
       else if (e.key === "ArrowRight") decide("like");
       else if (e.key === "ArrowUp" || e.key === "j") go(idx + 1);
@@ -461,7 +485,7 @@ export function FeedClient() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [cur, idx, open, undo, decide, go, openDetail, closeDetail, toggleSave, doUndo, toggleVoice]);
+  }, [cur, idx, open, undo, decide, go, openDetail, closeDetail, toggleSave, doUndo, toggleVoice, searchOpen, openSearch]);
 
   /* ---- layout: three cards on a vertical rail, current one also follows x ---- */
   const dX = drag.active && drag.axis === "x" ? drag.dx : 0;
@@ -532,7 +556,7 @@ export function FeedClient() {
                 {cur ? (
                   <Card key={cur.id} f={cur} style={curStyle} debug={debug} saved={saved.has(cur.id)} reaction={reacted.current.get(cur.id)}
                     onSave={() => toggleSave(cur.id)} onOpen={() => openDetail(cur.id)}
-                    onVoice={toggleVoice} voice={{ state: voice.state, level: voice.level }} />
+                    onVoice={toggleVoice} onSearch={openSearch} voice={{ state: voice.state, level: voice.level }} />
                 ) : (
                   <Splash style={curStyle} onStart={() => go(0)} />
                 )}
@@ -551,9 +575,10 @@ export function FeedClient() {
               <button onClick={doUndo}>undo</button>
             </div>
           )}
-          <div className="keyhints">← pass · → like · ↑ ↓ browse · enter deep dive · v voice · b bookmark · z undo</div>
+          <div className="keyhints">← pass · → like · ↑ ↓ browse · enter deep dive · v voice · / search · b bookmark · z undo</div>
         </div>
 
+        <Search open={searchOpen} onClose={() => setSearchOpen(false)} onPick={pickResult} />
         {open && (
           <div className="detail-host">
             {/* pointerdown, not click: a tap on the card opens the sheet on pointerup, and the browser's

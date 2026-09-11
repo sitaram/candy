@@ -12,9 +12,21 @@ export type VoiceState = "idle" | "connecting" | "listening" | "speaking" | "thi
 
 export interface VoiceHandlers {
   /** Called for next_card / react — returns the brief of the card now on screen, or null if none. */
-  onNextCard: () => Promise<string | null>;
-  onReact: (kind: "like" | "skip" | "save") => Promise<string | null>;
+  onNextCard?: () => Promise<string | null>;
+  onReact?: (kind: "like" | "skip" | "save") => Promise<string | null>;
+  /** Search mode: run the query in the UI and return what the model should say from. */
+  onSearch?: (query: string) => Promise<string | null>;
+  /** Search mode: what the user said, once transcribed (fills the box). */
+  onUserTranscript?: (text: string) => void;
+  /** Search mode: user said open / show me the Nth one. */
+  onOpenResult?: (which: string) => Promise<string | null>;
+  /** Idle cutoff; default 30 s for card conversations. Search uses a shorter one. */
+  silenceMs?: number;
 }
+
+export type VoiceStart =
+  | { mode: "card"; id: string; why: string[] }
+  | { mode: "search"; query?: string };
 
 const SILENCE_MS = 30_000;
 
@@ -56,7 +68,7 @@ export function useVoice(handlers: VoiceHandlers) {
   const bumpSilence = useCallback(() => {
     lastActivity.current = Date.now();
     if (silenceT.current) clearTimeout(silenceT.current);
-    silenceT.current = setTimeout(() => stop(), SILENCE_MS);
+    silenceT.current = setTimeout(() => stop(), h.current.silenceMs ?? SILENCE_MS);
   }, [stop]);
 
   const send = useCallback((ev: RTEvent) => {
@@ -72,8 +84,10 @@ export function useVoice(handlers: VoiceHandlers) {
   const runTool = useCallback(async (name: string, args: Record<string, unknown>, callId: string) => {
     let output: string;
     try {
-      if (name === "next_card") output = (await h.current.onNextCard()) ?? "No more cards in the feed right now.";
-      else if (name === "react") output = (await h.current.onReact(args.kind as "like" | "skip" | "save")) ?? "Recorded.";
+      if (name === "next_card") output = (await h.current.onNextCard?.()) ?? "No more cards in the feed right now.";
+      else if (name === "react") output = (await h.current.onReact?.(args.kind as "like" | "skip" | "save")) ?? "Recorded.";
+      else if (name === "search") output = (await h.current.onSearch?.(String(args.query ?? ""))) ?? "Search is unavailable.";
+      else if (name === "open_result") output = (await h.current.onOpenResult?.(String(args.which ?? "1"))) ?? "Could not open that.";
       else {
         const r = await fetch("/api/voice/tool", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name, args }) });
         output = ((await r.json()) as { output?: string }).output ?? "No result.";
@@ -102,6 +116,8 @@ export function useVoice(handlers: VoiceHandlers) {
         setTranscript((t) => (t.length > 600 ? "" : t) + String(ev.delta ?? "")); break;
       case "response.output_audio_transcript.done":
         setTranscript(String(ev.transcript ?? "")); break;
+      case "conversation.item.input_audio_transcription.completed":
+        h.current.onUserTranscript?.(String(ev.transcript ?? "").trim()); break;
       case "response.done": {
         setState("listening"); bumpSilence();
         const resp = ev.response as { output?: { type: string; name?: string; arguments?: string; call_id?: string }[] } | undefined;
@@ -121,7 +137,7 @@ export function useVoice(handlers: VoiceHandlers) {
     }
   }, [bumpSilence, runTool]);
 
-  const start = useCallback(async (id: string, why: string[]) => {
+  const start = useCallback(async (opts: VoiceStart) => {
     if (pc.current) return;
     setError(null); setTranscript("");
     setState("connecting");
@@ -135,7 +151,7 @@ export function useVoice(handlers: VoiceHandlers) {
       // 2. Mic + ephemeral secret in parallel.
       const [ms, sess] = await Promise.all([
         navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } }),
-        fetch("/api/voice/session", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ id, why }) }).then(async (r) => {
+        fetch("/api/voice/session", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(opts) }).then(async (r) => {
           if (!r.ok) throw new Error(((await r.json().catch(() => ({}))) as { error?: string }).error ?? `session ${r.status}`);
           return (await r.json()) as { secret: string };
         }),
@@ -153,8 +169,8 @@ export function useVoice(handlers: VoiceHandlers) {
       d.onopen = () => {
         setState("listening");
         bumpSilence();
-        // Opening take: the instructions tell it what to say; this kicks the first response.
-        send({ type: "response.create" });
+        // Card mode opens with a spoken take; search mode waits for the user to speak.
+        if (opts.mode === "card") send({ type: "response.create" });
       };
       d.onclose = () => stop();
       p.onconnectionstatechange = () => { if (p.connectionState === "failed" || p.connectionState === "disconnected") stop("connection lost"); };

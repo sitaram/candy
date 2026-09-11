@@ -81,12 +81,15 @@ function Card({
   const hook = c && c.hook !== "none" && c.hook !== "big-org" ? HOOK_LABEL[c.hook] : null;
   const second = hook ?? social ?? null;
 
-  // One quiet line of facts. Owner already says "from github"; release age says "active".
-  const facts: string[] = [`${fmt(r.stars)} stars`];
-  if (r.starsPerDay >= 10) facts.push(`+${fmt(Math.round(r.starsPerDay))}/day`);
-  if (r.latestRelease) facts.push(`${r.latestRelease.replace(/^v(?=\d)/, "")} · ${agoShort(r.latestReleaseAt)} ago`);
-  else if (r.pushedAt) facts.push(`pushed ${agoShort(r.pushedAt)} ago`);
-  if (r.language) facts.push(r.language);
+  // Four-up snapshot: popularity, momentum, age, activity. No boxes, just numbers.
+  const stats: { v: string; k: string }[] = [
+    { v: fmt(r.stars), k: "stars" },
+    { v: r.starsPerDay >= 1 ? `+${fmt(Math.round(r.starsPerDay))}` : "—", k: "per day" },
+    { v: agoShort(r.createdAt), k: "old" },
+    r.latestRelease
+      ? { v: r.latestRelease.replace(/^v(?=\d)/, "").slice(0, 8), k: `${agoShort(r.latestReleaseAt)} ago` }
+      : { v: agoShort(r.pushedAt), k: "last push" },
+  ];
 
   return (
     <article className={`fcard ${className ?? ""}`} style={style}>
@@ -118,7 +121,12 @@ function Card({
 
       <div className="fcard-spacer" />
 
-      <div className="c-facts">{facts.join("  ·  ")}</div>
+      <div className="c-stats">
+        {stats.map((st) => (
+          <div key={st.k} className="c-stat"><div className="c-stat-v">{st.v}</div><div className="c-stat-k">{st.k}</div></div>
+        ))}
+        {r.language && <div className="c-stat"><div className="c-stat-v lang">{r.language}</div><div className="c-stat-k">{c ? MATURITY_LABEL[c.maturity] : ""}</div></div>}
+      </div>
       {debug && <div className="fcard-dbg">score {f.score} · fit {f.fit}</div>}
 
       <div className="fcard-actions" onPointerDown={stop}>
@@ -145,12 +153,22 @@ export function FeedClient() {
   const [open, setOpen] = useState<string | null>(null);
   const [undo, setUndo] = useState<{ item: FeedItem; kind: Decision } | null>(null);
   const [debug, setDebug] = useState(false);
+  const [entering, setEntering] = useState(false);
   const seenRef = useRef<Set<string>>(new Set());
   const fetching = useRef(false);
   const start = useRef<{ x: number; y: number; id: number } | null>(null);
   const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => setDebug(new URLSearchParams(window.location.search).has("debug")), []);
+
+  // Bounce the new top card in whenever the id at the top changes.
+  const topId = queue[0]?.id;
+  useEffect(() => {
+    if (!topId) return;
+    setEntering(true);
+    const t = setTimeout(() => setEntering(false), 650);
+    return () => clearTimeout(t);
+  }, [topId]);
 
   const load = useCallback(async (initial = false) => {
     if (fetching.current) return;
@@ -314,14 +332,14 @@ export function FeedClient() {
             <div className="stack">
               {next && (
                 <div key={`peek-${next.id}`} className={`peek-strip${leaving ? " rising" : ""}`} style={{ "--p": pr, "--peekhue": hueOf(next) } as CSSProperties} aria-hidden>
-                  <div className="peek-label">up next</div>
+                  <div className="peek-label">up next · {next.item.card ? CAT_LABEL[next.item.card.category] ?? next.item.card.category : ""}</div>
                   <div className="peek-title">{next.id.split("/")[1]}</div>
                   <div className="peek-pitch">{next.item.card?.pitch}</div>
                 </div>
               )}
               <div className={`drag-layer${pendingDir ? ` hint-${pendingDir}` : ""}${liftHint ? " hint-open" : ""}`} style={{ "--p": pr } as CSSProperties}
                 onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp}>
-                <Card key={cur.id} f={cur} style={curStyle} className={leaving ? "" : "enter"} debug={debug} saved={saved.has(cur.id)}
+                <Card key={cur.id} f={cur} style={curStyle} className={entering && !leaving && !drag.active ? "enter" : ""} debug={debug} saved={saved.has(cur.id)}
                   onSave={() => toggleSave(cur.id)} onOpen={() => openDetail(cur.id)} onDecide={decide} />
               </div>
             </div>

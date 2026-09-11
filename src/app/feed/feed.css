@@ -1,7 +1,7 @@
 /* ===== candy feed — mobile-first, quiet, light + dark ===== */
 
 :root {
-  --peek-h: 84px;
+  --peek-h: 118px;
   --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", Inter, system-ui, sans-serif;
   --font-display: -apple-system, BlinkMacSystemFont, "SF Pro Display", Inter, system-ui, sans-serif;
 
@@ -86,8 +86,8 @@
   will-change: transform; overflow: hidden;
   transition: transform .22s ease-out;
 }
-.fcard.enter { animation: card-in .6s cubic-bezier(.34, 1.5, .64, 1) both; }
-@keyframes card-in { 0% { transform: translateY(calc(var(--peek-h) + 20px)) scale(.96); opacity: .7; } 100% { transform: none; opacity: 1; } }
+.fcard.enter { animation: card-in .62s cubic-bezier(.3, 1.45, .5, 1) both; transition: none; }
+@keyframes card-in { 0% { transform: translateY(calc(var(--peek-h) + 24px)) scale(.965); opacity: .6; } 100% { transform: translateY(0) scale(1); opacity: 1; } }
 
 .c-head { display: flex; align-items: center; gap: 10px; margin-bottom: 22px; }
 .c-cat { font-size: 12px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: hsl(var(--hue) 55% var(--kicker-l)); }
@@ -109,7 +109,12 @@
 .c-body { margin: 0; font-size: clamp(15.5px, 4.3vw, 17.5px); line-height: 1.5; color: var(--ink-2); display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 5; overflow: hidden; overflow-wrap: anywhere; }
 
 .fcard-spacer { flex: 1; min-height: 10px; }
-.c-facts { font-size: 13px; color: var(--ink-3); white-space: pre; overflow: hidden; text-overflow: ellipsis; text-align: center; margin-bottom: 14px; font-variant-numeric: tabular-nums; }
+.c-stats { display: flex; justify-content: space-between; align-items: flex-end; gap: 6px; margin-bottom: 18px; padding: 0 2px; }
+.c-stat { min-width: 0; flex: 1; text-align: center; }
+.c-stat + .c-stat { border-left: 1px solid var(--line); }
+.c-stat-v { font-family: var(--font-display); font-weight: 800; font-size: clamp(16px, 4.6vw, 20px); letter-spacing: -.02em; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+.c-stat-v.lang { font-weight: 700; font-size: clamp(13px, 3.8vw, 16px); }
+.c-stat-k { font-size: 11px; color: var(--ink-3); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: .02em; }
 .fcard-dbg { font-size: 11px; color: var(--ink-4); text-align: center; margin-bottom: 6px; }
 
 /* actions */
@@ -150,15 +155,16 @@
   background: color-mix(in srgb, var(--bg-2) 70%, hsl(var(--peekhue) 40% var(--wash-l)));
   border-top: 1px solid var(--line);
   border-radius: 24px 24px 0 0;
-  transform: translateY(calc(var(--peek-h) * .4 * (1 - var(--p))));
+  transform: translateY(calc(var(--peek-h) * .28 * (1 - var(--p))));
+  box-shadow: 0 -12px 40px rgba(0,0,0,.18);
   transition: transform .15s ease-out;
   pointer-events: none; overflow: hidden;
 }
 .peek-strip.rising { animation: peek-rise .3s ease-in forwards; }
 @keyframes peek-rise { to { transform: translateY(-16px); } }
 .peek-label { font-size: 10.5px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-4); }
-.peek-title { font-family: var(--font-display); font-weight: 800; font-size: 17px; letter-spacing: -.02em; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--ink); }
-.peek-pitch { color: var(--ink-3); font-size: 13px; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.peek-title { font-family: var(--font-display); font-weight: 800; font-size: 19px; letter-spacing: -.02em; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--ink); }
+.peek-pitch { color: var(--ink-3); font-size: 13.5px; line-height: 1.35; margin-top: 3px; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
 
 /* undo toast */
 .toast { position: absolute; left: 50%; bottom: calc(var(--peek-h) + 104px + env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 5; background: var(--ink); color: var(--bg); padding: 10px 14px; border-radius: 14px; font-size: 13px; display: flex; gap: 12px; align-items: center; box-shadow: 0 8px 30px rgba(0,0,0,.3); white-space: nowrap; }

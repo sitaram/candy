@@ -133,6 +133,10 @@
   cursor: pointer; transition: transform .12s, background .12s;
 }
 .act:active { transform: scale(.9); }
+/* no focus square after a tap; keyboard focus still shows a ring */
+.act, .splash, .drag-layer { -webkit-tap-highlight-color: transparent; }
+.act:focus { outline: none; }
+.act:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .act.dive, .act.voice { width: 64px; height: 64px; color: var(--ink-2); }
 /* voice running: accent disc, stop glyph, a soft ring that breathes with the audio level */
 .act.voice.on {

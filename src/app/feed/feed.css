@@ -110,6 +110,8 @@
 .chip.fit { background: hsl(var(--hue) 55% var(--kicker-l) / .18); color: hsl(var(--hue) 55% var(--kicker-l)); }
 .chip.fit::before { content: "◎ "; opacity: .8; }
 .chip.explore { background: var(--fill); color: var(--accent); }
+.chip.hot { background: color-mix(in srgb, #ffb45a 16%, transparent); color: color-mix(in srgb, #ffb45a 75%, var(--ink)); }
+.chip.social { background: var(--fill); color: var(--ink-2); }
 
 .c-body { margin: 0; font-size: clamp(15.5px, 4.3vw, 17.5px); line-height: 1.5; color: var(--ink-2); display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 5; overflow: hidden; overflow-wrap: anywhere; }
 
@@ -141,14 +143,16 @@
 
 /* splash — page −1 */
 .fcard.splash { justify-content: space-between; align-items: center; text-align: center; padding-bottom: calc(28px + env(safe-area-inset-bottom)); --hue: 268; --hue2: 205; }
-.sp-mid { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 22px; }
+.sp-mid { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 18px; }
 .sp-brand { font-family: var(--font-display); font-weight: 900; font-size: clamp(56px, 18vw, 84px); letter-spacing: -.05em; line-height: 1; color: var(--ink); }
 .sp-line { font-size: clamp(19px, 5.4vw, 24px); font-weight: 500; letter-spacing: -.014em; color: var(--ink); }
 .sp-ops { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; margin-top: 8px; }
 .sp-ops > div { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 56px; padding: 10px 8px; border-radius: 14px; background: var(--fill); }
 .sp-ops b { font-family: var(--font-display); font-size: 20px; font-weight: 800; color: var(--ink); line-height: 1; }
 .sp-ops span { font-size: 11.5px; color: var(--ink-3); letter-spacing: .02em; }
+.sp-how { font-size: clamp(15px, 4.2vw, 17px); color: var(--ink-2); max-width: 34ch; line-height: 1.5; }
 .sp-sub { font-size: 14px; color: var(--ink-3); max-width: 28ch; line-height: 1.45; }
+.sp-sub a { color: var(--accent); text-decoration: none; font-weight: 600; }
 .sp-start { background: none; border: none; color: var(--ink-2); font: inherit; font-size: 14px; font-weight: 600; letter-spacing: .04em; display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer; padding: 8px 16px; }
 .sp-arrow { font-size: 22px; animation: bob 1.4s ease-in-out infinite; }
 @keyframes bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-7px); } }

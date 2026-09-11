@@ -79,10 +79,18 @@ function Card({
   const stop = (e: React.SyntheticEvent) => e.stopPropagation();
   const { fit, rest } = splitWhy(f.why);
 
-  // At most two reasons: fit first, then the single strongest other signal.
+  // Up to three reasons, in the order the ranker weighs them: your fit, then what is happening, then who noticed.
+  const ageD = (Date.now() - Date.parse(r.createdAt)) / 86_400_000;
+  const reasons: { t: string; k?: string }[] = [];
+  if (f.explore) reasons.push({ t: "✦ exploring", k: "explore" });
+  if (fit) reasons.push({ t: fit, k: "fit" });
+  if (ageD < 14) reasons.push({ t: `new · ${agoShort(r.createdAt)} old${r.starsPerDay >= 5 ? ` · +${fmt(Math.round(r.starsPerDay))}/day` : ""}`, k: "hot" });
+  else if (c?.hook === "viral" || r.starsPerDay >= 50) reasons.push({ t: `+${fmt(Math.round(r.starsPerDay))} stars/day`, k: "hot" });
+  else if (r.latestReleaseAt && (Date.now() - Date.parse(r.latestReleaseAt)) / 86_400_000 < 14) reasons.push({ t: `released ${agoShort(r.latestReleaseAt)} ago`, k: "hot" });
+  const hook = c && c.hook !== "none" && c.hook !== "big-org" && c.hook !== "viral" && c.hook !== "new-project" ? HOOK_LABEL[c.hook] : null;
+  if (hook) reasons.push({ t: hook });
   const social = rest.find((w) => w.startsWith("on "));
-  const hook = c && c.hook !== "none" && c.hook !== "big-org" ? HOOK_LABEL[c.hook] : null;
-  const second = hook ?? social ?? null;
+  if (social) reasons.push({ t: social.replace("Hacker News", "HN").replace(" and ", " + "), k: "social" });
 
   // Four-up snapshot: popularity, momentum, age, activity. Labels short enough never to wrap.
   const rel = r.latestReleaseAt ? agoShort(r.latestReleaseAt) : "";
@@ -114,11 +122,9 @@ function Card({
 
       <p className="c-pitch">{c?.pitch ?? r.description}</p>
 
-      {(fit || second || f.explore) && (
+      {reasons.length > 0 && (
         <div className="c-why">
-          {f.explore && <span className="chip explore">✦ exploring</span>}
-          {fit && <span className="chip fit">{fit}</span>}
-          {second && <span className="chip">{second}</span>}
+          {reasons.slice(0, 3).map((x) => <span key={x.t} className={`chip${x.k ? ` ${x.k}` : ""}`}>{x.t}</span>)}
         </div>
       )}
 
@@ -150,6 +156,7 @@ function Splash({ style, onStart }: { style?: CSSProperties; onStart: () => void
       <div className="sp-mid">
         <div className="sp-brand">candy</div>
         <div className="sp-line">Open source worth your time.</div>
+        <div className="sp-how">Swipe up and down through what’s new, TikTok-style. Swipe right on what you like, left on what you don’t, Tinder-style. It learns from every swipe.</div>
         <div className="sp-ops">
           <div><b>↑</b><span>next</span></div>
           <div><b>↓</b><span>back</span></div>
@@ -157,7 +164,7 @@ function Splash({ style, onStart }: { style?: CSSProperties; onStart: () => void
           <div><b>←</b><span>pass</span></div>
           <div><b>tap</b><span>deep dive</span></div>
         </div>
-        <div className="sp-sub">Every card says why it’s here. Every like teaches it.</div>
+        <div className="sp-sub">Every card says why it’s here. <a href="/about" onPointerDown={(e) => e.stopPropagation()}>Read more</a></div>
       </div>
       <button className="sp-start" onClick={onStart}><span className="sp-arrow">↑</span>swipe up to start</button>
     </section>
@@ -436,6 +443,7 @@ export function FeedClient() {
             </>
           ) : profileSize === 0 ? "swipe a few and it learns" : ""}
         </span>
+        <a href="/about" className="feed-me" title="What is this?">?</a>
         <a href="/me" className="feed-me">{count.like + count.skip > 0 ? `${count.like} 👍 · ${count.skip} 👎` : "me"}</a>
       </header>
 

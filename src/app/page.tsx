@@ -1,5 +1,6 @@
 import { categories, getItems, type Item, type Sort } from "@/lib/corpus/api";
 import type { Category } from "@/lib/enrich/card";
+import { listCollections } from "@/lib/store/collections";
 import { stats } from "@/lib/store/corpus";
 
 export const dynamic = "force-dynamic";
@@ -23,15 +24,17 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
   const sort = (SORTS.includes(sp.sort as Sort) ? sp.sort : "interest") as Sort;
   const cat = sp.category as Category | undefined;
   const flagged = sp.flagged === "1";
+  const collection = sp.collection;
 
-  const [items, cats, st] = await Promise.all([
-    getItems({ category: cat, excludeFlags: flagged ? [] : undefined, cardsOnly: !flagged }, sort, 200),
+  const [items, cats, st, cols] = await Promise.all([
+    getItems({ category: cat, collection, excludeFlags: flagged ? [] : undefined, cardsOnly: !flagged }, sort, 200),
     categories(),
     stats(),
+    listCollections(),
   ]);
   const q = (over: Record<string, string | undefined>) => {
     const p = new URLSearchParams();
-    for (const [k, v] of Object.entries({ sort, category: cat, flagged: flagged ? "1" : undefined, ...over })) if (v) p.set(k, v);
+    for (const [k, v] of Object.entries({ sort, category: cat, collection, flagged: flagged ? "1" : undefined, ...over })) if (v) p.set(k, v);
     return `/?${p}`;
   };
 
@@ -50,6 +53,16 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
           <a key={x} href={q({ sort: x })} className={x === sort ? "on" : ""}>{x}</a>
         ))}
       </nav>
+      {cols.length > 0 && (
+        <nav className="tabs wrap">
+          <a href={q({ collection: undefined })} className={!collection ? "on" : ""}>everything</a>
+          {cols.map((c) => (
+            <a key={c.name} href={q({ collection: c.name })} className={c.name === collection ? "on" : ""} title={c.description}>
+              {c.name} <span className="n">{c.count}</span>
+            </a>
+          ))}
+        </nav>
+      )}
       <nav className="tabs wrap">
         <a href={q({ category: undefined })} className={!cat ? "on" : ""}>all</a>
         {cats.map((c) => (

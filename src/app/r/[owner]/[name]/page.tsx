@@ -1,4 +1,6 @@
 import { getItemDetail, getItems, similar } from "@/lib/corpus/api";
+import { ensureItem } from "@/lib/corpus/ensure";
+import { collectionsOf } from "@/lib/store/collections";
 import { notFound } from "next/navigation";
 
 export const dynamic = "force-dynamic";
@@ -13,7 +15,10 @@ function ago(iso: string): string {
 export default async function RepoPage({ params }: { params: Promise<{ owner: string; name: string }> }) {
   const { owner, name } = await params;
   const id = `${owner}/${name}`;
-  const [d, sim] = await Promise.all([getItemDetail(id), similar(id, 8)]);
+  // Tier 3: fetch + enrich on demand if we have never seen this repo.
+  const ens = await ensureItem(id);
+  if (!ens.exists) notFound();
+  const [d, sim, cols] = await Promise.all([getItemDetail(ens.id), similar(ens.id, 8), collectionsOf(ens.id)]);
   if (!d) notFound();
   const { repo: r, card: c } = d;
   const alts = d.edges.alt.length ? await getItems({ exclude: [], cardsOnly: false }, "stars", 500).then((all) => all.filter((x) => d.edges.alt.includes(x.repo.id))) : [];
@@ -28,6 +33,8 @@ export default async function RepoPage({ params }: { params: Promise<{ owner: st
       <div className="meta">
         {r.stars.toLocaleString()}★ · {Math.round(r.starsPerDay)}/day · {r.language} · {r.license || "no license"} · created {ago(r.createdAt)} · pushed {ago(r.pushedAt)}
         {r.latestRelease && <> · latest <b>{r.latestRelease}</b> {ago(r.latestReleaseAt)}</>}
+        {cols.length > 0 && <> · in {cols.map((c) => <a key={c} href={`/?collection=${c}`}>{c}</a>)}</>}
+        {ens.fetched && <> · <span className="tag hook">fetched just now</span></>}
       </div>
 
       {c && (

@@ -5,8 +5,10 @@
  */
 import { CK, getCards, type StoredCard } from "../enrich";
 import type { Category, Flag, Hook } from "../enrich/card";
+import { collectionMembers } from "../store/collections";
 import { corpusIds, getEdges, getMentions, getRepos, getTags } from "../store/corpus";
 import { K, normId } from "../store/keys";
+import { getRaw } from "../store/raw";
 import { redis } from "../store/redis";
 import type { Mention, Repo } from "../store/types";
 
@@ -53,6 +55,7 @@ export interface Filter {
   source?: string;
   cardsOnly?: boolean; // default true
   exclude?: string[]; // ids already seen
+  collection?: string; // niche collection name
 }
 
 export type Sort = "interest" | "velocity" | "released" | "priority" | "stars" | "created" | "random";
@@ -146,7 +149,11 @@ export function sortItems(items: Item[], sort: Sort): Item[] {
 }
 
 export async function getItems(filter: Filter = {}, sort: Sort = "interest", limit = 50): Promise<Item[]> {
-  const all = await allItems();
+  let all = await allItems();
+  if (filter.collection) {
+    const members = new Set(await collectionMembers(filter.collection));
+    all = all.filter((it) => members.has(it.repo.id));
+  }
   return sortItems(all.filter((it) => matches(it, filter)), sort).slice(0, limit);
 }
 
@@ -162,8 +169,8 @@ export async function getItemDetail(id: string): Promise<ItemDetail | null> {
   const r = redis();
   const nid = item.repo.id;
   const [readme, relRaw, mentions, links, alt, buildsOn, awesomeTags] = await Promise.all([
-    r.get(K.raw(nid, "readme")),
-    r.get(K.raw(nid, "releases")),
+    getRaw(nid, "readme"),
+    getRaw(nid, "releases"),
     getMentions(nid),
     getEdges(nid, "links"),
     r.smembers(CK.alt(nid)),
@@ -178,7 +185,7 @@ export async function getItemDetail(id: string): Promise<ItemDetail | null> {
   }
   return {
     ...item,
-    readme: readme ?? "",
+    readme,
     releases: relRaw ? (JSON.parse(relRaw) as Release[]) : [],
     mentions,
     edges: { links, alt, buildsOn, awesomeSiblings },

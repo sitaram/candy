@@ -17,6 +17,7 @@ export async function GET(req: Request) {
     createdWithinDays: g("createdWithinDays") ? Number(g("createdWithinDays")) : undefined,
     releasedWithinDays: g("releasedWithinDays") ? Number(g("releasedWithinDays")) : undefined,
     source: g("source"),
+    collection: g("collection"),
     cardsOnly: g("cardsOnly") !== "0",
     exclude: ga("exclude"),
   };

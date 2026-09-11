@@ -134,6 +134,18 @@
 }
 .act:active { transform: scale(.9); }
 .act.dive, .act.voice { width: 64px; height: 64px; color: var(--ink-2); }
+/* voice running: accent disc, stop glyph, a soft ring that breathes with the audio level */
+.act.voice.on {
+  color: var(--bg); background: var(--accent); border-color: transparent;
+  box-shadow: 0 0 0 calc(2px + var(--lvl, 0) * 14px) color-mix(in srgb, var(--accent) 22%, transparent);
+  transition: transform .12s, box-shadow .09s linear;
+}
+.act.voice.on:hover { background: var(--accent); color: var(--bg); }
+.act.voice.on.connecting { animation: vpulse 1.2s ease-in-out infinite; }
+@keyframes vpulse { 0%, 100% { box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 22%, transparent); } 50% { box-shadow: 0 0 0 10px color-mix(in srgb, var(--accent) 10%, transparent); } }
+.act.voice.on .stop { width: 20px; height: 20px; border-radius: 4px; background: currentColor; display: block; }
+.toast.err { background: var(--skip); color: #fff; }
+.toast.err button { color: #fff; }
 .act svg { width: 26px; height: 26px; }
 .act:hover { background: var(--fill-2); color: var(--ink); }
 

@@ -144,7 +144,7 @@ function Card({
         <button className="act dive" onClick={onOpen} aria-label="Deep dive" title="Deep dive (enter, or tap the card)">{I.open}</button>
         <button className={`act voice${voice && voice.state !== "idle" ? ` on ${voice.state}` : ""}`} style={{ "--lvl": voice?.level ?? 0 } as CSSProperties}
           onClick={(e) => { e.stopPropagation(); onVoice?.(); }} aria-label={voice && voice.state !== "idle" ? "End conversation" : "Talk about this"} title="Talk about this (v)">
-          {voice && voice.state !== "idle" ? <span className="bars" aria-hidden><i /><i /><i /><i /><i /></span> : I.voice}
+          {voice && voice.state !== "idle" ? <span className="stop" aria-hidden /> : I.voice}
         </button>
       </div>
       <div className="stamp like">YES</div>
@@ -545,7 +545,6 @@ export function FeedClient() {
             </div>
           )}
           {voice.error && <div className="toast err">{voice.error}<button onClick={() => voice.stop()}>ok</button></div>}
-          {voice.active && voice.transcript && !undo && <div className="toast voice">{voice.transcript}</div>}
           {undo && (
             <div className="toast">
               {undo.kind === "like" ? "Marked interesting" : "Skipped"} <b>{undo.item.id.split("/")[1]}</b>

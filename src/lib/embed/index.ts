@@ -6,14 +6,15 @@
  * u:{uid}:tastew    STRING   total |weight| behind the taste vector
  *
  * The term-vector profile stays the source of *reasons*; this is the source of *score*.
- * voyage-3-lite: 512 dims, 200M free tokens, then $0.02 per 1M — a card is ~120 tokens.
- * Documents are embedded with input_type "document"; a future query path should use "query".
+ * Provider is picked from env: OPENAI_API_KEY → text-embedding-3-small at 512 dims (the model
+ * supports Matryoshka truncation, so 512 keeps Redis small at almost no quality cost; ~$0.002
+ * for the whole corpus). Else VOYAGE_API_KEY → voyage-3-lite, also 512. Same DIM either way,
+ * but vectors from the two are NOT comparable — run `pnpm embed --force` if you switch.
  */
 import { redis } from "../store/redis";
 import type { Item } from "../corpus/api";
 
 export const DIM = 512;
-const MODEL = "voyage-3-lite";
 
 export const EK = {
   emb: (id: string) => `emb:${id}`,
@@ -35,15 +36,25 @@ export function cardText(it: Item): string {
   ].filter(Boolean).join("\n");
 }
 
+export function provider(): "openai" | "voyage" {
+  if (process.env.OPENAI_API_KEY) return "openai";
+  if (process.env.VOYAGE_API_KEY) return "voyage";
+  throw new Error("set OPENAI_API_KEY or VOYAGE_API_KEY");
+}
+
 export async function embedTexts(texts: string[], inputType: "document" | "query" = "document"): Promise<Float32Array[]> {
-  const key = process.env.VOYAGE_API_KEY;
-  if (!key) throw new Error("VOYAGE_API_KEY missing");
-  const res = await fetch("https://api.voyageai.com/v1/embeddings", {
+  const prov = provider();
+  const url = prov === "openai" ? "https://api.openai.com/v1/embeddings" : "https://api.voyageai.com/v1/embeddings";
+  const key = prov === "openai" ? process.env.OPENAI_API_KEY : process.env.VOYAGE_API_KEY;
+  const body = prov === "openai"
+    ? { model: "text-embedding-3-small", input: texts, dimensions: DIM, encoding_format: "float" }
+    : { model: "voyage-3-lite", input: texts, input_type: inputType, truncation: true };
+  const res = await fetch(url, {
     method: "POST",
     headers: { "content-type": "application/json", authorization: `Bearer ${key}` },
-    body: JSON.stringify({ model: MODEL, input: texts, input_type: inputType, truncation: true }),
+    body: JSON.stringify(body),
   });
-  if (!res.ok) throw new Error(`embeddings ${res.status}: ${(await res.text()).slice(0, 200)}`);
+  if (!res.ok) throw new Error(`embeddings(${prov}) ${res.status}: ${(await res.text()).slice(0, 200)}`);
   const j = (await res.json()) as { data: { index: number; embedding: number[] }[] };
   return j.data.sort((a, b) => a.index - b.index).map((d) => normalize(Float32Array.from(d.embedding)));
 }

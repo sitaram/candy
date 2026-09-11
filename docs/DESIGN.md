@@ -46,7 +46,7 @@ GitHub knows *what* a repo is. Nobody has built the layer that knows **why it ma
 | Haiku for cards, tool-use schema | $0.007/repo, schema-enforced output | Over-scores famous repos; fixed with an explicit scale in the prompt |
 | GitHub + HN + Lobsters + RSS + awesome lists as sources | All free, no scraping, complementary signals | GitHub-only universe; Hugging Face and registries are gaps |
 | Anonymous cookie user, no auth | Personalization from the first swipe | Real accounts later |
-| Terms *and* embeddings, blended 40/60 | Terms explain, vectors discriminate; embedding a card is ~120 tokens on Voyage (free to 200M) | Two models to keep honest; the blend weight is a guess until there is data |
+| Terms *and* embeddings, blended 40/60 | Terms explain, vectors discriminate; embedding the whole corpus costs about $0.002 | Two models to keep honest; the blend weight is a guess until there is data |
 
 ## Learnings
 

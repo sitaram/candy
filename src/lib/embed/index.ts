@@ -86,6 +86,19 @@ export async function putEmbeddings(pairs: { id: string; v: Float32Array }[]): P
 }
 
 /** All corpus vectors in one round trip. Missing ids map to null. */
+/**
+ * Whole-corpus vector cache for search: one Redis round-trip per 60 s per process instead of one per
+ * query. ~10k × 512 × 4 B = 20 MB; fine for a Node process, and vectors only change when cards do.
+ */
+let all: { at: number; m: Map<string, Float32Array>; ids: string } | null = null;
+export async function getEmbeddingsCached(ids: string[]): Promise<Map<string, Float32Array>> {
+  const sig = `${ids.length}:${ids[0]}:${ids[ids.length - 1]}`;
+  if (all && all.ids === sig && Date.now() - all.at < 60_000) return all.m;
+  const m = await getEmbeddings(ids);
+  all = { at: Date.now(), m, ids: sig };
+  return m;
+}
+
 export async function getEmbeddings(ids: string[]): Promise<Map<string, Float32Array>> {
   const out = new Map<string, Float32Array>();
   if (!ids.length) return out;

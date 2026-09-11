@@ -13,7 +13,7 @@
  * absent or the embedding call fails. No LLM on the path; one embeddings call (~60 ms).
  */
 import { allItems, type Item } from "../corpus/api";
-import { embedTexts, getEmbeddings, getTaste, dot } from "../embed";
+import { embedTexts, getEmbeddings, getEmbeddingsCached, getTaste, dot } from "../embed";
 import { baseScore, fitScore, tasteFit } from "./rank";
 import { getProfile, isSaved } from "./state";
 import type { FeedItem } from "./feed";
@@ -71,10 +71,12 @@ export async function search(uid: string, qRaw: string, limit = 20): Promise<Sea
     if (kws.length) {
       const c = it.card!;
       const tags = c.tags.map((t) => t.toLowerCase());
-      const hay = `${c.pitch} ${c.whyCare} ${c.category} ${c.ecosystem.join(" ")} ${c.audience.join(" ")}`.toLowerCase();
+      const lang = (it.repo.language ?? "").toLowerCase();
+      const hay = `${c.pitch} ${c.whyCare} ${c.category} ${c.ecosystem.join(" ")} ${c.audience.join(" ")} ${it.repo.description}`.toLowerCase();
       let k = 0;
       for (const w of kws) {
-        if (tags.some((t) => t === w)) k += 2;
+        if (lang && lang === w) k += 2;
+        else if (tags.some((t) => t === w)) k += 2;
         else if (tags.some((t) => t.includes(w))) k += 1.2;
         else if (hay.includes(w)) k += 0.6;
       }
@@ -90,7 +92,7 @@ export async function search(uid: string, qRaw: string, limit = 20): Promise<Sea
   if (!nameQuery || q.includes(" ")) {
     try {
       const [qv] = await embedTexts([q], "query");
-      const vectors = await getEmbeddings(carded.map((it) => it.repo.id));
+      const vectors = await getEmbeddingsCached(carded.map((it) => it.repo.id));
       if (vectors.size > 0) {
         semantic = true;
         const scored: { it: Item; cos: number }[] = [];
@@ -119,8 +121,12 @@ export async function search(uid: string, qRaw: string, limit = 20): Promise<Sea
   const tasteVectors = taste && taste.w > 0 ? await getEmbeddings(ids) : undefined;
   const bestSem = Math.max(...Array.from(hits.values()).map((h) => h.sem), 0.0001);
   const ranked = Array.from(hits.values()).map((h) => {
-    // Relevance in [0,1]: semantic relative to the best hit; lexical saturates at 1 for an exact.
-    const rel = Math.max(h.sem / bestSem, Math.min(1, h.lex / 6));
+    // Relevance in [0,1]. Exact/name hits saturate. Otherwise semantic finds and lexical confirms:
+    // a candidate the embedding likes *and* that says "rust" / "cli" outranks one the embedding
+    // merely likes — cosine over short queries is noisy about language and form factor.
+    const semRel = h.sem / bestSem;
+    const lexRel = Math.min(1, h.lex / 3);
+    const rel = h.lex >= 4 ? 1 : h.sem > 0 ? 0.7 * semRel + 0.3 * lexRel : 0.6 * lexRel;
     const b = baseScore(h.it);
     const f = fitScore(h.it, profile);
     const t = tasteFit(tasteVectors?.get(h.it.repo.id), taste);

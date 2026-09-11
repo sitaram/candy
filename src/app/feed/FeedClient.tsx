@@ -34,7 +34,8 @@ function post(id: string, kind: Action) {
 /* ---------- icons (inline, no deps) ---------- */
 const I = {
   bookmark: (filled: boolean) => <svg viewBox="0 0 24 24" width="22" height="22" fill={filled ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z" /></svg>,
-  mic: <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" /><path d="M19 10v2a7 7 0 0 1-14 0v-2" /><line x1="12" x2="12" y1="19" y2="22" /></svg>,
+  // live-voice bars — the glyph Siri / ChatGPT Voice / Gemini Live use for a real-time conversation
+  voice: <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M4 10v4" /><path d="M8 7v10" /><path d="M12 4v16" /><path d="M16 7v10" /><path d="M20 10v4" /></svg>,
   // "maximize": two diagonal corner arrows — reads as "open this up"
   open: <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 3h6v6" /><path d="m21 3-7 7" /><path d="M9 21H3v-6" /><path d="m3 21 7-7" /></svg>,
 };
@@ -134,7 +135,7 @@ function Card({
 
       <div className="fcard-actions" onPointerDown={stop}>
         <button className="act dive" onClick={onOpen} aria-label="Deep dive" title="Deep dive (enter, or tap the card)">{I.open}</button>
-        <button className="act voice" onClick={(e) => { e.stopPropagation(); onVoice?.(); }} aria-label="Talk about this (coming soon)" title="Talk about this — coming soon">{I.mic}</button>
+        <button className="act voice" onClick={(e) => { e.stopPropagation(); onVoice?.(); }} aria-label="Talk about this (coming soon)" title="Talk about this — coming soon">{I.voice}</button>
       </div>
       <div className="stamp like">YES</div>
       <div className="stamp skip">NOPE</div>
@@ -183,6 +184,7 @@ export function FeedClient() {
   const [hinting, setHinting] = useState(false);
   const [voiceNote, setVoiceNote] = useState(false);
   const lastTouch = useRef(Date.now());
+  const peekDown = useRef<{ x: number; y: number } | null>(null);
   const seenRef = useRef<Set<string>>(new Set());
   const reacted = useRef<Map<string, Decision>>(new Map());
   const fetching = useRef(false);
@@ -427,7 +429,20 @@ export function FeedClient() {
               {prev && <Card key={prev.id} f={prev} style={prevStyle} className="rail" saved={saved.has(prev.id)} reaction={reacted.current.get(prev.id)} />}
               {next && <Card key={next.id} f={next} style={nextStyle} className="rail" saved={saved.has(next.id)} reaction={reacted.current.get(next.id)} />}
               {next && !ghost && !intro && (
-                <div className="peek-strip" style={{ opacity: peekFade, "--peekhue": hueOf(next) } as CSSProperties} aria-hidden>
+                <div className="peek-strip" style={{ opacity: peekFade, "--peekhue": hueOf(next) } as CSSProperties} role="button" aria-label={`Next: ${next.id}`}
+                  onPointerDown={(e) => {
+                    // A tap pages forward; a drag hands off to the card so "swipe up from the peek" still works.
+                    peekDown.current = { x: e.clientX, y: e.clientY };
+                    lastTouch.current = Date.now(); setHinting(false);
+                    onDown(e as unknown as RPointerEvent<HTMLDivElement>);
+                  }}
+                  onPointerMove={(e) => onMove(e as unknown as RPointerEvent<HTMLDivElement>)}
+                  onPointerUp={(e) => {
+                    const p = peekDown.current; peekDown.current = null;
+                    if (p && Math.hypot(e.clientX - p.x, e.clientY - p.y) < 10) { start.current = null; setDrag({ dx: 0, dy: 0, axis: null, active: false }); go(idx + 1); return; }
+                    onUp(e as unknown as RPointerEvent<HTMLDivElement>);
+                  }}
+                  onPointerCancel={(e) => { peekDown.current = null; onUp(e as unknown as RPointerEvent<HTMLDivElement>); }}>
                   <div className="peek-label">up next · {next.item.card ? CAT_LABEL[next.item.card.category] ?? next.item.card.category : ""}</div>
                   <div className="peek-title">{next.id.split("/")[1]}</div>
                   <div className="peek-pitch">{next.item.card?.pitch}</div>

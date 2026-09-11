@@ -11,7 +11,10 @@
     "discover": "node --env-file-if-exists=.env.local --import tsx scripts/discover.mts",
     "crawl": "node --env-file-if-exists=.env.local --import tsx scripts/crawl.mts",
     "stats": "node --env-file-if-exists=.env.local --import tsx scripts/stats.mts",
-    "enrich": "node --env-file-if-exists=.env.local --import tsx scripts/enrich.mts"
+    "enrich": "node --env-file-if-exists=.env.local --import tsx scripts/enrich.mts",
+    "snapshot": "node --env-file-if-exists=.env.local --import tsx scripts/snapshot.mts",
+    "pipeline": "node --env-file-if-exists=.env.local --import tsx scripts/pipeline.mts",
+    "enrich:sample": "node --env-file-if-exists=.env.local --import tsx scripts/enrich-sample.mts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.124.0",

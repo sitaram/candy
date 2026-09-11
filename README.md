@@ -27,3 +27,10 @@ pnpm dev                     # http://localhost:3000
 
 If your shell has a Socket Firewall / corporate proxy, Node's `fetch` will fail TLS. Run scripts with
 `env -u https_proxy -u HTTPS_PROXY -u NODE_EXTRA_CA_CERTS pnpm crawl ...`.
+
+## Iterating on product without waiting on data
+
+- **Read API**: `src/lib/corpus/api.ts` is the only thing product code imports. `getItems(filter, sort, n)`, `getItem`, `getItemDetail`, `similar`, `search`, `categories`. HTTP mirror at `/api/items` and `/api/items/:owner/:name`.
+- **Snapshot**: `pnpm snapshot` dumps Redis to `data/snapshot-*.json.gz`. `pnpm snapshot restore` loads it anywhere. `pnpm snapshot restore --fixture` loads only the top-60 for fast dev/tests.
+- **Pipeline loop**: `pnpm pipeline` runs discover/crawl/enrich forever with budgets (`CRAWL_PER_CYCLE`, `ENRICH_PER_CYCLE`, `CYCLE_MIN`, `LLM_USD_PER_DAY`). Product code never calls GitHub or an LLM synchronously.
+- **Pages**: `/` list, `/r/:owner/:name` deep-dive (card, voice script, similar, releases, mentions, graph, README).

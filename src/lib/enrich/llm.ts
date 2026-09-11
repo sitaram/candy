@@ -88,6 +88,37 @@ README:
 ${clip(readme, 12_000) || "(empty)"}`;
 }
 
+/** The schema is enforced, but models still occasionally return a string where an array is declared. Coerce. */
+export function normalizeCard(raw: Record<string, unknown>): Card {
+  const arr = (v: unknown): string[] => {
+    if (Array.isArray(v)) return v.map(String).filter(Boolean);
+    if (typeof v === "string" && v.trim()) return v.split(/[,;\n]/).map((s) => s.trim()).filter(Boolean);
+    return [];
+  };
+  const str = (v: unknown, d = ""): string => (typeof v === "string" ? v : d);
+  const num = (v: unknown, d = 0): number => (typeof v === "number" && Number.isFinite(v) ? v : Number(v) || d);
+  const flags = arr(raw.flags).filter((f): f is Card["flags"][number] =>
+    ["spam-suspect", "star-farm-suspect", "no-substance", "non-english", "abandoned", "fork-of-known", "ai-slop"].includes(f),
+  );
+  return {
+    pitch: str(raw.pitch),
+    whyCare: str(raw.whyCare),
+    voice: str(raw.voice),
+    category: (CATEGORIES.includes(raw.category as Card["category"]) ? raw.category : "other") as Card["category"],
+    tags: arr(raw.tags).map((t) => t.toLowerCase()),
+    audience: arr(raw.audience),
+    ecosystem: arr(raw.ecosystem).map((t) => t.toLowerCase()),
+    maturity: str(raw.maturity, "usable") as Card["maturity"],
+    kind: str(raw.kind, "other") as Card["kind"],
+    alternatives: arr(raw.alternatives),
+    buildsOn: arr(raw.buildsOn),
+    hook: str(raw.hook, "none") as Card["hook"],
+    interest: Math.max(0, Math.min(10, Math.round(num(raw.interest)))),
+    flags,
+    lang: str(raw.lang, "en"),
+  };
+}
+
 export interface Enriched {
   card: Card;
   model: string;
@@ -107,7 +138,7 @@ export async function enrichOne(repo: Repo, readme: string, releases: Release[],
   const block = res.content.find((b) => b.type === "tool_use");
   if (!block || block.type !== "tool_use") throw new Error("no tool_use in response");
   return {
-    card: block.input as Card,
+    card: normalizeCard(block.input as Record<string, unknown>),
     model: res.model,
     inputTokens: res.usage.input_tokens,
     outputTokens: res.usage.output_tokens,

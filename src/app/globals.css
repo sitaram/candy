@@ -72,3 +72,24 @@ pre.readme { max-height: 70vh; overflow: auto; }
 .act.save { border-color: #6a5a2a; color: #e8d59a; }
 .act.dive { border-color: #3a4a6a; color: #9fbce0; }
 @media (min-width: 720px) { .feed { padding-top: 40px; } .fcard { padding: 28px; } }
+
+/* ---- swipe ---- */
+.stack { position: relative; display: grid; flex: 1; align-items: start; }
+.stack > * { grid-area: 1 / 1; }
+.drag-layer { position: relative; cursor: grab; user-select: none; -webkit-user-select: none; }
+.drag-layer:active { cursor: grabbing; }
+.fcard { will-change: transform; }
+.fcard.peek { pointer-events: none; opacity: .6; filter: saturate(.6); transform-origin: top center; transition: transform .2s ease-out; }
+.fcard.hint-like { border-color: #3a8a5a; }
+.fcard.hint-skip { border-color: #8a3a3a; }
+.fcard.hint-save { border-color: #8a7a2a; }
+.fcard.hint-dive { border-color: #3a5a8a; }
+.swipe-hint { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; font-size: 40px; font-weight: 800; letter-spacing: .02em; text-shadow: 0 2px 20px #000; }
+.swipe-hint.like { color: #9fe0b5; }
+.swipe-hint.skip { color: #e09f9f; }
+.swipe-hint.save { color: #e8d59a; }
+.swipe-hint.dive { color: #9fbce0; }
+.fcard-foot a { position: relative; z-index: 1; }
+@media (max-height: 760px) {
+  .fcard-whycare { display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+}

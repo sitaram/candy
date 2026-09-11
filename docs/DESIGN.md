@@ -1,5 +1,7 @@
 # candy — design rationale
 
+**Live:** https://candy-sitaram1-s-teams.vercel.app — open it on a phone; the feed is built for a thumb.
+
 **Problem.** Engineers learn about useful open source by accident. Newsletters and trending pages exist, but they are one more thing to read, they are the same for everyone, and they stop at the headline. The time most of us actually have free is walking or driving.
 
 **Idea.** Ten minutes a day, personalized, navigable, and deep. Two modalities on one backend: a swipeable feed when you have a screen, voice exploration when you don't. Every item says *why it is here*, and any item can be opened, questioned, or compared, not just glanced at.

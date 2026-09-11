@@ -19,15 +19,16 @@
 .feed-me { color: #b9a6ff; text-decoration: none; white-space: nowrap; }
 
 .deck-wrap { flex: 1; min-height: 0; display: flex; }
-.deck { flex: 1; min-width: 0; display: flex; flex-direction: column; position: relative; padding: 4px 12px calc(12px + env(safe-area-inset-bottom)); }
-.stack { position: relative; flex: 1; min-height: 0; display: grid; }
-.stack > * { grid-area: 1 / 1; min-height: 0; }
-.drag-layer { position: relative; display: flex; cursor: grab; user-select: none; -webkit-user-select: none; touch-action: none; min-height: 0; }
+.deck { flex: 1; min-width: 0; width: 100%; box-sizing: border-box; display: flex; flex-direction: column; position: relative; padding: 4px 12px calc(12px + env(safe-area-inset-bottom)); }
+.deck-wrap { min-width: 0; width: 100%; }
+.stack { position: relative; flex: 1; min-height: 0; min-width: 0; width: 100%; display: grid; grid-template-columns: minmax(0, 1fr); }
+.stack > * { grid-area: 1 / 1; min-height: 0; min-width: 0; width: 100%; }
+.drag-layer { position: relative; display: flex; cursor: grab; user-select: none; -webkit-user-select: none; touch-action: none; min-height: 0; min-width: 0; width: 100%; }
 .drag-layer:active { cursor: grabbing; }
 
 /* card fills the deck */
 .fcard {
-  position: relative; flex: 1; min-height: 0;
+  position: relative; flex: 1; min-height: 0; min-width: 0; width: 100%; box-sizing: border-box;
   display: flex; flex-direction: column; gap: 10px;
   background: #17171a; border: 1px solid #26262b; border-radius: 22px;
   padding: 18px 18px 14px;
@@ -41,11 +42,12 @@
 .fcard-why { flex: 1; color: #b9a6ff; font-size: 13px; line-height: 1.35; }
 .fcard-title { font-size: 20px; margin: 0; display: flex; align-items: center; gap: 10px; min-width: 0; }
 .fcard-id { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.fcard-pitch { font-size: 17px; line-height: 1.4; margin: 0; }
-.fcard-whycare { color: #a0a0a6; margin: 0; line-height: 1.45; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 6; overflow: hidden; }
+.fcard-pitch { font-size: 17px; line-height: 1.4; margin: 0; overflow-wrap: anywhere; }
+.fcard-whycare { color: #a0a0a6; margin: 0; line-height: 1.45; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 6; overflow: hidden; overflow-wrap: anywhere; }
+.fcard-why { overflow-wrap: anywhere; }
 .fcard-spacer { flex: 1; }
 .fcard-dbg { font-size: 11px; color: #6a6a70; }
-.tags.scroll { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; margin: 0 -18px; padding: 0 18px; }
+.tags.scroll { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; margin: 0 -18px; padding: 0 18px; min-width: 0; max-width: calc(100% + 36px); }
 .tags.scroll::-webkit-scrollbar { display: none; }
 .tags.scroll .tag { white-space: nowrap; flex: 0 0 auto; }
 

@@ -232,6 +232,7 @@ export function FeedClient() {
     const t = setInterval(() => {
       if (Date.now() - lastTouch.current < HINT_EVERY - 500) return;
       if (start.current || busy.current || document.hidden || window.matchMedia("(min-width: 900px)").matches) return;
+      lastTouch.current = Date.now();            // one breath per idle minute, not one per second
       setHinting(true);
       setTimeout(() => setHinting(false), 3200);
     }, 1000);

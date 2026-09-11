@@ -55,11 +55,7 @@
   overflow: hidden;
   padding-top: env(safe-area-inset-top);
   --hue: 230; --hue2: 270;
-  background:
-    radial-gradient(130% 70% at 50% -20%, hsl(var(--hue) 55% var(--wash-l) / var(--wash-a)), transparent 62%),
-    radial-gradient(80% 50% at 110% 105%, hsl(var(--hue2) 55% var(--wash-l) / calc(var(--wash-a) * .75)), transparent 60%),
-    linear-gradient(180deg, var(--bg-2) 0%, var(--bg) 100%);
-  transition: background .7s ease;
+  background: var(--bg);
   -webkit-font-smoothing: antialiased;
 }
 
@@ -75,13 +71,13 @@
 .deck { flex: 1; min-width: 0; width: 100%; box-sizing: border-box; display: flex; flex-direction: column; position: relative; }
 .stack { position: relative; flex: 1; min-height: 0; min-width: 0; width: 100%; display: grid; grid-template-columns: minmax(0, 1fr); overflow: hidden; }
 .stack > * { grid-area: 1 / 1; min-height: 0; min-width: 0; width: 100%; }
+.drag-layer .fcard { box-shadow: 0 -18px 60px rgba(0,0,0,.35); }
 .drag-layer { position: relative; display: flex; cursor: grab; user-select: none; -webkit-user-select: none; touch-action: none; min-height: 0; min-width: 0; width: 100%; z-index: 2; }
 .drag-layer:active { cursor: grabbing; }
 .drag-layer.ghost { pointer-events: none; z-index: 3; }
 /* prev/next cards sit on a vertical rail above/below the current one */
 .fcard.rail { z-index: 1; pointer-events: none; }
-.fcard.rail::before { content: ""; position: absolute; left: 24px; right: 24px; top: 0; height: 1px; background: var(--line); }
-.stack .fcard { background: linear-gradient(180deg, transparent, transparent); }
+.fcard.rail::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 1px; background: var(--line); }
 .peek-strip { z-index: 2; }
 
 /* ---- card ---- */
@@ -90,7 +86,10 @@
   display: flex; flex-direction: column;
   padding: 14px 24px calc(var(--peek-h) + 12px + env(safe-area-inset-bottom));
   will-change: transform; overflow: hidden;
-  background: transparent;
+  background:
+    radial-gradient(130% 70% at 50% -20%, hsl(var(--hue) 55% var(--wash-l) / var(--wash-a)), transparent 62%),
+    radial-gradient(80% 50% at 110% 105%, hsl(var(--hue2) 55% var(--wash-l) / calc(var(--wash-a) * .75)), transparent 60%),
+    linear-gradient(180deg, var(--bg-2) 0%, var(--bg) 100%);
 }
 
 .c-head { display: flex; align-items: center; gap: 10px; margin-bottom: 22px; }
@@ -123,7 +122,7 @@
 .fcard-dbg { font-size: 11px; color: var(--ink-4); text-align: center; margin-bottom: 6px; }
 
 /* actions */
-.fcard-actions { display: flex; justify-content: center; align-items: center; gap: 28px; }
+.fcard-actions { display: flex; justify-content: center; align-items: center; gap: 22px; }
 .act {
   width: 64px; height: 64px; border-radius: 50%;
   border: 1.5px solid var(--line); background: var(--fill); color: var(--ink);
@@ -134,14 +133,30 @@
 .act:active { transform: scale(.9); }
 .act.up { color: var(--like); }
 .act.down { color: var(--skip); }
-.act.open { width: 52px; height: 52px; color: var(--ink-3); }
+.act.dive { width: auto; height: 44px; padding: 0 16px 0 12px; border-radius: 999px; gap: 6px; color: var(--ink-2); font-size: 13px; font-weight: 600; letter-spacing: .01em; }
+.act.dive svg { width: 18px; height: 18px; }
 .act.up:hover { background: color-mix(in srgb, var(--like) 14%, transparent); }
 .act.down:hover { background: color-mix(in srgb, var(--skip) 14%, transparent); }
-.act.open:hover { background: var(--fill-2); }
+.act.dive:hover { background: var(--fill-2); color: var(--ink); }
 
 .icon-btn { background: none; border: none; color: var(--ink-3); padding: 6px; cursor: pointer; border-radius: 10px; display: inline-flex; text-decoration: none; font-size: 18px; line-height: 1; }
 .icon-btn:hover { color: var(--ink); background: var(--fill); }
 .icon-btn.bm.on { color: #e6b422; }
+
+/* splash — page −1 */
+.fcard.splash { justify-content: space-between; align-items: center; text-align: center; padding-bottom: calc(28px + env(safe-area-inset-bottom)); --hue: 268; --hue2: 205; }
+.sp-mid { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 22px; }
+.sp-brand { font-family: var(--font-display); font-weight: 900; font-size: clamp(56px, 18vw, 84px); letter-spacing: -.05em; line-height: 1; color: var(--ink); }
+.sp-line { font-size: clamp(19px, 5.4vw, 24px); font-weight: 500; letter-spacing: -.014em; color: var(--ink); }
+.sp-ops { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; margin-top: 8px; }
+.sp-ops > div { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 56px; padding: 10px 8px; border-radius: 14px; background: var(--fill); }
+.sp-ops b { font-family: var(--font-display); font-size: 20px; font-weight: 800; color: var(--ink); line-height: 1; }
+.sp-ops span { font-size: 11.5px; color: var(--ink-3); letter-spacing: .02em; }
+.sp-sub { font-size: 14px; color: var(--ink-3); max-width: 28ch; line-height: 1.45; }
+.sp-start { background: none; border: none; color: var(--ink-2); font: inherit; font-size: 14px; font-weight: 600; letter-spacing: .04em; display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer; padding: 8px 16px; }
+.sp-arrow { font-size: 22px; animation: bob 1.4s ease-in-out infinite; }
+@keyframes bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-7px); } }
+.fcard.splash.rail .sp-start { visibility: hidden; }
 
 /* swipe feedback */
 .drag-layer::after { content: ""; position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity .1s; }
@@ -224,7 +239,8 @@
   .deck-wrap { max-width: 1180px; width: 100%; margin: 0 auto; gap: 24px; padding: 0 24px 24px; box-sizing: border-box; }
   .deck { flex: 0 0 560px; padding: 0; }
   .stack { max-height: 720px; overflow: hidden; border-radius: 28px; }
-  .fcard { padding: 28px 32px 26px !important; background: color-mix(in srgb, var(--bg-2) 82%, transparent); border: 1px solid var(--line); border-radius: 28px; box-shadow: 0 24px 70px rgba(0,0,0,.25); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); }
+  .fcard { padding: 28px 32px 26px !important; border-radius: 28px; }
+  .stack { border: 1px solid var(--line); box-shadow: 0 24px 70px rgba(0,0,0,.25); }
   .c-name { font-size: 42px; }
   .c-pitch { font-size: 22px; }
   .c-body { font-size: 16.5px; -webkit-line-clamp: 7; }

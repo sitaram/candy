@@ -94,8 +94,9 @@ function Card({
       : { v: agoShort(r.pushedAt), k: "last push" },
   ];
 
+  const hue = hueOf(f);
   return (
-    <article className={`fcard ${className ?? ""}`} style={style}>
+    <article className={`fcard ${className ?? ""}`} style={{ ...style, "--hue": hue, "--hue2": (hue + 40) % 360 } as CSSProperties}>
       <header className="c-head">
         <span className="c-cat">{c ? CAT_LABEL[c.category] ?? c.category : ""}</span>
         <span className="c-spacer" />
@@ -135,7 +136,7 @@ function Card({
 
       <div className="fcard-actions" onPointerDown={stop}>
         <button className="act down" onClick={() => onDecide?.("skip")} aria-label="Not for me" title="Not for me (←)">{I.down}</button>
-        <button className="act open" onClick={onOpen} aria-label="Read more" title="Read more (↑ / enter)">{I.open}</button>
+        <button className="act dive" onClick={onOpen} aria-label="Deep dive" title="Deep dive (enter, or tap the card)">{I.open}<span>deep dive</span></button>
         <button className="act up" onClick={() => onDecide?.("like")} aria-label="Interesting" title="Interesting (→)">{I.up}</button>
       </div>
       <div className="stamp like">YES</div>
@@ -144,10 +145,31 @@ function Card({
   );
 }
 
+/* ---------- splash: page −1 on the rail ---------- */
+function Splash({ style, onStart }: { style?: CSSProperties; onStart: () => void }) {
+  return (
+    <section className="fcard splash" style={style}>
+      <div className="sp-mid">
+        <div className="sp-brand">candy</div>
+        <div className="sp-line">Open source worth your time.</div>
+        <div className="sp-ops">
+          <div><b>↑</b><span>next</span></div>
+          <div><b>↓</b><span>back</span></div>
+          <div><b>→</b><span>like</span></div>
+          <div><b>←</b><span>pass</span></div>
+          <div><b>tap</b><span>deep dive</span></div>
+        </div>
+        <div className="sp-sub">Every card says why it’s here. Every like teaches it.</div>
+      </div>
+      <button className="sp-start" onClick={onStart}><span className="sp-arrow">↑</span>swipe up to start</button>
+    </section>
+  );
+}
+
 /* ---------- deck ---------- */
 export function FeedClient() {
   const [items, setItems] = useState<FeedItem[]>([]);
-  const [idx, setIdx] = useState(0);
+  const [idx, setIdx] = useState(-1);   // −1 = splash
   const [since, setSince] = useState<Feed["since"] | null>(null);
   const [profileSize, setProfileSize] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -198,7 +220,8 @@ export function FeedClient() {
   }, []);
   useEffect(() => { void load(true); }, [load]);
 
-  const cur = items[idx];
+  const intro = idx < 0;
+  const cur = intro ? undefined : items[idx];
   const prev = idx > 0 ? items[idx - 1] : undefined;
   const next = items[idx + 1];
 
@@ -233,13 +256,13 @@ export function FeedClient() {
     requestAnimationFrame(() => requestAnimationFrame(() => {
       setAnimating(true);
       setSettle(0);
-      setTimeout(() => { setAnimating(false); busy.current = false; }, 380);
+      setTimeout(() => { setAnimating(false); busy.current = false; }, 500);
     }));
   }, []);
 
   /** Move to another page; the new current card slides in from the side it was on. */
   const go = useCallback((to: number, fromDragDy = 0) => {
-    if (to < 0 || to >= items.length || busy.current) return;
+    if (to < -1 || to >= items.length || busy.current) return;
     const dir = to > idx ? 1 : -1;               // +1 = advancing (next rises from below)
     setIdx(to);
     setDrag({ dx: 0, dy: 0, axis: null, active: false });
@@ -293,7 +316,7 @@ export function FeedClient() {
 
   /* ---- pointer: lock to an axis after a few px; x decides, y pages ---- */
   const onDown = (e: RPointerEvent<HTMLDivElement>) => {
-    if (!cur || open) return;
+    if ((!cur && !intro) || open) return;
     // A touch during a settle animation snaps it to rest instead of being dropped; the finger takes over.
     if (busy.current) { busy.current = false; setAnimating(false); setSettle(0); }
     start.current = { x: e.clientX, y: e.clientY, id: e.pointerId, axis: null };
@@ -312,10 +335,11 @@ export function FeedClient() {
     if (!st || st.id !== e.pointerId) return;
     const dx = e.clientX - st.x, dy = e.clientY - st.y;
     start.current = null;
-    if (st.axis === "x" && Math.abs(dx) >= THRESH) { decide(dx > 0 ? "like" : "skip", { dx, dy }); return; }
+    if (!st.axis && Math.hypot(dx, dy) < 8 && cur) { setDrag({ dx: 0, dy: 0, axis: null, active: false }); openDetail(cur.id); return; }
+    if (st.axis === "x" && Math.abs(dx) >= THRESH && cur) { decide(dx > 0 ? "like" : "skip", { dx, dy }); return; }
     if (st.axis === "y") {
       if (dy <= -VTHRESH && next) { go(idx + 1, dy); return; }
-      if (dy >= VTHRESH && prev) { go(idx - 1, dy); return; }
+      if (dy >= VTHRESH && idx >= 0) { go(idx - 1, dy); return; }
       // not far enough: glide back to rest from where the finger left it
       setDrag({ dx: 0, dy: 0, axis: null, active: false });
       settleFrom(dy);
@@ -347,7 +371,7 @@ export function FeedClient() {
   const dY = drag.active && drag.axis === "y" ? drag.dy : 0;
   // Vertical rail position of the current card (px). settle animates toward 0 after a page.
   const railY = dY + settle;
-  const ease = animating ? "transform .38s cubic-bezier(.22,.9,.3,1)" : "none";
+  const ease = animating ? "transform .5s cubic-bezier(.3,1.25,.45,1)" : "none";
   const pr = Math.min(1, Math.abs(dX) / THRESH);
   const pendingDir: Decision | null = drag.axis === "x" && Math.abs(dX) > 12 ? (dX > 0 ? "like" : "skip") : null;
   const peekFade = Math.max(0, 1 - Math.max(0, -railY) / 120);   // strip fades as the next card rises
@@ -379,12 +403,13 @@ export function FeedClient() {
       <div className="deck-wrap">
         <div className="deck">
           {loading && <div className="feed-empty">loading…</div>}
-          {!loading && !cur && <div className="feed-empty">You’ve seen everything ranked for you today.<br /><a href="/">Browse the corpus</a> or come back tomorrow.</div>}
-          {cur && (
+          {!loading && !intro && !cur && <div className="feed-empty">You’ve seen everything ranked for you today.<br /><a href="/">Browse the corpus</a> or come back tomorrow.</div>}
+          {!loading && (cur || intro) && (
             <div className="stack" ref={stackRef}>
+              {idx === 0 && <Splash style={prevStyle} onStart={() => {}} />}
               {prev && <Card key={prev.id} f={prev} style={prevStyle} className="rail" saved={saved.has(prev.id)} reaction={reacted.current.get(prev.id)} />}
               {next && <Card key={next.id} f={next} style={nextStyle} className="rail" saved={saved.has(next.id)} reaction={reacted.current.get(next.id)} />}
-              {next && !ghost && (
+              {next && !ghost && !intro && (
                 <div className="peek-strip" style={{ opacity: peekFade, "--peekhue": hueOf(next) } as CSSProperties} aria-hidden>
                   <div className="peek-label">up next · {next.item.card ? CAT_LABEL[next.item.card.category] ?? next.item.card.category : ""}</div>
                   <div className="peek-title">{next.id.split("/")[1]}</div>
@@ -393,8 +418,12 @@ export function FeedClient() {
               )}
               <div className={`drag-layer${pendingDir ? ` hint-${pendingDir}` : ""}`} style={{ "--p": pr } as CSSProperties}
                 onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp}>
-                <Card key={cur.id} f={cur} style={curStyle} debug={debug} saved={saved.has(cur.id)} reaction={reacted.current.get(cur.id)}
-                  onSave={() => toggleSave(cur.id)} onOpen={() => openDetail(cur.id)} onDecide={(k) => decide(k)} />
+                {cur ? (
+                  <Card key={cur.id} f={cur} style={curStyle} debug={debug} saved={saved.has(cur.id)} reaction={reacted.current.get(cur.id)}
+                    onSave={() => toggleSave(cur.id)} onOpen={() => openDetail(cur.id)} onDecide={(k) => decide(k)} />
+                ) : (
+                  <Splash style={curStyle} onStart={() => go(0)} />
+                )}
               </div>
               {ghost && (
                 <div className={`drag-layer ghost hint-${ghost.kind}`} style={{ "--p": 1 } as CSSProperties} aria-hidden>
@@ -409,7 +438,7 @@ export function FeedClient() {
               <button onClick={doUndo}>undo</button>
             </div>
           )}
-          <div className="keyhints">← not for me · → interesting · ↑↓ browse · enter read · b bookmark · z undo</div>
+          <div className="keyhints">← pass · → like · ↑↓ browse · enter / click deep dive · b bookmark · z undo</div>
         </div>
 
         {open && (

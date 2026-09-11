@@ -33,9 +33,8 @@ function post(id: string, kind: Action) {
 
 /* ---------- icons (inline, no deps) ---------- */
 const I = {
-  up: <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 10v12" /><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z" /></svg>,
-  down: <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 14V2" /><path d="M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22a3.13 3.13 0 0 1-3-3.88Z" /></svg>,
   bookmark: (filled: boolean) => <svg viewBox="0 0 24 24" width="22" height="22" fill={filled ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z" /></svg>,
+  mic: <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" /><path d="M19 10v2a7 7 0 0 1-14 0v-2" /><line x1="12" x2="12" y1="19" y2="22" /></svg>,
   // "maximize": two diagonal corner arrows — reads as "open this up"
   open: <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 3h6v6" /><path d="m21 3-7 7" /><path d="M9 21H3v-6" /><path d="m3 21 7-7" /></svg>,
 };
@@ -68,10 +67,10 @@ function splitWhy(why: string[]): { fit: string | null; rest: string[] } {
 }
 
 function Card({
-  f, style, className, debug, saved, reaction, onSave, onOpen, onDecide,
+  f, style, className, debug, saved, reaction, onSave, onOpen, onVoice,
 }: {
   f: FeedItem; style?: CSSProperties; className?: string; debug?: boolean; saved?: boolean; reaction?: Decision;
-  onSave?: () => void; onOpen?: () => void; onDecide?: (d: Decision) => void;
+  onSave?: () => void; onOpen?: () => void; onVoice?: () => void;
 }) {
   const c = f.item.card;
   const r = f.item.repo;
@@ -134,9 +133,8 @@ function Card({
       {debug && <div className="fcard-dbg">score {f.score} · fit {f.fit}</div>}
 
       <div className="fcard-actions" onPointerDown={stop}>
-        <button className="act down" onClick={() => onDecide?.("skip")} aria-label="Not for me" title="Not for me (←)">{I.down}</button>
         <button className="act dive" onClick={onOpen} aria-label="Deep dive" title="Deep dive (enter, or tap the card)">{I.open}</button>
-        <button className="act up" onClick={() => onDecide?.("like")} aria-label="Interesting" title="Interesting (→)">{I.up}</button>
+        <button className="act voice" onClick={(e) => { e.stopPropagation(); onVoice?.(); }} aria-label="Talk about this (coming soon)" title="Talk about this — coming soon">{I.mic}</button>
       </div>
       <div className="stamp like">YES</div>
       <div className="stamp skip">NOPE</div>
@@ -182,6 +180,9 @@ export function FeedClient() {
   const [undo, setUndo] = useState<{ item: FeedItem; kind: Decision; at: number } | null>(null);
   const [debug, setDebug] = useState(false);
   const [vh, setVh] = useState(800);
+  const [hinting, setHinting] = useState(false);
+  const [voiceNote, setVoiceNote] = useState(false);
+  const lastTouch = useRef(Date.now());
   const seenRef = useRef<Set<string>>(new Set());
   const reacted = useRef<Map<string, Decision>>(new Map());
   const fetching = useRef(false);
@@ -221,6 +222,19 @@ export function FeedClient() {
 
   const intro = idx < 0;
   const cur = intro ? undefined : items[idx];
+
+  // Gesture reminder: once a minute of stillness, the card leans right, left, then lifts — no words.
+  const HINT_EVERY = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("hintfast") ? 4_000 : 60_000;
+  useEffect(() => {
+    if (!cur || open) return;
+    const t = setInterval(() => {
+      if (Date.now() - lastTouch.current < HINT_EVERY - 500) return;
+      if (start.current || busy.current || document.hidden || window.matchMedia("(min-width: 900px)").matches) return;
+      setHinting(true);
+      setTimeout(() => setHinting(false), 3200);
+    }, 1000);
+    return () => clearInterval(t);
+  }, [cur, open]);
   const prev = idx > 0 ? items[idx - 1] : undefined;
   const next = items[idx + 1];
 
@@ -262,6 +276,7 @@ export function FeedClient() {
   /** Move to another page; the new current card slides in from the side it was on. */
   const go = useCallback((to: number, fromDragDy = 0) => {
     if (to < -1 || to >= items.length || busy.current) return;
+    lastTouch.current = Date.now();
     const dir = to > idx ? 1 : -1;               // +1 = advancing (next rises from below)
     setIdx(to);
     setDrag({ dx: 0, dy: 0, axis: null, active: false });
@@ -272,6 +287,7 @@ export function FeedClient() {
   /** Horizontal decision: fly the current card out, next rises in. */
   const decide = useCallback((kind: Decision, fromDrag?: { dx: number; dy: number }) => {
     if (!cur || busy.current) return;
+    lastTouch.current = Date.now();
     seenRef.current.add(cur.id);
     reacted.current.set(cur.id, kind);
     setCount((c) => ({ ...c, [kind]: c[kind] + 1 }));
@@ -315,6 +331,8 @@ export function FeedClient() {
 
   /* ---- pointer: lock to an axis after a few px; x decides, y pages ---- */
   const onDown = (e: RPointerEvent<HTMLDivElement>) => {
+    lastTouch.current = Date.now();
+    setHinting(false);
     if ((!cur && !intro) || open) return;
     // A touch during a settle animation snaps it to rest instead of being dropped; the finger takes over.
     if (busy.current) { busy.current = false; setAnimating(false); setSettle(0); }
@@ -415,11 +433,12 @@ export function FeedClient() {
                   <div className="peek-pitch">{next.item.card?.pitch}</div>
                 </div>
               )}
-              <div className={`drag-layer${pendingDir ? ` hint-${pendingDir}` : ""}`} style={{ "--p": pr } as CSSProperties}
+              <div className={`drag-layer${pendingDir ? ` hint-${pendingDir}` : ""}${hinting && !drag.active ? " breathing" : ""}`} style={{ "--p": pr } as CSSProperties}
                 onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp}>
                 {cur ? (
                   <Card key={cur.id} f={cur} style={curStyle} debug={debug} saved={saved.has(cur.id)} reaction={reacted.current.get(cur.id)}
-                    onSave={() => toggleSave(cur.id)} onOpen={() => openDetail(cur.id)} onDecide={(k) => decide(k)} />
+                    onSave={() => toggleSave(cur.id)} onOpen={() => openDetail(cur.id)}
+                    onVoice={() => { setVoiceNote(true); setTimeout(() => setVoiceNote(false), 2200); }} />
                 ) : (
                   <Splash style={curStyle} onStart={() => go(0)} />
                 )}
@@ -431,13 +450,14 @@ export function FeedClient() {
               )}
             </div>
           )}
+          {voiceNote && !undo && <div className="toast">Voice is next. For now, tap the card to read.</div>}
           {undo && (
             <div className="toast">
               {undo.kind === "like" ? "Marked interesting" : "Skipped"} <b>{undo.item.id.split("/")[1]}</b>
               <button onClick={doUndo}>undo</button>
             </div>
           )}
-          <div className="keyhints">← pass · → like · ↑↓ browse · enter / click deep dive · b bookmark · z undo</div>
+          <div className="keyhints">← pass · → like · ↑ ↓ browse · enter deep dive · b bookmark · z undo</div>
         </div>
 
         {open && (

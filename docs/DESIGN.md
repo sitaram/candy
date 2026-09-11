@@ -64,6 +64,7 @@ score = interest^1.2 × (1 + fit) × recency × social
 - Buttons should perform the gesture. A thumbs-up tap that flies the card right teaches the swipe without a tutorial.
 - Transparent cards break paging. When the card was just text over a page gradient, swiping down showed words sliding over the card below. Give each card its own opaque background and the same motion reads as a page.
 - A bare chevron is not a call to action. "deep dive" in words, plus tap-anywhere, doubled detail opens in testing.
+- Buttons for swipes are training wheels. Once the gestures are learned, 👍/👎 buttons only compete with them. Replaced by the card itself demonstrating: after a minute still, it leans right (green edge), left (red edge), lifts to show the peek, and settles. No words, and it stops the moment you touch it.
 - Show the reason, not the score. `score 26.45 · fit 0.31` is for `?debug=1`; "matches your interest in mcp, vs code" is what the user needs, and it doubles as a check that the model is learning the right thing.
 - Redis `noeviction` fails silently through a pipeline. Writes were dropped for an hour before anything surfaced as an error; monitor `used_memory`, and treat an empty profile after reactions as an alarm.
 - Mobile CSS grid: overlapping cards with `grid-area: 1/1` need `min-width: 0` or the longest unbreakable string sets the width of the whole deck.

@@ -37,6 +37,8 @@ GitHub knows *what* a repo is. Nobody has built the layer that knows **why it ma
 
 **The tool result is the voice UI.** Whatever a tool handler returns, the model says. A stale `null` from a superseded fetch became a confident "no matches" spoken over twenty results on screen. So handlers return only what is true *right now*, and the screen and the spoken summary come from the same response.
 
+**Nothing is transcribed to the screen.** While a session runs the only visual change is the button: an accent disc with a stop glyph and a ring that breathes with whoever is louder. The card stays the visual, the voice stays the audio. A running transcript would turn it into a chat, and the point is that you are not reading.
+
 **Cost is bounded.** Sessions end after 30 s of silence (8 s in search). Audio is $32 / $64 per M tokens in / out, so a 3-minute conversation is ~$0.20; the 3k-token context is cached at $0.40 / M on reconnect. `gpt-realtime-2.1-mini` is a drop-in if quality allows.
 - **The screen follows the voice.** When the model shifts to talking about another repo — an alternative, a related project, a search result — it calls `show_repo`, which puts that card on the rail right after the current one and pages to it. What you hear and what you see stay the same thing; swipe down to return.
 
@@ -75,4 +77,6 @@ GitHub knows *what* a repo is. Nobody has built the layer that knows **why it ma
 - Reaction semantics matter more than the ranking formula. "Save" as a fourth swipe direction competed with "like"; making bookmark a non-dismissing tap fixed both the UI and the training signal.
 - A small general embedder clusters by vocabulary, not by function or quality. Fine for taste (a user who likes "Rust CLIs" is a vocabulary cluster); wrong for search order. Fuse it with keywords and the interest score, and consider a second, search-facing embedding text without the language and ecosystem lines.
 - Two writers to one input box is a bug waiting to happen. Voice transcript and tool argument both wanted the search field; the debounce on one superseded the fetch of the other. Give every piece of UI state exactly one writer.
+- The realtime handshake fails late. `client_secrets` mints happily with zero credits; only `/calls` refuses, with the reason in the body. Surface that body or the button spins forever.
+- Prompt the voice model like a style guide, not a system prompt: labeled sections, a word budget per answer type, "never read more than three items", how to pronounce repo names. The first take came out at 60 words and used `why[]` verbatim; none of that happens with prose instructions.
 - Show the reason, not the score. "Matches your interest in mcp, vs code" is what the user needs, and it doubles as a check that the model is learning the right thing.

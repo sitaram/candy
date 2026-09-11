@@ -1,0 +1,17 @@
+:root { color-scheme: dark; }
+body { margin: 0; font: 15px/1.45 system-ui, sans-serif; background: #0e0e10; color: #e8e8ea; }
+main { max-width: 720px; margin: 0 auto; padding: 24px 16px 80px; }
+h1 { font-size: 20px; margin: 0 0 4px; }
+.meta { color: #8a8a90; font-size: 13px; margin-bottom: 20px; }
+.tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+.tabs a { padding: 6px 12px; border-radius: 999px; background: #1c1c20; color: #c8c8cc; text-decoration: none; font-size: 13px; }
+.tabs a.on { background: #e8e8ea; color: #0e0e10; }
+.card { display: block; padding: 14px 16px; margin-bottom: 10px; border-radius: 12px; background: #17171a; text-decoration: none; color: inherit; border: 1px solid #222226; }
+.card:hover { border-color: #3a3a40; }
+.row { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
+.title { font-weight: 600; }
+.stars { color: #8a8a90; font-size: 13px; white-space: nowrap; }
+.desc { color: #b8b8bc; margin: 4px 0 8px; }
+.tags { display: flex; flex-wrap: wrap; gap: 6px; font-size: 12px; color: #8a8a90; }
+.tag { background: #222226; padding: 2px 8px; border-radius: 6px; }
+.tag.src { background: #2a2340; color: #b9a6ff; }

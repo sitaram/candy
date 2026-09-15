@@ -1,10 +1,24 @@
 # Candy: Open source worth your time · [live](https://candy-sitaram1-s-teams.vercel.app)
 
-**Problem.** Engineers learn about useful open source by accident. The tools for finding it are trending pages, newsletters and awesome lists. They are the same for everyone, they stop at the headline, and they ask for time at a desk, when the time most of us have free is walking or driving. Meanwhile, the last fifteen years of consumer software solved these exact problems for other things. TikTok showed that a feed can learn what you like from nothing but swipes. Tinder showed that a decision can be a flick of the thumb. TripAdvisor showed that what other people said matters more than the listing. None of this has been brought to software itself.
+**Problem.** Engineers learn about useful open source by accident. The tools for finding it are trending pages, newsletters and awesome lists. They are the same for everyone, they stop at the headline, and they ask for time at a desk, when the time most of us have free is walking or driving.
+
+Meanwhile, consumer software solved these exact problems for other things:
+
+- TikTok showed that a feed can learn what you like from nothing but swipes.
+- Tinder showed that a decision can be a flick of the thumb.
+- TripAdvisor showed that what other people said matters more than the listing.
+
+None of this has been brought to software itself.
 
 **Idea.** Bring it. Candy is a deck you swipe, a guide you talk to, and a reason under every recommendation, built on a corpus that knows why each project matters. It asks for ten minutes a day and gives back a personal, navigable, deep view of what is moving in open source.
 
-It does three things with one corpus, and the splash names them. **Discover**: see what is new and rising across GitHub, Hacker News, newsletters and the awesome lists, and swipe to shape what you see next. **Search**: describe what you are building in your own words and find the repos that fit. **Ask**: pick any repo and get real answers about how it works, what changed, its limits and whether it is ready, on screen or out loud. Two modalities carry all three. You swipe when you have a screen and talk when you don't.
+It does three things with one corpus:
+
+- **Discover.** See what is new and rising across GitHub, Hacker News, newsletters and the awesome lists, and swipe to shape what you see next.
+- **Search.** Describe what you are building in your own words and find the repos that fit.
+- **Ask.** Pick any repo and get real answers about how it works, what changed, its limits and whether it is ready, on screen or out loud.
+
+Two modalities carry all three. You swipe when you have a screen and talk when you don't.
 
 ## What is novel
 

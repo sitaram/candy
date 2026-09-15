@@ -2,8 +2,8 @@
 import { corpusIds, getRepos, getMentions } from "../src/lib/store/corpus.ts";
 import { getCards, saveCard } from "../src/lib/enrich/index.ts";
 import { enrichOne } from "../src/lib/enrich/llm.ts";
-import { K } from "../src/lib/store/keys.ts";
 import { closeRedis, redis } from "../src/lib/store/redis.ts";
+import { getRaw } from "../src/lib/store/raw.ts";
 
 const n = Number(process.argv[2] ?? 15);
 const ids = await corpusIds();
@@ -16,8 +16,9 @@ const fresh = repos
 const r = redis();
 let tin = 0, tout = 0;
 for (const repo of fresh) {
-  const [readme, rel, men] = await Promise.all([r.get(K.raw(repo.id, "readme")), r.get(K.raw(repo.id, "releases")), getMentions(repo.id)]);
-  const e = await enrichOne(repo, readme ?? "", rel ? JSON.parse(rel) : [], men);
+  // getRaw, not r.get: raw docs are gzip'd since compaction; a plain get handed Claude gzip bytes as the README.
+  const [readme, rel, men] = await Promise.all([getRaw(repo.id, "readme"), getRaw(repo.id, "releases"), getMentions(repo.id)]);
+  const e = await enrichOne(repo, readme, rel ? JSON.parse(rel) : [], men);
   await saveCard(repo.id, e.card, { readmeHash: repo.readmeHash, model: e.model, enrichedAt: new Date().toISOString(), inputTokens: e.inputTokens, outputTokens: e.outputTokens });
   tin += e.inputTokens; tout += e.outputTokens;
   const fl = e.card.flags.length ? `  ⚑ ${e.card.flags.join(",")}` : "";

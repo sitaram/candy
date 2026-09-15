@@ -38,10 +38,16 @@ async function dump(): Promise<void> {
       else if (t === "set") p.smembers(k);
       else if (t === "zset") p.zrange(k, "0", "-1", "WITHSCORES");
       else if (t === "list") p.lrange(k, "0", "-1");
-      else p.get(k);
+      // STRING keys hold binary: raw:* is gzip, emb:* is Float32. get() would UTF-8-decode them and turn every
+      // invalid byte into U+FFFD — a restore then wrote the mangled bytes back and every README/embedding was
+      // unreadable. Bytes in, base64 out.
+      else p.getBuffer(k);
     });
     const vals = (await p.exec())!;
-    slice.forEach((k, j) => entries.push({ key: k, type: types[j], value: vals[j][1] }));
+    slice.forEach((k, j) => {
+      const v = vals[j][1];
+      entries.push({ key: k, type: types[j], value: types[j] === "string" && Buffer.isBuffer(v) ? { b64: v.toString("base64") } : v });
+    });
     process.stdout.write(`\r${Math.min(i + B, keys.length)}/${keys.length}`);
   }
   await mkdir("data", { recursive: true });
@@ -107,7 +113,11 @@ async function restore(file: string | undefined, fixture: boolean): Promise<void
       } else if (e.type === "list") {
         p.del(e.key);
         p.rpush(e.key, ...(v as string[]));
-      } else p.set(e.key, v as string);
+      } else {
+        const b = v as { b64?: string } | string;
+        // Base64 envelope (new snapshots) or plain string (old ones — text keys survived those; binary ones didn't).
+        p.set(e.key, typeof b === "object" && b && "b64" in b ? Buffer.from(b.b64!, "base64") : (b as string));
+      }
     }
     await p.exec();
     process.stdout.write(`\r${Math.min(i + B, entries.length)}/${entries.length}`);

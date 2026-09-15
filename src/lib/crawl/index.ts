@@ -1,5 +1,5 @@
 import { extract } from "../extract";
-import { addEdges, discover, markUnfetchable, nextToCrawl, saveRepo } from "../store/corpus";
+import { addEdges, discover, markUnfetchable, noteCrawlFailure, retireRenamed, nextToCrawl, saveRepo } from "../store/corpus";
 import { fetchRepo, RateLimited } from "./fetchRepo";
 
 export interface CrawlResult {
@@ -36,7 +36,7 @@ export async function crawl(n: number, concurrency = 4, log = console.log, stale
           { ...f.repo, readmeLen: x.readmeLen, readmeHash: x.readmeHash, manifestKind: f.manifestKind, depCount: x.depCount },
           { readme: f.readme, manifest: f.manifest, releases: JSON.stringify(f.releases) },
         );
-        if (f.repo.id !== id) await markUnfetchable(id); // renamed: retire the old id
+        if (f.repo.id !== id) await retireRenamed(id); // renamed: out of frontier and corpus, parked
         if (x.linkedRepos.length) {
           await addEdges(f.repo.id, "links", x.linkedRepos);
           // README links are weak discovery, but they are how the corpus grows beyond seeds.
@@ -51,7 +51,8 @@ export async function crawl(n: number, concurrency = 4, log = console.log, stale
           return;
         }
         res.failed++;
-        log(`  ✗ ${id}: ${(e as Error).message}`);
+        const fl = await noteCrawlFailure(id).catch(() => ({ parked: false, n: 0 }));
+        log(`  ✗ ${id}: ${(e as Error).message}${fl.parked ? "  (3 failures — parked)" : ` (${fl.n}/3)`}`);
       }
     }
   };

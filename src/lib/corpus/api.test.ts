@@ -24,7 +24,8 @@ describe("parseCard", () => {
 });
 
 describe("saveCard / getCard", () => {
-  it("stores the card, indexes by category and lowercase tag, records owner/repo alternatives as edges and bumps them onto the frontier", async () => {
+  it("stores the card, indexes by category and lowercase tag, records owner/repo alternatives as edges; bumps only *already-discovered* ones on the frontier", async () => {
+    await mockRedis.zadd(K.frontier, 0.5, "other/tool");   // discovered by some other source
     await seed([{ id: "a/b", card: { category: "cli", tags: ["MCP"], ecosystem: ["node"], alternatives: ["Other/Tool", "just a name"], buildsOn: ["x/y"] } }]);
     const c = (await getCard("A/B"))!;
     expect(c.tags).toEqual(["MCP"]);
@@ -32,7 +33,8 @@ describe("saveCard / getCard", () => {
     expect(await mockRedis.smembers(CK.byTag("mcp"))).toEqual(["a/b"]);
     expect(await mockRedis.smembers(CK.alt("a/b"))).toEqual(["other/tool"]);
     expect(await mockRedis.smembers(CK.builds("a/b"))).toEqual(["x/y"]);
-    expect(Number(await mockRedis.zscore(K.frontier, "other/tool"))).toBe(1);
+    expect(Number(await mockRedis.zscore(K.frontier, "other/tool"))).toBe(1.5);   // 0.5 + 1 nudge
+    expect(await mockRedis.zscore(K.frontier, "x/y")).toBeNull();               // named only by this (untrusted) card: not minted
     expect((await getCards(["a/b", "nope/x"])).size).toBe(1);
     expect((await getCards([])).size).toBe(0);
   });

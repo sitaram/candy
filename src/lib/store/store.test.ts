@@ -79,6 +79,14 @@ describe("discover", () => {
     expect(await mockRedis.zscore(K.frontier, "not a repo")).toBeNull();
     expect(await discover([])).toBe(0);
   });
+  it("dedupes mentions on URL across runs and caps the list: an hourly HN window re-run does not append the same story again", async () => {
+    const ev = (url: string) => ({ source: "hn" as const, title: "t", url, ts: "now" });
+    await discover([{ repo: "a/b", source: "hn", weight: 1, evidence: ev("u1") }]);
+    await discover([{ repo: "a/b", source: "hn", weight: 1, evidence: ev("u1") }, { repo: "a/b", source: "rss", weight: 1, evidence: ev("u2") }]);
+    expect((await getMentions("a/b")).map((m) => m.url)).toEqual(["u1", "u2"]);
+    for (let i = 0; i < 60; i++) await discover([{ repo: "a/b", source: "hn", weight: 0, evidence: ev(`x${i}`) }]);
+    expect((await getMentions("a/b")).length).toBe(50);
+  });
   it("getMentions drops corrupt rows instead of throwing", async () => {
     await mockRedis.rpush(K.mentions("a/b"), "{bad", JSON.stringify({ source: "hn", title: "ok", url: "u", ts: "t" }));
     expect(await getMentions("a/b")).toEqual([{ source: "hn", title: "ok", url: "u", ts: "t" }]);

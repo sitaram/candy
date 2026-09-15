@@ -76,9 +76,17 @@ export async function saveCard(id: string, card: Card, meta: Omit<StoredCard, ke
   if (alts.length) p.sadd(CK.alt(id), ...alts);
   const builds = card.buildsOn.filter((a) => REPO_RE.test(a)).map(normId);
   if (builds.length) p.sadd(CK.builds(id), ...builds);
-  // Alternatives and builds-on are discovery too: they name repos worth having in the corpus.
-  for (const a of [...alts, ...builds]) p.zincrby(K.frontier, 1, a);
   await p.exec();
+  // Alternatives and builds-on are discovery too — but only a nudge for ids some *other* source already found.
+  // A card is derived from an untrusted README; minting new frontier entries from it made the enrich pass a
+  // paid crawl oracle (name repos in your README → we fetch and card them). zincrby XX-style: only if present.
+  const named = [...new Set([...alts, ...builds])];
+  if (named.length) {
+    const present = await r.zmscore(K.frontier, ...named);
+    const q = r.pipeline();
+    named.forEach((a, i) => { if (present[i] != null) q.zincrby(K.frontier, 1, a); });
+    await q.exec();
+  }
 }
 
 export async function getCard(id: string): Promise<StoredCard | null> {
@@ -104,11 +112,11 @@ export async function needsEnrich(limit: number, onlyIds?: Set<string>): Promise
   if (!ids.length) return [];
   const [repos, cards, prio] = await Promise.all([getRepos(ids), getCards(ids), r.zmscore(K.frontier, ...ids)]);
   const pr = new Map(ids.map((id, i) => [id, Number(prio[i] ?? 0)]));
-  return repos
-    .filter((x) => {
-      const c = cards.get(x.id);
-      return !c || (x.readmeHash && c.readmeHash !== x.readmeHash);
-    })
+  const cand = repos.filter((x) => { const c = cards.get(x.id); return !c || (x.readmeHash && c.readmeHash !== x.readmeHash); });
+  // Skip repos whose current README has already failed enrichment 3×.
+  const fails = cand.length ? await r.mget(...cand.map((x) => `enrichfail:${x.id}:${x.readmeHash ?? "-"}`)) : [];
+  return cand
+    .filter((_, i) => Number(fails[i] ?? 0) < 3)
     .sort((a, b) => (pr.get(b.id) ?? 0) - (pr.get(a.id) ?? 0))
     .slice(0, limit);
 }
@@ -151,7 +159,11 @@ export async function enrich(limit: number, concurrency = 4, log = console.log, 
         log(`  ${String(e.card.interest).padStart(2)}  ${repo.id.padEnd(42)} ${e.card.category.padEnd(18)} ${e.card.hook.padEnd(14)} ${e.card.pitch.slice(0, 70)}${fl}`);
       } catch (err) {
         st.failed++;
-        log(`  ✗ ${repo.id}: ${(err as Error).message}`);
+        // Same README failing again is the same failure: count it, and after 3 stop paying to retry it until the
+        // README changes. (The SDK's own retries are already spent by the time we get here.)
+        const k = `enrichfail:${repo.id}:${repo.readmeHash ?? "-"}`;
+        const n = await redis().incr(k).catch(() => 0); await redis().expire(k, 30 * 86_400).catch(() => {});
+        log(`  ✗ ${repo.id}: ${(err as Error).message}${n >= 3 ? "  (3 failures — skipped until README changes)" : ` (${n}/3)`}`);
       }
     }
   };

@@ -44,6 +44,11 @@ async function gh<T>(path: string): Promise<T | null> {
   if (res.status === 403 || res.status === 429) {
     const reset = Number(res.headers.get("x-ratelimit-reset") ?? 0) * 1000;
     if (res.headers.get("x-ratelimit-remaining") === "0") throw new RateLimited(reset || Date.now() + 60_000);
+    // Secondary (abuse) limit: 403/429 with Retry-After and remaining > 0. Fell through to a plain error before,
+    // so the crawl counted it as one failure and 4–6 workers kept hammering — which lengthens the ban.
+    const ra = Number(res.headers.get("retry-after") ?? 0);
+    if (ra > 0) throw new RateLimited(Date.now() + ra * 1000);
+    if (res.status === 429) throw new RateLimited(Date.now() + 60_000);
   }
   if (!res.ok) throw new Error(`github ${res.status} ${path}`);
   return (await res.json()) as T;

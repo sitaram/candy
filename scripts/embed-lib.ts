@@ -1,5 +1,5 @@
 import { allItems } from "../src/lib/corpus/api";
-import { cardText, embedTexts, hasEmbedding, putEmbeddings } from "../src/lib/embed";
+import { cardText, embedTexts, hasEmbedding, putEmbeddings, writeMatrix } from "../src/lib/embed";
 
 /** Embed every carded item without a vector. Returns how many were embedded. OpenAI: 128/batch, no pacing needed. */
 export async function embedMissing(): Promise<number> {
@@ -11,5 +11,8 @@ export async function embedMissing(): Promise<number> {
     const vecs = await embedTexts(slice.map(cardText));
     await putEmbeddings(slice.map((it, j) => ({ id: it.repo.id, v: vecs[j] })));
   }
+  // The matrix is what search and tasteFit read; without this, a week's new cards were embedded but invisible
+  // to both until someone ran `pnpm embed` by hand.
+  if (todo.length) await writeMatrix();
   return todo.length;
 }

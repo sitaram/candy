@@ -11,6 +11,7 @@ export async function discover(hits: Discovery[]): Promise<number> {
   const p = r.pipeline();
   const now = Date.now();
   const seen = new Set<string>();
+  const mentionsToAdd: [string, Mention][] = [];
   // One priority bump per (repo, source) per run: a feed that links the same
   // repo in every item should not dominate the frontier.
   const bumped = new Set<string>();
@@ -25,9 +26,23 @@ export async function discover(hits: Discovery[]): Promise<number> {
     }
     p.zadd(K.discovered, "NX", now, id);
     p.sadd(K.tags(id), `src:${h.source.split(":")[0]}`);
-    if (h.evidence) p.rpush(K.mentions(id), JSON.stringify(h.evidence));
+    if (h.evidence) mentionsToAdd.push([id, h.evidence]);
   }
   await p.exec();
+  // Mentions: dedupe on URL and cap the list. HN is a 72 h window re-run hourly, so the same story was appended
+  // dozens of times — inflating "N mentions" and the prompt.
+  if (mentionsToAdd.length) {
+    const byId = new Map<string, Mention[]>();
+    for (const [id, ev] of mentionsToAdd) (byId.get(id) ?? byId.set(id, []).get(id)!).push(ev);
+    const existing = await Promise.all([...byId.keys()].map((id) => r.lrange(K.mentions(id), 0, -1)));
+    const q = r.pipeline();
+    [...byId.entries()].forEach(([id, evs], i) => {
+      const have = new Set(existing[i].map((s) => { try { return (JSON.parse(s) as Mention).url ?? s; } catch { return s; } }));
+      for (const ev of evs) { const key = ev.url ?? JSON.stringify(ev); if (have.has(key)) continue; have.add(key); q.rpush(K.mentions(id), JSON.stringify(ev)); }
+      q.ltrim(K.mentions(id), -50, -1);
+    });
+    await q.exec();
+  }
   return seen.size;
 }
 
@@ -79,10 +94,32 @@ export async function saveRepo(
   await p.exec();
 }
 
+/**
+ * A repo that threw a non-404 (timeout, 5xx, parse) is neither saved nor retired: it stays at the top of the
+ * frontier and is retried every cycle, and since nextToCrawl only looks at the top n×4, a few persistent
+ * failures starve the tail. Count failures; after 3 park it like a 404. The counter expires so a repo that
+ * failed a week ago gets a fresh 3.
+ */
+export async function noteCrawlFailure(id: string): Promise<{ parked: boolean; n: number }> {
+  const r = redis();
+  const k = `crawlfail:${normId(id)}`;
+  const n = await r.incr(k);
+  await r.expire(k, 7 * 86_400);
+  if (n >= 3) { await markUnfetchable(id); await r.del(k); return { parked: true, n }; }
+  return { parked: false, n };
+}
+
 export async function markUnfetchable(id: string): Promise<void> {
   const r = redis();
   // Park it far in the future so it is not retried for 30 days, but keep it out of corpus.
   await r.zadd(K.fetched, Date.now() + 23 * 86_400_000, normId(id));
+}
+
+/** A repo moved (owner/name changed). Retire the old id everywhere the new one now lives, or both get carded. */
+export async function retireRenamed(oldId: string): Promise<void> {
+  const r = redis();
+  const o = normId(oldId);
+  await r.pipeline().zrem(K.frontier, o).srem(K.corpus, o).zadd(K.fetched, Date.now() + 23 * 86_400_000, o).exec();
 }
 
 export async function addEdges(from: string, type: EdgeType, to: string[]): Promise<void> {

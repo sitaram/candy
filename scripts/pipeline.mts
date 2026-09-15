@@ -72,6 +72,9 @@ async function cycle(): Promise<void> {
     await log(`embed: ${await embedMissing()} new vectors`);
     await r.set("pipeline:lastWeekly", Date.now());
   }
+  // Rebuild the read snapshot every process serves from — per cycle, not at exit. In loop mode the exit
+  // never came, so new cards never reached the product until the pipeline was restarted.
+  await invalidate();
   await log(`stats ${JSON.stringify(await stats())}`);
 }
 
@@ -84,5 +87,4 @@ do {
   if (!once) await new Promise((res) => setTimeout(res, CYCLE_MIN * 60_000));
 } while (!once);
 
-await invalidate();   // rebuild the read snapshot every process serves from
 await closeRedis();

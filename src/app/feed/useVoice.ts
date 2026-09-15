@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { log as tlog, traceEnd, traceStart } from "@/lib/voice/trace";
 
 /**
  * Realtime voice over WebRTC. The server mints a client secret with the card's context baked in;
@@ -36,8 +37,15 @@ const SILENCE_MS = 180_000;   // neither side has spoken for this long → hang 
 
 interface RTEvent { type: string; [k: string]: unknown }
 
+function summarizeResponse(ev: RTEvent): unknown {
+  const r = ev.response as { status?: string; status_details?: unknown; output?: { type: string; name?: string }[]; usage?: { total_tokens?: number } } | undefined;
+  return r ? { status: r.status, details: r.status_details, out: r.output?.map((o) => o.name ? `${o.type}:${o.name}` : o.type), tokens: r.usage?.total_tokens } : undefined;
+}
+
 export function useVoice(handlers: VoiceHandlers) {
-  const [state, setState] = useState<VoiceState>("idle");
+  const [state, setStateRaw] = useState<VoiceState>("idle");
+  const stateRef = useRef<VoiceState>("idle");
+  const setState = useCallback((st: VoiceState) => { if (stateRef.current !== st) { tlog(`state ${stateRef.current}→${st}`); stateRef.current = st; } setStateRaw(st); }, []);
   const [level, setLevel] = useState(0);          // 0..1, whoever is louder (mic or model) — drives the button ring
   const [micLevel, setMicLevel] = useState(0);    // 0..1, you only — drives "hearing you"
   const [muted, setMuted] = useState(false);       // mic track disabled; the model hears silence
@@ -59,7 +67,7 @@ export function useVoice(handlers: VoiceHandlers) {
   h.current = handlers;
 
   const stop = useCallback((reason?: string, opts?: { quiet?: boolean }) => {
-    if (pc.current || dc.current) console.info(`[voice] end: ${reason ?? "user"} · ${Math.round((Date.now() - startedAt.current) / 1000)}s · last activity ${Math.round((Date.now() - lastActivity.current) / 1000)}s ago`);
+    if (pc.current || dc.current) traceEnd(`${reason ?? "user"} · lastActivity ${Math.round((Date.now() - lastActivity.current) / 1000)}s ago · pc ${pc.current?.connectionState} · dc ${dc.current?.readyState}`);
     if (silenceT.current) clearTimeout(silenceT.current);
     silenceT.current = null;
     cancelAnimationFrame(raf.current);
@@ -87,7 +95,8 @@ export function useVoice(handlers: VoiceHandlers) {
   }, [stop]);
 
   const send = useCallback((ev: RTEvent) => {
-    if (dc.current?.readyState === "open") dc.current.send(JSON.stringify(ev));
+    if (dc.current?.readyState === "open") { dc.current.send(JSON.stringify(ev)); tlog(`send ${ev.type}`, ev.type === "conversation.item.create" ? { role: (ev.item as { role?: string })?.role, len: JSON.stringify(ev.item).length } : undefined); }
+    else tlog(`send.dropped ${ev.type}`, { dc: dc.current?.readyState ?? "none" });
   }, []);
 
   /** Tell the model the on-screen card changed (used by swipes while talking). */
@@ -98,6 +107,8 @@ export function useVoice(handlers: VoiceHandlers) {
 
   const runTool = useCallback(async (name: string, args: Record<string, unknown>, callId: string) => {
     let output: string;
+    const t0 = Date.now();
+    tlog(`tool.call ${name}`, args);
     try {
       if (name === "next_card") output = (await h.current.onNextCard?.()) ?? "No more cards in the feed right now.";
       else if (name === "react") output = (await h.current.onReact?.(args.kind as "like" | "skip" | "save")) ?? "Recorded.";
@@ -109,22 +120,27 @@ export function useVoice(handlers: VoiceHandlers) {
         output = ((await r.json()) as { output?: string }).output ?? "No result.";
       }
     } catch (e) {
-      output = `Tool error: ${(e as Error).message}`;
+      const err = e as Error;
+      tlog(`tool.throw ${name}`, { msg: err?.message, stack: (err?.stack ?? "").split("\n").slice(0, 4).join(" | ") });
+      output = `That didn't work on my end (${err?.message ?? "error"}). Try again or ask something else.`;
     }
+    tlog(`tool.done ${name}`, { ms: Date.now() - t0, out: output.slice(0, 160) });
     send({ type: "conversation.item.create", item: { type: "function_call_output", call_id: callId, output } });
     send({ type: "response.create" });
   }, [send]);
 
-  const seenTypes = useRef(new Set<string>());
   const setMic = useCallback((on: boolean) => {
     const t = mic.current?.getAudioTracks()[0];
     if (!t) return;
     t.enabled = on;
+    tlog(`mic ${on ? "open" : "muted"}`);
     setMuted(!on);
   }, []);
 
   const onEvent = useCallback((ev: RTEvent) => {
-    if (!seenTypes.current.has(ev.type) && !ev.type.endsWith(".delta")) { seenTypes.current.add(ev.type); console.info(`[voice] ev ${ev.type}`); }
+    tlog(`ev ${ev.type}`, ev.type === "error" ? ev.error : ev.type === "response.done" ? summarizeResponse(ev) : undefined);
+    try { handle(ev); } catch (e) { const err = e as Error; tlog("onEvent.throw", { type: ev.type, msg: err?.message, stack: (err?.stack ?? "").split("\n").slice(0, 5).join(" | ") }); }
+    function handle(ev: RTEvent) {
     switch (ev.type) {
       case "session.created":
       case "session.updated":
@@ -165,10 +181,10 @@ export function useVoice(handlers: VoiceHandlers) {
         break;
       }
       case "error":
-        console.warn("[voice] server error", ev.error);
         console.error("[voice]", ev.error);
         setError(String((ev.error as { message?: string })?.message ?? "voice error"));
         break;
+    }
     }
   }, [bumpSilence, runTool, setMic]);
 
@@ -177,6 +193,8 @@ export function useVoice(handlers: VoiceHandlers) {
     setError(null); setTranscript("");
     setState("connecting");
     startedAt.current = Date.now();
+    traceStart(opts.mode);
+    tlog("start.opts", opts);
     try {
       // 1. Audio element must be created inside the user gesture (iOS autoplay policy).
       const el = document.createElement("audio");
@@ -193,16 +211,24 @@ export function useVoice(handlers: VoiceHandlers) {
         }),
       ]);
       mic.current = ms;
+      tlog("mic+secret ok", { tracks: ms.getAudioTracks().map((t) => ({ label: t.label, enabled: t.enabled, muted: t.muted, settings: t.getSettings?.() })) });
+      ms.getAudioTracks()[0]?.addEventListener("ended", () => tlog("mic.track.ended"));
+      ms.getAudioTracks()[0]?.addEventListener("mute", () => tlog("mic.track.mute"));
+      ms.getAudioTracks()[0]?.addEventListener("unmute", () => tlog("mic.track.unmute"));
 
       // 3. Peer connection.
       const p = new RTCPeerConnection();
       pc.current = p;
-      p.ontrack = (e) => { el.srcObject = e.streams[0]; meter(e.streams[0], ms); };
+      p.ontrack = (e) => { tlog("pc.track", { kind: e.track.kind }); el.srcObject = e.streams[0]; meter(e.streams[0], ms); };
+      el.addEventListener("play", () => tlog("audio.play"));
+      el.addEventListener("pause", () => tlog("audio.pause"));
+      el.addEventListener("error", () => tlog("audio.error", el.error?.message));
       p.addTrack(ms.getTracks()[0]);
       const d = p.createDataChannel("oai-events");
       dc.current = d;
       d.onmessage = (e) => { try { onEvent(JSON.parse(e.data) as RTEvent); } catch { /* ignore */ } };
       d.onopen = () => {
+        tlog("dc.open");
         setState("listening");
         bumpSilence();
         // Both modes open with a line: card mode a 20 s take on the repo, search mode a one-sentence invitation.
@@ -211,18 +237,21 @@ export function useVoice(handlers: VoiceHandlers) {
         send({ type: "response.create" });
       };
       d.onclose = () => { if (dc.current === d) stop("ended by server"); };
-      d.onerror = (e) => console.warn("[voice] datachannel error", e);
+      d.onerror = (e) => tlog("dc.error", String((e as unknown as { error?: unknown }).error ?? e.type));
+      d.onclose = () => tlog("dc.close");
       // "disconnected" is transient on mobile (radio handoff, screen lock); ICE usually recovers within seconds.
       // Only "failed" or "closed" is terminal; give "disconnected" 8 s to come back.
       let lost: ReturnType<typeof setTimeout> | null = null;
       p.onconnectionstatechange = () => {
         const st = p.connectionState;
-        console.info(`[voice] connection ${st}`);
+        tlog(`pc ${st}`);
         if (st === "connected") { if (lost) { clearTimeout(lost); lost = null; } return; }
         if (st === "failed" || st === "closed") { if (pc.current === p) stop("connection lost"); return; }
         if (st === "disconnected" && !lost) lost = setTimeout(() => { if (pc.current === p && p.connectionState !== "connected") stop("connection lost"); }, 8_000);
       };
-      p.oniceconnectionstatechange = () => console.info(`[voice] ice ${p.iceConnectionState}`);
+      p.oniceconnectionstatechange = () => tlog(`ice ${p.iceConnectionState}`);
+      p.onicegatheringstatechange = () => tlog(`icegather ${p.iceGatheringState}`);
+      p.onsignalingstatechange = () => tlog(`signaling ${p.signalingState}`);
 
       const offer = await p.createOffer();
       await p.setLocalDescription(offer);
@@ -237,7 +266,9 @@ export function useVoice(handlers: VoiceHandlers) {
         throw new Error(msg);
       }
       await p.setRemoteDescription({ type: "answer", sdp: await sdp.text() });
+      tlog("sdp.answer ok");
     } catch (e) {
+      tlog("start.throw", { msg: (e as Error).message, name: (e as Error).name, stack: ((e as Error).stack ?? "").split("\n").slice(0, 4).join(" | ") });
       stop((e as Error).message === "Permission denied" || (e as Error).name === "NotAllowedError" ? "microphone blocked" : (e as Error).message);
       setState("error");
     }
@@ -259,7 +290,7 @@ export function useVoice(handlers: VoiceHandlers) {
   useEffect(() => () => stopRef.current("unmount", { quiet: true }), []);
 
   useEffect(() => {
-    const onVis = () => console.info(`[voice] page ${document.visibilityState}`);
+    const onVis = () => tlog(`page ${document.visibilityState}`);
     document.addEventListener("visibilitychange", onVis);
     return () => document.removeEventListener("visibilitychange", onVis);
   }, []);

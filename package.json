@@ -19,7 +19,8 @@
     "compact": "node --env-file-if-exists=.env.local --import tsx scripts/compact.mts",
     "embed": "node --env-file-if-exists=.env.local --import tsx scripts/embed.mts",
     "relate": "node --env-file-if-exists=.env.local --import tsx scripts/relate.mts",
-    "alts": "node --env-file-if-exists=.env.local --import tsx scripts/alts.mts"
+    "alts": "node --env-file-if-exists=.env.local --import tsx scripts/alts.mts",
+    "voice:trace": "node --env-file-if-exists=.env.local --import tsx scripts/voice-trace.mts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.124.0",

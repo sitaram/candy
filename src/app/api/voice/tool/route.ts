@@ -10,7 +10,9 @@ export const dynamic = "force-dynamic";
  * (next_card / react are executed in the client because they drive the UI.)
  */
 export async function POST(req: Request) {
+  const t0 = Date.now();
   const body = (await req.json().catch(() => ({}))) as { name?: string; args?: Record<string, unknown>; current?: string };
+  console.info(`[voice/tool] ${body.name} ${JSON.stringify(body.args ?? {}).slice(0, 120)}${body.current ? ` @${body.current}` : ""}`);
   const args = body.args ?? {};
   try {
     switch (body.name) {
@@ -45,7 +47,7 @@ export async function POST(req: Request) {
         return Response.json({ output: `Unknown tool ${body.name}` }, { status: 400 });
     }
   } catch (e) {
-    console.error("[voice/tool]", e);
+    console.error(`[voice/tool] ${body.name} threw after ${Date.now() - t0}ms`, e);
     return Response.json({ output: "Tool failed; tell the user briefly and continue." }, { status: 500 });
   }
 }

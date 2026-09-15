@@ -41,7 +41,11 @@ The corpus holds 1,225 carded repos. Thirty percent came from more than one sour
 
 **The card answers the questions an engineer actually asks.** What is this, in one sentence? Why should I care right now? Who is it for? Is it an experiment or is it mature? What does it compete with, and what does it build on? Is it real, or inflated stars? A small model reads each repo once and fills in exactly those fields, with a strict schema and an honest 0–10 interest score. Because the answers are fields rather than prose, the ranker can sort on them, every card can say in plain words why it is here, and the voice can read the same words aloud. Popularity decides what to fetch first; the card decides what to show.
 
-**Every swipe trains two models, because one cannot both explain and discriminate.** The first is a term profile over tags, ecosystem, category and language. It is cheap and it explains itself: "matches your interest in rust, cli." The second is a taste vector. Each card is embedded once, the user is a weighted sum of what they liked minus what they passed, and fit is the cosine between them. Terms supply the reason and the vector supplies the score, blended 40/60 once there are enough reactions to trust it. This is what tells "small sharp CLI tools" from "Rust", a distinction no tag captures. The vector is stored as a raw sum and normalized on read, which makes every nudge exactly reversible: undo subtracts what like added. A running mean could not do that, and the first version left a ghost of every undone like.
+**Nothing is generated while you wait.** Cards, scores, reasons and voice scripts are all computed before anyone asks. The feed fetches thirty ranked cards in one call, shows them one at a time, sends reactions in the background and refills when eight remain, so a swipe is instant and the next card is already there. The model runs once per repo, offline. The product reads.
+
+**Every swipe trains two models, because one cannot both explain and discriminate.** The first is a term profile over tags, ecosystem, category and language. It is cheap and it explains itself: "matches your interest in rust, cli." It learns on the same fields the card model extracted for ranking, so ranking and learning share one vocabulary, and "rust" on one card means the same as "rust" on another. The second is a taste vector. Each card is embedded once, the user is a weighted sum of what they liked minus what they passed, and fit is the cosine between them. Terms supply the reason and the vector supplies the score, blended 40/60 once there are enough reactions to trust it. This is what tells "small sharp CLI tools" from "Rust", a distinction no tag captures.
+
+Browsing is not a "no". Swiping past a card marks it seen and teaches nothing; only like, pass, bookmark and deep dive move the profile, each with its own weight. Interests decay two percent a day, so what you liked in March fades unless you like it again. Six reactions visibly re-rank the feed, because the tags were already clean; nobody fills out a form. The taste vector is stored as a raw sum and normalized on read, which makes every nudge exactly reversible: undo subtracts what like added. A running mean could not do that, and the first version left a ghost of every undone like.
 
 **One card in five ignores your profile on purpose.** It is chosen for high interest and low fit, and it says so: "outside your usual — exploring." A feed that only confirms narrows over time. The slots keep the taste vector from collapsing onto whatever you liked first.
 
@@ -51,7 +55,9 @@ The corpus holds 1,225 carded repos. Thirty percent came from more than one sour
 
 ## Voice
 
-Voice is a live, two-way conversation with the corpus. You talk, it talks back, and you can interrupt it, the way you would a person. There is no dictation step and no transcript to read. It lives in two places:
+Voice is a live, two-way conversation with the corpus. You talk, it talks back, and you can interrupt it, the way you would a person. There is no dictation step and no transcript to read. This is what makes Candy usable on the go, which is when most of us actually have the time: on a walk, or on a long drive, when you might otherwise put on a podcast. You open the app, hit the voice button on the home page, and start talking, and it walks you through repos for as long as you want to keep going.
+
+It lives in two places:
 
 - **On a card.** Tap the bars and a guide that already knows the project gives you a short take, then lets you ask, discuss and go deep, or move on to the next card by voice.
 - **In the header.** The same bars open search already listening. Describe what you need in your own words and the results appear on the rail.

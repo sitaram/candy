@@ -12,6 +12,9 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
  *
  *   <Tip label="Hear this page summarized, then ask about it" tipKey="about-voice"><button …/></Tip>
  */
+/** Tip keys armed this page load — a tap that unmounts the effect must not let a later mount re-arm it. */
+const armed = new Set<string>();
+
 export function Tip({ label, tipKey, side = "bottom", align = "center", active = true, delay = 900, children }: {
   label: ReactNode; tipKey: string; side?: "top" | "bottom"; align?: "start" | "center" | "end";
   active?: boolean; delay?: number; children: ReactNode;
@@ -24,16 +27,19 @@ export function Tip({ label, tipKey, side = "bottom", align = "center", active =
     const touch = matchMedia("(hover: none)").matches;
     if (!touch) return;
     const k = `candy:tip:${tipKey}`;
+    // Once per page load, not once per mount or per active→inactive→active. The card button's `active` flips
+    // off while a session runs and back on when it ends, which re-ran this effect and showed the tip 1.8 s after
+    // stopping; and a card renders twice (current + ghost), each with its own Tip. First arm wins, for good.
+    if (armed.has(k)) return;
     try { if (localStorage.getItem(k)) return; } catch { return; }
+    armed.add(k);
+    try { localStorage.setItem(k, "1"); } catch { /* fine */ }
     // Only when the control is actually visible (not a rail card behind the splash).
     const el = wrap.current; if (!el) return;
     let t1: ReturnType<typeof setTimeout> | undefined, t2: ReturnType<typeof setTimeout> | undefined;
     const io = new IntersectionObserver(([e]) => {
       if (!e.isIntersecting) return;
       io.disconnect();
-      // Mark it seen at *schedule* time. Marking at show time meant a tap inside the 900 ms (which sets
-      // active=false and unmounts this effect) left the flag unset — and the tip showed when the session ended.
-      try { localStorage.setItem(k, "1"); } catch { /* fine */ }
       t1 = setTimeout(() => {
         setShown(true);
         t2 = setTimeout(() => setShown(false), 3200);

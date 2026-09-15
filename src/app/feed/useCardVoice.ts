@@ -83,6 +83,13 @@ export function useCardVoice(rail: Rail, detailOpen: boolean) {
     else if (cur) void voice.start({ mode: "card", id: cur.id, why: cur.why });
   }, [voice, cur]);
 
+  /** Start (or restart) a card session on a specific item — used when search hands a spoken conversation to the card it opened. */
+  const startOn = useCallback((f: FeedItem) => {
+    if (voice.active) voice.stop();
+    // The search sheet's session is tearing down as it unmounts; let the mic release before we ask for it again.
+    setTimeout(() => { void voice.start({ mode: "card", id: f.id, why: f.why }); }, 250);
+  }, [voice]);
+
   // Swiping while talking: tell the model what's on screen now (but not for tool-driven changes, which return the brief themselves).
   const voiceCardId = useRef<string | null>(null);
   useEffect(() => {
@@ -95,5 +102,5 @@ export function useCardVoice(rail: Rail, detailOpen: boolean) {
   }, [cur, voice.active, voice, briefOf]);
   useEffect(() => { if (!voice.active) voiceCardId.current = null; }, [voice.active]);
 
-  return { voice, toggle, showRepo, jumpTo };
+  return { voice, toggle, showRepo, jumpTo, startOn };
 }

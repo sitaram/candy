@@ -38,7 +38,7 @@ const I = {
   micOff: <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 9v2a3 3 0 0 0 5.1 2.1" /><path d="M15 9.3V6a3 3 0 0 0-6 0" /><path d="M5 11a7 7 0 0 0 11.4 5.4M19 11a7 7 0 0 1-.6 2.8" /><path d="M12 18v3" /><path d="m3 3 18 18" /></svg>,
 };
 
-export function Search({ open, onClose, onPick, autoVoice }: { open: boolean; onClose: () => void; onPick: (r: SearchResult) => void; autoVoice?: boolean }) {
+export function Search({ open, onClose, onPick, autoVoice }: { open: boolean; onClose: () => void; onPick: (r: SearchResult, opts?: { voice: boolean }) => void; autoVoice?: boolean }) {
   const [q, setQ] = useState("");
   const [res, setRes] = useState<SearchResponse | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -107,8 +107,10 @@ export function Search({ open, onClose, onPick, autoVoice }: { open: boolean; on
         ? list[n - 1]
         : list.find((r) => r.item.repo.name.toLowerCase().includes(which.toLowerCase()) || r.id.toLowerCase().includes(which.toLowerCase()));
       if (!pick) return `No result matching "${which}".`;
-      onPick(pick);
-      return `Opened ${pick.item.repo.name}.`;
+      // Hand the conversation to the card: this search session ends when the sheet unmounts, and the
+      // feed starts a card-mode session on the repo we just opened. Say nothing — the new session opens.
+      onPick(pick, { voice: true });
+      return `Opened ${pick.item.repo.name}. The card's own guide takes over now; do not say anything further.`;
     }),
   });
   const toggleVoice = () => { if (voice.active) voice.stop(); else void voice.start({ mode: "search", query: q || undefined }); };
@@ -178,7 +180,7 @@ export function Search({ open, onClose, onPick, autoVoice }: { open: boolean; on
                   const c = r.item.card; const rp = r.item.repo; const hue = c ? HUE[c.category] ?? 230 : 230;
                   return (
                     <li key={r.id}>
-                      <button className="s-row" style={{ "--hue": hue } as CSSProperties} onClick={() => onPick(r)}>
+                      <button className="s-row" style={{ "--hue": hue } as CSSProperties} onClick={() => onPick(r, { voice: voice.active })}>
                         <span className="s-n">{i + 1}</span>
                         <span className="s-main">
                           <span className="s-head">

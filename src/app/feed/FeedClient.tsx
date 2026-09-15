@@ -46,10 +46,14 @@ export function FeedClient() {
   /* ---- search: results hand a card to the rail, right after the current one ---- */
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchVoice, setSearchVoice] = useState(false);
-  const pickResult = useCallback((r: SearchResult) => { setSearchOpen(false); insertAndGo(r); }, [insertAndGo]);
-
   /* ---- voice ---- */
-  const { voice, toggle: toggleVoice, jumpTo } = useCardVoice(rail, !!open);
+  const { voice, toggle: toggleVoice, jumpTo, startOn } = useCardVoice(rail, !!open);
+  /** A result picked while talking keeps the conversation: the card's voice session starts on the new card. */
+  const pickResult = useCallback((r: SearchResult, opts?: { voice: boolean }) => {
+    setSearchOpen(false);
+    insertAndGo(r);
+    if (opts?.voice) startOn(r);
+  }, [insertAndGo, startOn]);
   const openSearch = useCallback(() => { if (voice.active) voice.stop(); setSearchVoice(false); setSearchOpen(true); }, [voice]);
   /** Header voice: straight into a listening search — one tap, no keyboard. */
   const openVoiceSearch = useCallback(() => { if (voice.active) voice.stop(); setSearchVoice(true); setSearchOpen(true); }, [voice]);

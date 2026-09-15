@@ -48,10 +48,12 @@ export function useVoice(handlers: VoiceHandlers) {
   const raf = useRef<number>(0);
   const silenceT = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastActivity = useRef(0);
+  const startedAt = useRef(0);
   const h = useRef(handlers);
   h.current = handlers;
 
-  const stop = useCallback((reason?: string) => {
+  const stop = useCallback((reason?: string, opts?: { quiet?: boolean }) => {
+    if (pc.current || dc.current) console.info(`[voice] end: ${reason ?? "user"} · ${Math.round((Date.now() - startedAt.current) / 1000)}s · last activity ${Math.round((Date.now() - lastActivity.current) / 1000)}s ago`);
     if (silenceT.current) clearTimeout(silenceT.current);
     silenceT.current = null;
     cancelAnimationFrame(raf.current);
@@ -64,13 +66,13 @@ export function useVoice(handlers: VoiceHandlers) {
     pc.current = null; dc.current = null; mic.current = null; ctx.current = null; audioEl.current = null;
     setLevel(0);
     setState("idle");
-    if (reason) setError(reason);
+    if (reason && !opts?.quiet) setError(reason);
   }, []);
 
   const bumpSilence = useCallback(() => {
     lastActivity.current = Date.now();
     if (silenceT.current) clearTimeout(silenceT.current);
-    silenceT.current = setTimeout(() => stop(), h.current.silenceMs ?? SILENCE_MS);
+    silenceT.current = setTimeout(() => stop("silence", { quiet: true }), h.current.silenceMs ?? SILENCE_MS);
   }, [stop]);
 
   const send = useCallback((ev: RTEvent) => {
@@ -134,6 +136,7 @@ export function useVoice(handlers: VoiceHandlers) {
         break;
       }
       case "error":
+        console.warn("[voice] server error", ev.error);
         console.error("[voice]", ev.error);
         setError(String((ev.error as { message?: string })?.message ?? "voice error"));
         break;
@@ -144,6 +147,7 @@ export function useVoice(handlers: VoiceHandlers) {
     if (pc.current) return;
     setError(null); setTranscript("");
     setState("connecting");
+    startedAt.current = Date.now();
     try {
       // 1. Audio element must be created inside the user gesture (iOS autoplay policy).
       const el = document.createElement("audio");
@@ -175,8 +179,19 @@ export function useVoice(handlers: VoiceHandlers) {
         // Card mode opens with a spoken take; search mode waits for the user to speak.
         if (opts.mode === "card") send({ type: "response.create" });
       };
-      d.onclose = () => stop();
-      p.onconnectionstatechange = () => { if (p.connectionState === "failed" || p.connectionState === "disconnected") stop("connection lost"); };
+      d.onclose = () => { if (dc.current === d) stop("ended by server"); };
+      d.onerror = (e) => console.warn("[voice] datachannel error", e);
+      // "disconnected" is transient on mobile (radio handoff, screen lock); ICE usually recovers within seconds.
+      // Only "failed" or "closed" is terminal; give "disconnected" 8 s to come back.
+      let lost: ReturnType<typeof setTimeout> | null = null;
+      p.onconnectionstatechange = () => {
+        const st = p.connectionState;
+        console.info(`[voice] connection ${st}`);
+        if (st === "connected") { if (lost) { clearTimeout(lost); lost = null; } return; }
+        if (st === "failed" || st === "closed") { if (pc.current === p) stop("connection lost"); return; }
+        if (st === "disconnected" && !lost) lost = setTimeout(() => { if (pc.current === p && p.connectionState !== "connected") stop("connection lost"); }, 8_000);
+      };
+      p.oniceconnectionstatechange = () => console.info(`[voice] ice ${p.iceConnectionState}`);
 
       const offer = await p.createOffer();
       await p.setLocalDescription(offer);
@@ -209,7 +224,14 @@ export function useVoice(handlers: VoiceHandlers) {
     }
   }, [bumpSilence, onEvent, send, stop]);
 
-  useEffect(() => () => stop(), [stop]);
+  const stopRef = useRef(stop); stopRef.current = stop;
+  useEffect(() => () => stopRef.current("unmount", { quiet: true }), []);
+
+  useEffect(() => {
+    const onVis = () => console.info(`[voice] page ${document.visibilityState}`);
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, []);
 
   return { state, level, transcript, error, start, stop, inject, active: state !== "idle" && state !== "error" };
 }

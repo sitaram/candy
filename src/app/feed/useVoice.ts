@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 /**
  * Realtime voice over WebRTC. The server mints a client secret with the card's context baked in;
  * this hook opens the peer connection, runs the data-channel event loop, dispatches tool calls,
- * meters audio for the UI, and ends the session after 30 s of silence to cap cost.
+ * meters audio for the UI, and ends the session after 3 min with neither party speaking.
  */
 
 export type VoiceState = "idle" | "connecting" | "listening" | "speaking" | "thinking" | "error";
@@ -30,7 +30,7 @@ export type VoiceStart =
   | { mode: "card"; id: string; why: string[] }
   | { mode: "search"; query?: string };
 
-const SILENCE_MS = 30_000;
+const SILENCE_MS = 180_000;   // neither side has spoken for this long → hang up. Resets on user speech and on assistant audio.
 
 interface RTEvent { type: string; [k: string]: unknown }
 

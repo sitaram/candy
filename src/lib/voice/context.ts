@@ -146,7 +146,7 @@ export async function buildContext(cur: FeedItem, meInfo: Me | null): Promise<Vo
     ? sims.map((s) => `  - ${s.item.repo.id}: ${s.item.card?.pitch ?? s.item.repo.description} (${fmt(s.item.repo.stars)}★${s.why[0] ? `; ${s.why[0]}` : ""})`).join("\n")
     : "  (none computed)";
   const profile = meInfo && meInfo.topTerms.length
-    ? `Interests (learned from swipes, strongest first): ${meInfo.topTerms.slice(0, 10).map((t) => t.term).join(", ")}.${meInfo.avoidTerms.length ? ` Tends to skip: ${meInfo.avoidTerms.slice(0, 5).map((t) => t.term).join(", ")}.` : ""} ${meInfo.reactions} reactions so far.`
+    ? `Interests (learned from swipes, strongest first): ${meInfo.topTerms.slice(0, 10).map((t) => spoken(t.term)).join(", ")}.${meInfo.avoidTerms.length ? ` Tends to skip: ${meInfo.avoidTerms.slice(0, 5).map((t) => spoken(t.term)).join(", ")}.` : ""} ${meInfo.reactions} reactions so far.`
     : "New user; no learned interests yet. Ask what they work on if it would help.";
 
   const instructions = `# Role and Objective
@@ -224,11 +224,54 @@ export const SEARCH_TOOLS = [
   },
 ] as const;
 
+/** Profile terms as a voice would say them: cat:ai-llm → "AI and LLMs", lang:rust → "Rust", mcp → "MCP servers". */
+const SPOKEN: Record<string, string> = {
+  "cat:ai-llm": "AI and LLM tools", "cat:ai-agents": "AI agents", "cat:ml-infra": "ML infrastructure", "cat:dev-tools": "dev tools", "cat:cli": "command-line tools",
+  "cat:web-framework": "web frameworks", "cat:frontend": "frontend", "cat:backend": "backend", "cat:database": "databases", "cat:data-eng": "data engineering",
+  "cat:devops-infra": "DevOps and infra", "cat:security": "security", "cat:networking": "networking", "cat:systems": "systems programming",
+  "cat:languages-compilers": "languages and compilers", "cat:mobile": "mobile", "cat:desktop": "desktop apps", "cat:games-graphics": "games and graphics",
+  "cat:science": "scientific computing", "cat:productivity": "productivity", "cat:learning-resource": "learning resources",
+  mcp: "MCP servers", llm: "LLM tooling", "local-inference": "local LLMs", rag: "RAG", agents: "agents", cli: "CLI tools", rust: "Rust", python: "Python",
+  typescript: "TypeScript", go: "Go", "vs code": "VS Code extensions", vscode: "VS Code extensions", neovim: "Neovim", terminal: "terminal tools",
+  "self-hosted": "self-hosted software", "local-first": "local-first apps", kubernetes: "Kubernetes", postgres: "Postgres", postgresql: "Postgres",
+  voice: "voice", tts: "text-to-speech", stt: "speech-to-text", testing: "testing", e2e: "end-to-end testing", observability: "observability",
+  claude: "Claude tooling", openai: "OpenAI tooling", anthropic: "Anthropic tooling", huggingface: "Hugging Face", "hugging-face": "Hugging Face",
+  pytorch: "PyTorch", cuda: "CUDA", react: "React", nextjs: "Next.js", "next.js": "Next.js", vue: "Vue", svelte: "Svelte", tailwind: "Tailwind",
+  docker: "Docker", wasm: "WebAssembly", webassembly: "WebAssembly", privacy: "privacy tools", "speaker-diarization": "speaker diarization",
+  whisper: "Whisper", langchain: "LangChain", "vector-database": "vector databases", embeddings: "embeddings", "fine-tuning": "fine-tuning",
+  "open-source": "open source", oss: "open source", github: "GitHub tooling", git: "Git tools", sqlite: "SQLite", redis: "Redis", graphql: "GraphQL",
+};
+export function spoken(term: string): string {
+  if (SPOKEN[term]) return SPOKEN[term];
+  if (term.startsWith("lang:")) { const l = term.slice(5); return l.length <= 3 ? l.toUpperCase() : l[0].toUpperCase() + l.slice(1); }
+  if (term.startsWith("cat:")) return term.slice(4).replace(/-/g, " ");
+  return term.replace(/-/g, " ");
+}
+
+/**
+ * Two interests to name in the opener, drawn from the top five so it is not "mcp" every time.
+ * Deterministic per hour, so a retry within a session sounds the same, but tomorrow sounds different.
+ * Skips categories/languages when tags are available — "more MCP servers" beats "more dev tools".
+ */
+function openerInterests(meInfo: Me): string[] {
+  const pool = meInfo.topTerms.slice(0, 6);
+  const tags = pool.filter((t) => !t.term.startsWith("cat:") && !t.term.startsWith("lang:"));
+  const pick = (tags.length >= 2 ? tags : pool).slice(0, 5);
+  if (pick.length <= 2) return pick.map((t) => spoken(t.term));
+  const seed = Math.floor(Date.now() / 3_600_000);
+  const a = seed % pick.length;
+  const b = (a + 1 + (seed >> 3) % (pick.length - 1)) % pick.length;
+  return [spoken(pick[a].term), spoken(pick[b].term)];
+}
+
 /** Instructions for a session started from the search box. */
 export function buildSearchContext(meInfo: Me | null, initialQuery?: string): string {
   const profile = meInfo && meInfo.topTerms.length
-    ? `Interests (learned from swipes, strongest first): ${meInfo.topTerms.slice(0, 10).map((t) => t.term).join(", ")}.`
+    ? `Interests (learned from swipes, strongest first): ${meInfo.topTerms.slice(0, 10).map((t) => spoken(t.term)).join(", ")}.`
     : "New user; no learned interests yet.";
+  // Only lean on the profile once it has some weight behind it; a three-swipe profile is noise.
+  const confident = !!meInfo && meInfo.topTerms.length >= 3 && (meInfo.tasteWeight >= 6 || meInfo.reactions >= 8);
+  const ints = confident && meInfo ? openerInterests(meInfo) : [];
   return `# Role and Objective
 You are candy's search. The user opened a search box on their phone and tapped the voice button. They will say what they are looking for — a repo by name, a topic, or something they want to build. Turn it into a search, read them the shape of the results, and help them pick. Everything you say is spoken aloud.
 
@@ -239,9 +282,9 @@ Quick, plain, helpful. No preamble, no "sure", no "great question".
 On connection, before the user speaks, say one short invitation and stop. Under twelve words, warm, no list. Pick one that fits:
 ${initialQuery
   ? `- They already typed "${initialQuery}": say something like "Searching that — or tell me more about what you're after."`
-  : meInfo && meInfo.topTerms.length
-    ? `- They have history: weave in one interest, e.g. "What are you after? More ${meInfo.topTerms[0].term}, or something new?"`
-    : `- New user: "What are you looking for? A name, a topic, or a problem."`}
+  : ints.length
+    ? `- They have history. Name their interests naturally and offer a way out, varying the phrasing. Their current interests: ${ints.join(" and ")}. Examples of the shape: "More ${ints[0]}, more ${ints[1] ?? ints[0]}, or something new?" / "Still on ${ints[0]}, or a change of scene?" / "What's today — ${ints[0]}, ${ints[1] ?? "something else"}, or a wild card?"`
+    : `- "What are you looking for? A name, a topic, or a problem."`}
 Do not explain the tool. Do not list options. One sentence, then listen.
 
 # Flow

@@ -1,12 +1,16 @@
 # Candy: Open source worth your time · [live](https://candy-sitaram1-s-teams.vercel.app)
 
-**Problem.** Engineers learn about useful open source by accident. Newsletters and trending pages are one more thing to read, the same for everyone, and stop at the headline. The time most of us have free is walking or driving.
+**Problem.** Engineers learn about useful open source by accident. Newsletters and trending pages are one more thing to read, the same for everyone, and stop at the headline. The time most of us have free is walking or driving. And the tools for finding software are built by engineers for engineers, so they look like engineering — lists, tables, stars, a README — while the interfaces people actually enjoy were invented somewhere else and never crossed over.
 
-**Idea.** Ten minutes a day, personalized, navigable, deep. Three verbs on one corpus — **discover** (a feed fused from GitHub, Hacker News, newsletters and awesome lists, ranked for you, learning from every swipe), **understand** (every card says why it is here; open one for what it does, what it competes with, what shipped), **ask** (find projects for what you are building, or put a hard question to one — it has read the README). Two modalities carry all three: a swipeable feed when you have a screen, voice when you don't.
+**Idea.** Treat the developer as a consumer. Borrow the patterns people already love — a deck you swipe, a guide you talk to, a reason under every recommendation — and put them on a corpus that knows why a project matters. Ten minutes a day, personalized, navigable, deep.
+
+Three verbs on one corpus — **discover** (a feed fused from GitHub, Hacker News, newsletters and awesome lists, ranked for you, learning from every swipe), **understand** (every card says why it is here; open one for what it does, what it competes with, what shipped), **ask** (find projects for what you are building, or put a hard question to one — it has read the README). Two modalities carry all three: a swipeable feed when you have a screen, voice when you don't.
 
 ## What is novel
 
-GitHub knows *what* a repo is. Nobody has built the layer that knows **why it matters, to whom, and what it relates to**. That layer is the product.
+GitHub knows *what* a repo is. Nobody has built the layer that knows **why it matters, to whom, and what it relates to** — or put a consumer interface on it. Both halves are the product: the form, and the corpus that makes the form honest.
+
+**Two swipe grammars on one deck.** Up/down browses like TikTok — back, no judgment. Left/right decides like Tinder — like or pass. Nobody combines them: TikTok has no "no", Tinder has no "back". Browsing is free and deciding is cheap. The card itself teaches the gestures: on first arrival, and after a minute idle, it breathes — a small lift and a lean to each side with the colour of that decision at the edge.
 
 **Signal fusion.** Six sources that never meet, each weak and biased; a repo seen by three is strong. Trending pages have one.
 
@@ -22,8 +26,6 @@ GitHub knows *what* a repo is. Nobody has built the layer that knows **why it ma
 1,225 carded repos, 30 % multi-source, 13 % human-endorsed. Machine sources outnumber human 6:1 — widening means more *humans*, not more GitHub. A weekly job re-pulls everything (11 minutes, $0.43); the feed never waits on it, and weekly is the honest cadence for a ten-minutes-a-day habit — "released this week" is true at that resolution, and a week of arrivals is about what one person can swipe through.
 
 **Interestingness as typed metadata.** Not a summary — a schema of *reasons*: momentum, event (release, license change, first HN thread), provenance, novelty, maturity, audience, spam flags. Extracted once per repo by a small model with a strict schema; every surface ranks and explains from the same fields. Ranking multiplies interest, personal fit, recency and social proof, so every item carries a list of reasons in plain words — and that list *is* the voice script. Crawl priority and interest are kept apart: popularity decides what to fetch first, the card decides what to show.
-
-**Two swipe grammars on one deck.** Up/down browses like TikTok — back, no judgment. Left/right decides like Tinder — like or pass. Nobody combines them: TikTok has no "no", Tinder has no "back". Browsing is free and deciding is cheap. The card itself teaches the gestures: on first arrival, and after a minute idle, it breathes — a small lift and a lean to each side with the colour of that decision at the edge.
 
 **Every swipe trains two models.** A *term profile* (tags, ecosystem, category, language) that explains itself — "matches your interest in rust, cli" — and a *taste vector*: each card embedded once, the user a weighted sum of what they liked minus what they passed, fit is cosine. Terms supply the reason, the vector the score; blended 40/60 once there are enough reactions to trust it. This is what tells "small sharp CLI tools" from "Rust" — a distinction no tag captures. The vector is stored as a raw sum and normalized on read, which makes every nudge exactly reversible: undo subtracts what like added. A running mean could not do that; the first version left a ghost of every undone like.
 
@@ -72,6 +74,14 @@ GitHub knows *what* a repo is. Nobody has built the layer that knows **why it ma
 - The realtime handshake fails late: the key mints with zero credits and only the call refuses, with the reason in the body. Surface it, or the button spins forever.
 - Show the reason, not the score. "Matches your interest in mcp, vs code" is what the user needs, and it checks that the model is learning the right thing.
 - A frame's pause before a transition reads as a stall; commit start and end in one step. Two easing tempos on one deck make it read as a stack, not a sheet.
+
+## Next
+
+- **What people say.** The reviews exist already — Hacker News threads, issues, forum posts. Extract what is praised and what is complained about as typed fields on the card. TripAdvisor's face, honestly sourced; no empty review box.
+- **A picture.** The README's first screenshot or demo on the card. Most projects have one; nobody surfaces it.
+- **Readable by machines.** The cards are typed already. An endpoint an agent can call before it picks a dependency, so the default is not whatever the vendor suggests.
+- **Plain language.** A second register for the card — what this lets you do, not what it is — for the person in marketing, or the artist, who could get much further than the tools let them.
+- **More humans.** Newsletters, Reddit, podcasts. The machine sources are six to one; the human ones are the signal.
 
 ## Robustness
 

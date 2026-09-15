@@ -4,7 +4,9 @@ import { api, report, ApiError } from "./api";
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import { HUE } from "./logic";
 import type { SearchResponse, SearchResult } from "@/lib/user/search";
-import { useVoice } from "./useVoice";
+import type { useVoice, VoiceHandlers } from "./useVoice";
+
+type Voice = ReturnType<typeof useVoice>;
 import { guarded } from "@/lib/voice/trace";
 import { VoiceBoundary } from "./VoiceBoundary";
 
@@ -38,7 +40,7 @@ const I = {
   micOff: <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 9v2a3 3 0 0 0 5.1 2.1" /><path d="M15 9.3V6a3 3 0 0 0-6 0" /><path d="M5 11a7 7 0 0 0 11.4 5.4M19 11a7 7 0 0 1-.6 2.8" /><path d="M12 18v3" /><path d="m3 3 18 18" /></svg>,
 };
 
-export function Search({ open, onClose, onPick, autoVoice }: { open: boolean; onClose: () => void; onPick: (r: SearchResult, opts?: { voice: boolean }) => void; autoVoice?: boolean }) {
+export function Search({ open, onClose, onPick, autoVoice, voice }: { open: boolean; onClose: () => void; onPick: (r: SearchResult) => void; autoVoice?: boolean; voice: Voice }) {
   const [q, setQ] = useState("");
   const [res, setRes] = useState<SearchResponse | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -80,14 +82,18 @@ export function Search({ open, onClose, onPick, autoVoice }: { open: boolean; on
   // Focus on open; reset on close.
   useEffect(() => {
     if (open) {
-      // Opened from the header's voice button: skip the keyboard and start listening at once.
-      if (autoVoice) void voice.start({ mode: "search" });
-      else setTimeout(() => inputRef.current?.focus(), 60);
+      // Opened from the header's voice button, or while a card conversation is live: the one session moves
+      // to search mode — same call, same mic, the model remembers what was being discussed.
+      if (autoVoice || voice.active) {
+        void voice.switchTo({ mode: "search" }, voice.active
+          ? { note: "The user opened search. You are now the search guide: listen for what they want to find and call search(query). Say one short sentence inviting them to say what they're looking for.", speak: true }
+          : undefined);
+      } else setTimeout(() => inputRef.current?.focus(), 60);
     } else { setQ(""); setRes(null); setHeard(""); ranFor.current = null; }
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  /* ---- voice: same transport, search mode ---- */
-  const voice = useVoice({
+  /* ---- voice: the feed's one session, with our tools layered on while the sheet is open ---- */
+  const handlers: VoiceHandlers = {
     silenceMs: 20_000,   // measured from the end of the model's *playback*; 8 s was ending sessions while people were still deciding what to say
     onUserTranscript: (t) => { try { if (t) setHeard(t); } catch { /* never let UI state throw into the event loop */ } },
     onSearch: guarded("search", async (query: string) => {
@@ -109,12 +115,27 @@ export function Search({ open, onClose, onPick, autoVoice }: { open: boolean; on
       if (!pick) return `No result matching "${which}".`;
       // Hand the conversation to the card: this search session ends when the sheet unmounts, and the
       // feed starts a card-mode session on the repo we just opened. Say nothing — the new session opens.
-      onPick(pick, { voice: true });
-      return `Opened ${pick.item.repo.name}. The card's own guide takes over now; do not say anything further.`;
+      onPick(pick);
+      return `Opened ${pick.item.repo.name}. Do not say anything further; you will be handed the card next.`;
     }),
-  });
+  };
+  const hRef = useRef(handlers); hRef.current = handlers;
+  useEffect(() => {
+    if (!open) return;
+    // Read through the ref at call time so the overlay always sees this render's closures without re-registering.
+    const live: VoiceHandlers = {
+      silenceMs: handlers.silenceMs,
+      onUserTranscript: (t) => hRef.current.onUserTranscript?.(t),
+      onSearch: (q) => hRef.current.onSearch!(q),
+      onOpenResult: (w) => hRef.current.onOpenResult!(w),
+    };
+    voice.setOverlay(live);
+    return () => voice.setOverlay(null);
+  }, [open, voice]);
   const toggleVoice = () => { if (voice.active) voice.stop(); else void voice.start({ mode: "search", query: q || undefined }); };
-  useEffect(() => { if (!open && voice.active) voice.stop(); }, [open, voice]);
+  // Closing the sheet with the keyboard/back while a search-mode conversation is live and no card took it: end it.
+  // (A pick hands the session to the card first, so voice.mode is already "card" by the time we unmount.)
+  useEffect(() => { if (!open && voice.active && voice.mode === "search") voice.stop(); }, [open, voice]);
 
   if (!open) return null;
   const listening = voice.active;
@@ -180,7 +201,7 @@ export function Search({ open, onClose, onPick, autoVoice }: { open: boolean; on
                   const c = r.item.card; const rp = r.item.repo; const hue = c ? HUE[c.category] ?? 230 : 230;
                   return (
                     <li key={r.id}>
-                      <button className="s-row" style={{ "--hue": hue } as CSSProperties} onClick={() => onPick(r, { voice: voice.active })}>
+                      <button className="s-row" style={{ "--hue": hue } as CSSProperties} onClick={() => onPick(r)}>
                         <span className="s-n">{i + 1}</span>
                         <span className="s-main">
                           <span className="s-head">

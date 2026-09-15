@@ -49,11 +49,13 @@ export function FeedClient() {
   /* ---- voice ---- */
   const { voice, toggle: toggleVoice, jumpTo, startOn } = useCardVoice(rail, !!open);
   /** A result picked while talking keeps the conversation: the card's voice session starts on the new card. */
-  const pickResult = useCallback((r: SearchResult, opts?: { voice: boolean }) => {
-    if (opts?.voice) startOn(r);   // first: flips the session to card mode before the sheet's unmount asks "is this still mine?"
+  const pickResult = useCallback((r: SearchResult) => {
+    // A live conversation follows the pick onto the card — whether the user said "open the second one" or tapped it.
+    // First, so the session is in card mode before the sheet's unmount asks "is this still mine to end?".
+    if (voice.active) startOn(r);
     setSearchOpen(false);
     insertAndGo(r);
-  }, [insertAndGo, startOn]);
+  }, [insertAndGo, startOn, voice.active]);
   const openSearch = useCallback(() => { setSearchVoice(false); setSearchOpen(true); }, []);
   /** Header voice: straight into a listening search — one tap, no keyboard. */
   const openVoiceSearch = useCallback(() => { setSearchVoice(true); setSearchOpen(true); }, []);

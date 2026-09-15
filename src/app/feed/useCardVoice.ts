@@ -78,6 +78,8 @@ export function useCardVoice(rail: Rail, detailOpen: boolean) {
     }),
   });
 
+  const voiceCardId = useRef<string | null>(null);
+
   const toggle = useCallback(() => {
     if (voice.active) voice.stop();
     else if (cur) void voice.start({ mode: "card", id: cur.id, why: cur.why });
@@ -85,13 +87,16 @@ export function useCardVoice(rail: Rail, detailOpen: boolean) {
 
   /** Start (or restart) a card session on a specific item — used when search hands a spoken conversation to the card it opened. */
   const startOn = useCallback((f: FeedItem) => {
-    if (voice.active) voice.stop();
-    // The search sheet's session is tearing down as it unmounts; let the mic release before we ask for it again.
-    setTimeout(() => { void voice.start({ mode: "card", id: f.id, why: f.why }); }, 250);
+    // Same connection: re-point the live session at this card. The model keeps what was just said in search,
+    // so its take can pick up from the question rather than starting cold. Idle → an ordinary start.
+    voiceCardId.current = f.id;   // the swipe-watcher must not also inject a brief for this change
+    void voice.switchTo({ mode: "card", id: f.id, why: f.why }, {
+      note: `The user opened ${f.id} from search. You are now this card's guide. Give your opening take on it, connecting it to what they were just looking for.`,
+      speak: true,
+    });
   }, [voice]);
 
   // Swiping while talking: tell the model what's on screen now (but not for tool-driven changes, which return the brief themselves).
-  const voiceCardId = useRef<string | null>(null);
   useEffect(() => {
     if (!voice.active || !cur) { voiceCardId.current = cur?.id ?? null; return; }
     if (voiceCardId.current === null) { voiceCardId.current = cur.id; return; }   // session just started on this card

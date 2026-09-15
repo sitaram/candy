@@ -2,13 +2,9 @@ import { env } from "@/lib/env";
 import { createHash } from "node:crypto";
 import { HttpError, route } from "@/lib/api/guard";
 import { recordServer } from "@/lib/errors";
+import { charge } from "@/lib/api/spend";
 import { VoiceSessionBody } from "@/lib/api/schemas";
-import { getItem } from "@/lib/corpus/api";
-import { feed } from "@/lib/user/feed";
-import { me } from "@/lib/user/state";
-import { buildContext, buildDocContext, buildSearchContext, SEARCH_TOOLS, TOOLS } from "@/lib/voice/context";
-import { readFile } from "node:fs/promises";
-import path from "node:path";
+import { resolveMode } from "@/lib/voice/mode";
 
 export const dynamic = "force-dynamic";
 
@@ -25,30 +21,9 @@ export const POST = route({ body: VoiceSessionBody, limit: "voice", maxBody: 8_1
   const t0 = Date.now();
   const key = env.OPENAI_API_KEY;
   if (!key) throw new HttpError(503, "voice not configured");
+  await charge("voice");
 
-  let instructions: string;
-  let tools: readonly unknown[];
-  let transcribeInput = false;
-  if (body.mode === "doc") {
-    // The design doc, read fresh so the guide describes what is deployed.
-    const md = await readFile(path.join(process.cwd(), "docs", "DESIGN.md"), "utf8");
-    instructions = buildDocContext(md);
-    tools = [];
-  } else if (body.mode === "search") {
-    const meInfo = await me(uid).catch(() => null);
-    instructions = buildSearchContext(meInfo, body.query);
-    tools = SEARCH_TOOLS;
-    transcribeInput = true;   // the search box shows what the user said
-  } else {
-    // Re-derive the FeedItem for this card (score/why) so the model knows why it's in the feed.
-    const [f, meInfo] = await Promise.all([feed(uid, 60), me(uid).catch(() => null)]);
-    const cur = f.items.find((x) => x.id === body.id) ?? null;
-    const item = cur?.item ?? (await getItem(body.id));
-    if (!item) throw new HttpError(404, "unknown repo");
-    const feedItem = cur ?? { id: body.id, item, score: 0, fit: 0, why: body.why ?? [], explore: false, saved: false };
-    instructions = (await buildContext(feedItem, meInfo)).instructions;
-    tools = TOOLS;
-  }
+  const { instructions, tools, maxOutputTokens } = await resolveMode(uid, body);
 
   const r = await fetch("https://api.openai.com/v1/realtime/client_secrets", {
     method: "POST",
@@ -71,11 +46,12 @@ export const POST = route({ body: VoiceSessionBody, limit: "voice", maxBody: 8_1
             // Best-effort: shows the user's words in the box as they speak. The search box is
             // authoritative from the model's search(query) call, so a key without a transcribe
             // model still works — you just don't see your own words until the query lands.
-            ...(transcribeInput ? { transcription: { model: env.REALTIME_TRANSCRIBE ?? "gpt-4o-mini-transcribe" } } : {}),
+            // Always on: one session moves between search and card, and the search box needs the user's words.
+            transcription: { model: env.REALTIME_TRANSCRIBE ?? "gpt-4o-mini-transcribe" },
           },
           output: { voice: VOICE, speed: 1.05 },
         },
-        max_output_tokens: body.mode === "doc" ? 1200 : 700,
+        max_output_tokens: maxOutputTokens,
       },
     }),
     signal: AbortSignal.timeout(15_000),

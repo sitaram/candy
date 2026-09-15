@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { log as tlog, traceEnd, traceStart } from "@/lib/voice/trace";
+import { api } from "./api";
 import { connect, friendlyError, type RTEvent, type Transport, type VoiceStart } from "@/lib/voice/transport";
 import { startMeter } from "@/lib/voice/meter";
 
@@ -35,6 +36,20 @@ export interface VoiceHandlers {
 
 const SILENCE_MS = 180_000;   // neither side has spoken for this long → hang up. Resets on user speech and on assistant audio.
 
+/**
+ * Tool args carry the user's words (search.query, ask_repo.question). The trace is shipped to the
+ * server and kept 7 days per uid; it is for diagnosing the transport, not for reading what people
+ * asked. Keep repo ids and enums (they are what the tool did), replace free text with its length.
+ */
+export function redactArgs(args: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(args)) {
+    if (k === "query" || k === "question" || k === "text") out[k] = typeof v === "string" ? `[${v.length} chars]` : typeof v;
+    else out[k] = v;
+  }
+  return out;
+}
+
 function summarizeResponse(ev: RTEvent): unknown {
   const r = ev.response as { status?: string; status_details?: unknown; output?: { type: string; name?: string }[]; usage?: { total_tokens?: number } } | undefined;
   return r ? { status: r.status, details: r.status_details, out: r.output?.map((o) => o.name ? `${o.type}:${o.name}` : o.type), tokens: r.usage?.total_tokens } : undefined;
@@ -57,8 +72,15 @@ export function useVoice(handlers: VoiceHandlers) {
   const speaking = useRef(false);    // model audio is playing on the device right now
   const autoMuted = useRef(false);   // muted by us for the opening take; released when that audio finishes playing
   const connecting = useRef(false);
-  const h = useRef(handlers);
-  h.current = handlers;
+  const base = useRef(handlers);
+  base.current = handlers;
+  // A surface that is temporarily on top (the search sheet) layers its tools over the owner's. Merged per call
+  // so whichever is mounted answers; the owner's handlers stay underneath for next_card / react / show_repo.
+  const overlay = useRef<VoiceHandlers | null>(null);
+  const h = { get current(): VoiceHandlers { return overlay.current ? { ...base.current, ...overlay.current } : base.current; } };
+  const setOverlay = useCallback((hs: VoiceHandlers | null) => { overlay.current = hs; }, []);
+  const [mode, setMode] = useState<VoiceStart["mode"] | null>(null);
+  const modeRef = useRef<VoiceStart["mode"] | null>(null);
 
   const stop = useCallback((reason?: string, opts?: { quiet?: boolean }) => {
     const t = tr.current;
@@ -68,6 +90,7 @@ export function useVoice(handlers: VoiceHandlers) {
     stopMeter.current?.(); stopMeter.current = null;
     t?.close(); tr.current = null; connecting.current = false;
     setLevel(0); setMicLevel(0); speaking.current = false; setMuted(false); autoMuted.current = false;
+    modeRef.current = null; setMode(null);
     setState("idle");
     if (reason && !opts?.quiet) setError(reason);
   }, [setState]);
@@ -96,7 +119,7 @@ export function useVoice(handlers: VoiceHandlers) {
   const runTool = useCallback(async (name: string, args: Record<string, unknown>, callId: string) => {
     let output: string;
     const t0 = Date.now();
-    tlog(`tool.call ${name}`, args);
+    tlog(`tool.call ${name}`, redactArgs(args));
     try {
       if (name === "next_card") output = (await h.current.onNextCard?.()) ?? "No more cards in the feed right now.";
       else if (name === "react") output = (await h.current.onReact?.(args.kind as "like" | "skip" | "save")) ?? "Recorded.";
@@ -173,6 +196,7 @@ export function useVoice(handlers: VoiceHandlers) {
     setState("connecting");
     traceStart(opts.mode);
     tlog("start.opts", opts);
+    modeRef.current = opts.mode; setMode(opts.mode);
     // The transport calls back (onOpen, onLost) possibly before connect() resolves, so it hands itself over
     // in onOpen and we adopt it there. `mine` is the one we adopted; anything else is a stale call.
     let mine: Transport | null = null;
@@ -211,6 +235,33 @@ export function useVoice(handlers: VoiceHandlers) {
     }
   }, [bumpSilence, onEvent, send, setMic, setState, stop]);
 
+  /**
+   * Move the live conversation to another surface without hanging up: fetch that surface's instructions
+   * and tools, send session.update, tell the model what just happened, and (optionally) have it speak.
+   * Same connection, same mic, same memory — the model still knows what the user asked a moment ago.
+   * Idle → plain start(). Concurrent switches: the last one wins.
+   */
+  const switchSeq = useRef(0);
+  const switchTo = useCallback(async (opts: VoiceStart, say?: { note: string; speak: boolean }) => {
+    if (!tr.current) { await start(opts); return; }
+    const my = ++switchSeq.current;
+    const from = modeRef.current;
+    tlog("switch", { from, to: opts });
+    // Mode flips at once, not when the update lands: a surface unmounting on the same tick reads it to decide
+    // whether the session is still its own to end.
+    modeRef.current = opts.mode; setMode(opts.mode);
+    try {
+      const m = await api<{ instructions: string; tools: unknown[]; maxOutputTokens: number }>("/api/voice/context", { method: "POST", body: opts });
+      if (my !== switchSeq.current || !tr.current) { tlog("switch.stale"); return; }
+      send({ type: "session.update", session: { type: "realtime", instructions: m.instructions, tools: m.tools, tool_choice: "auto", max_output_tokens: m.maxOutputTokens } });
+      if (say) inject(say.note, say.speak);
+      tlog("switch.ok", { to: opts.mode });
+    } catch (e) {
+      tlog("switch.throw", { msg: (e as Error).message });
+      // The old instructions still apply; the conversation carries on rather than dying.
+    }
+  }, [inject, send, start]);
+
   const stopRef = useRef(stop); stopRef.current = stop;
   useEffect(() => () => stopRef.current("unmount", { quiet: true }), []);
 
@@ -225,5 +276,5 @@ export function useVoice(handlers: VoiceHandlers) {
     if (tr.current) setMic(!tr.current.micEnabled());
   }, [setMic]);
 
-  return { state, level, micLevel, transcript, error, start, stop, inject, muted, toggleMute, active: state !== "idle" && state !== "error" };
+  return { state, mode, level, micLevel, transcript, error, start, stop, switchTo, setOverlay, inject, muted, toggleMute, active: state !== "idle" && state !== "error" };
 }

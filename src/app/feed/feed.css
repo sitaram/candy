@@ -134,18 +134,15 @@
 .fcard-dbg { font-size: 11px; color: var(--ink-4); text-align: center; margin-bottom: 6px; }
 
 /* actions */
-/* dive · voice, with room between them for mute + stop to appear beside voice without moving anything */
-.fcard-actions { display: flex; justify-content: center; align-items: center; gap: 100px; }
+/* dive · voice. While talking, mute attaches to the voice disc's right shoulder: a 36px satellite with the
+   same accent border, overlapping the disc's edge so the pair reads as one control. Row stays put. */
+.fcard-actions { display: flex; justify-content: center; align-items: center; gap: 64px; }
 .voice-cluster { position: relative; width: 64px; height: 64px; }
 .voice-cluster .act.voice { position: absolute; left: 0; top: 0; }
-.voice-cluster .act.sub { position: absolute; top: 12px; width: 40px; height: 40px; }
-.voice-cluster .act.sub.mute { right: calc(100% + 10px); }
-.voice-cluster .act.sub.end { left: calc(100% + 10px); }
-.act.sub svg { width: 20px; height: 20px; }
-.act.sub.end svg { width: 18px; height: 18px; }
-.act.sub.mute.off { color: var(--skip); border-color: color-mix(in srgb, var(--skip) 45%, transparent); background: color-mix(in srgb, var(--skip) 12%, var(--fill)); }
-@media (hover: hover) { .act.sub.mute.off:hover { color: var(--skip); background: color-mix(in srgb, var(--skip) 18%, var(--fill)); } }
-@media (max-width: 360px) { .fcard-actions { gap: 84px; } .voice-cluster .act.sub.mute { right: calc(100% + 6px); } .voice-cluster .act.sub.end { left: calc(100% + 6px); } }
+.voice-cluster .act.sub.mute { position: absolute; left: 52px; top: 30px; width: 36px; height: 36px; z-index: 1; border-color: var(--accent); background: var(--bg); color: var(--ink-2); }
+.act.sub svg { width: 18px; height: 18px; }
+.act.sub.mute.off { color: var(--skip); border-color: var(--skip); background: color-mix(in srgb, var(--skip) 14%, var(--bg)); }
+@media (hover: hover) { .act.sub.mute:hover { background: var(--fill-2); color: var(--ink); } .act.sub.mute.off:hover { color: var(--skip); background: color-mix(in srgb, var(--skip) 20%, var(--bg)); } }
 .act {
   width: 64px; height: 64px; border-radius: 50%;
   border: 1.5px solid var(--line); background: var(--fill); color: var(--ink);
@@ -323,6 +320,7 @@
 
 /* related: labelled groups, each a horizontal rail of small tinted cards. The label is the point. */
 .rel-group { margin: 0 0 18px; }
+.rel-pending { font-size: 13px; color: var(--ink-4); margin: -4px 0 14px; }
 .rel-label { font-size: 15px; font-weight: 650; color: var(--ink); margin: 0 0 8px; letter-spacing: -.01em; }
 /* The rail bleeds to the right edge only: the left edge stays on the text column. Bleeding both sides
    with negative margins loses the start padding in iOS Safari once the row scrolls. */

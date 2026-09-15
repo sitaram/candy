@@ -6,7 +6,7 @@ import type { ItemDetail } from "@/lib/corpus/api";
 
 type Sim = { id: string; score: number; why: string[]; pitch?: string };
 type RelItem = { id: string; name: string; owner: string; pitch: string; stars: number; lang: string | null; category: string };
-type Data = ItemDetail & { similar: Sim[]; related?: { labelled: boolean; groups: { label: string; items: RelItem[] }[] } };
+type Data = ItemDetail & { similar: Sim[]; related?: { labelled: boolean; pending?: number; groups: { label: string; items: RelItem[] }[] } };
 
 const HUE: Record<string, number> = {
   "ai-llm": 268, "ai-agents": 280, "ml-infra": 255, "dev-tools": 205, cli: 195, "web-framework": 330, frontend: 340,
@@ -89,9 +89,10 @@ export function Detail({ id, onClose, onOpen }: { id: string; onClose: () => voi
 
             <AskBox id={id} />
 
-            {d.related && d.related.groups.length > 0 ? (
+            {d.related && (d.related.groups.length > 0 || d.related.pending) ? (
               <section className="rel">
                 <h3>Related</h3>
+                {!!d.related.pending && <p className="rel-pending">{d.related.pending} more {d.related.pending === 1 ? "alternative" : "alternatives"} being fetched — back next time you open this.</p>}
                 {d.related.groups.map((g) => (
                   <div key={g.label} className="rel-group">
                     <div className="rel-label">{g.label}</div>

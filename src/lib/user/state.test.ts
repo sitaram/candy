@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeAll, beforeEach, afterAll } from "vitest";
-import { react, unsave, undo, getProfile, getSeen, getReactions, isSaved, markSeen, touchVisit, me, resetTaste, UK } from "./state";
+import { react, unsave, undo, getProfile, getSeen, getReactions, isSaved, markSeen, touchVisit, me, resetTaste, loadUser, UK } from "./state";
 import { EK, getTaste, putEmbeddings } from "@/lib/embed";
 import { item, vec, NOW } from "@/test/fixtures";
 import { mockRedis } from "@/test/setup";
@@ -197,5 +197,29 @@ describe("key schema", () => {
     expect(EK.taste("a")).toBe("u:a:taste");
     expect(EK.emb("o/r")).toBe("emb:o/r");
     expect(new Set([UK.seen("a"), UK.react("a"), UK.saved("a"), UK.profile("a"), UK.meta("a"), EK.taste("a"), EK.tastew("a")]).size).toBe(7);
+  });
+});
+
+describe("loadUser", () => {
+  it("returns profile, seen, saved, lastVisit and taste bytes in one pipeline, and touches lastVisit", async () => {
+    await putEmbeddings([{ id: "a/b", v: vec(0) }]);
+    await react("u", item("a/b"), "like");
+    await react("u", item("c/d"), "save");
+    await markSeen("u", ["e/f"]);
+    const u1 = await loadUser("u");
+    expect(u1.profile.size).toBeGreaterThan(0);
+    expect(u1.seen.has("e/f")).toBe(true);
+    expect(u1.saved.has("c/d")).toBe(true);
+    expect(u1.tasteBuf?.length).toBe(512 * 4);
+    expect(u1.tasteW).toBeGreaterThan(0);
+    // The pipeline reads lastVisit *then* writes now: the second call sees the first's stamp.
+    const stamp = Number(await mockRedis.hget(UK.meta("u"), "lastVisit"));
+    const u2 = await loadUser("u");
+    expect(u2.lastVisit).toBe(stamp);
+  });
+  it("is all-empty for an unknown user and does not throw", async () => {
+    const u = await loadUser("nobody");
+    expect(u.profile.size).toBe(0); expect(u.seen.size).toBe(0); expect(u.saved.size).toBe(0);
+    expect(u.lastVisit).toBe(0); expect(u.tasteBuf).toBeNull(); expect(u.tasteW).toBe(0);
   });
 });

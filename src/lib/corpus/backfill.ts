@@ -12,7 +12,7 @@ import { getItem, allItems } from "./api";
 import { ensureItem } from "./ensure";
 import { ghHeaders } from "../discover/github";
 import { getJson } from "../discover/util";
-import { cardText, embedTexts, putEmbeddings } from "../embed";
+import { cardText, embedTexts, putEmbeddings, writeMatrix } from "../embed";
 
 const BF = (id: string) => `bf:${id}`;
 const RESOLVE = (name: string) => `bfname:${name}`;   // name → owner/repo or "-" (unresolvable), 30 d
@@ -92,7 +92,7 @@ export async function backfillAlternatives(id: string, max = 4): Promise<{ added
     // Embed the newcomers so they can take part in neighbours() at once.
     try {
       const items = (await Promise.all(added.map((a) => getItem(a)))).filter((x): x is NonNullable<typeof x> => !!x?.card);
-      if (items.length) { const vecs = await embedTexts(items.map(cardText)); await putEmbeddings(items.map((it, i) => ({ id: it.repo.id, v: vecs[i] }))); }
+      if (items.length) { const vecs = await embedTexts(items.map(cardText)); await putEmbeddings(items.map((it, i) => ({ id: it.repo.id, v: vecs[i] }))); await writeMatrix(); }
     } catch (e) { console.warn("[backfill] embed", (e as Error).message); }
     await r.del(`rel:${id}`);   // labels are stale now; fallback grouping shows until relate runs
     console.log(`[backfill] ${id}: +${added.length} ${added.join(", ")}`);

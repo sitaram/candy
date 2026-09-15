@@ -4,6 +4,7 @@
  * Reads niches/<name>.json
  */
 import { readFile } from "node:fs/promises";
+import { invalidate } from "../src/lib/corpus/api";
 import { crawl } from "../src/lib/crawl/index.ts";
 import { discoverAwesome } from "../src/lib/discover/awesome.ts";
 import { discoverTopics } from "../src/lib/discover/topics.ts";
@@ -66,4 +67,5 @@ if (enrichN) {
 const final = await collectionMembers(name);
 const finalInCorpus = (await r.smismember(K.corpus, ...final)).filter(Boolean).length;
 console.log(`\ncollection:${name}  ${final.length} members, ${finalInCorpus} in corpus  ${((Date.now() - t0) / 1000).toFixed(0)}s`);
+await invalidate();   // rebuild the read snapshot every process serves from
 await closeRedis();

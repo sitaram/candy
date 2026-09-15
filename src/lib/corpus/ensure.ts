@@ -12,7 +12,7 @@ import { addEdges, discover, getMentions, getRepo, saveRepo } from "../store/cor
 import { K, normId } from "../store/keys";
 import { getRaw } from "../store/raw";
 import { redis } from "../store/redis";
-import { invalidate } from "./api";
+import { upsertSnapshotItem } from "./api";
 
 export interface EnsureResult {
   id: string;
@@ -72,6 +72,6 @@ async function doEnsure(id: string, wantCard: boolean): Promise<EnsureResult> {
       res.enriched = true;
     }
   }
-  if (res.fetched || res.enriched) invalidate();
+  if (res.fetched || res.enriched) await upsertSnapshotItem(repo.id);
   return res;
 }

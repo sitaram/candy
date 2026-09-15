@@ -1,6 +1,6 @@
 /** Embed every carded item that lacks a vector. Idempotent; safe to rerun after enrich. */
 import { allItems } from "../src/lib/corpus/api";
-import { cardText, dot, embedTexts, getEmbeddings, hasEmbedding, provider, putEmbeddings } from "../src/lib/embed";
+import { cardText, dot, embedTexts, getEmbeddings, hasEmbedding, provider, putEmbeddings , writeMatrix } from "../src/lib/embed";
 import { closeRedis } from "../src/lib/store/redis";
 
 const force = process.argv.includes("--force");
@@ -49,4 +49,5 @@ for (let i = 0; i < 3000; i++) {
 sample.sort((x, y) => x - y);
 const q = (p: number) => sample[Math.floor(p * (sample.length - 1))].toFixed(3);
 console.log(`pairwise cosine  p10 ${q(0.1)}  p50 ${q(0.5)}  p90 ${q(0.9)}  p99 ${q(0.99)}   (tasteFit centers on p50; 1.0 at ~p99)`);
+await writeMatrix();   // one-key matrix every process serves from
 await closeRedis();

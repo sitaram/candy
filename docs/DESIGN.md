@@ -70,13 +70,13 @@ GitHub knows *what* a repo is. Nobody has built the layer that knows **why it ma
 
 Hardening pass, after the prototype worked.
 
-- **Tests** — vitest, 97 cases on the pure logic: ranking, search fusion, user state, embeddings, API guard, rate limit, schemas, error sink.
+- **Tests** — vitest against a real scratch Redis, 137 cases on the pure logic: ranking, search fusion, user state, embeddings, API guard, rate limit, schemas, error sink.
 - **Validated front door** — one `guard()` per route: uid or 401, zod schema per query/body/params with the field named, 413 on oversize, 400 on non-JSON, 500 never leaks the message, `x-request-id` on everything.
 - **Rate limits** — per-caller per-bucket token bucket in Redis, `Retry-After` on 429, fails open when Redis is down.
 - **Env** — every `process.env` read in one typed object; `assertEnv()` at boot names missing keys in one message.
 - **Bounded Redis** — 5-try retry, 5 s connect timeout, error log at 1/s; `safeJson()` so one corrupt row costs one item, not the shared corpus cache.
 - **One client fetch** — `api()` turns non-2xx into `ApiError` with a human message and the request id; GET retries once; 12 s timeout; every failure has a visible state and a retry — no spinner forever.
 - **Error sink** — server 500s and client throws (fetch, window error, boundary) ship to a Redis ring buffer with fingerprint counts per day.
-- **Round trips, not bytes** — deep dive paints repo+card first, neighbours second; cold `getItem` is one pipeline, not a corpus load; backfill runs after the response.
+- **Round trips, not bytes** — Redis is ~75 ms away, so cost is hops, not payload. The read model is one gzip'd key (`corpus:snap`, 700 KB, versioned; writers bump, readers re-check every 30 s) and the vectors one Float32 block (`emb:matrix`, 1.8 MB): a cold process loads both in ~300 ms flat in corpus size, where assembling from 5k per-repo keys took 1.1 s and grew linearly. User state is one pipeline (`loadUser`). Neighbours score a generated candidate set — hard edges ∪ specific-tag matches ∪ semantic top-64 over inverted indexes — not the corpus. Query embeddings are LRU-cached and start before the Redis reads. Warm: feed 88 ms, neighbours 90 ms, search 80 ms, each one hop.
 - **Accessibility** — AA contrast on tertiary text; one `:focus-visible` ring; global reduced-motion; deck is a named live region announcing each card; rail copies hidden from AT; toggles `aria-pressed`; detail is a focus-managed `dialog`; toasts are `status`/`alert`.
 - **Split `FeedClient`** — `Card` extracted; rail, gestures and keyboard next.

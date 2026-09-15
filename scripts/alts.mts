@@ -9,6 +9,7 @@
  * pnpm alts [max=150] [minMentions=1]
  */
 import { allItems } from "../src/lib/corpus/api";
+import { invalidate } from "../src/lib/corpus/api";
 import { ensureItem } from "../src/lib/corpus/ensure";
 import { ghHeaders } from "../src/lib/discover/github";
 import { getJson } from "../src/lib/discover/util";
@@ -57,4 +58,5 @@ for (const [name, n] of todo) {
 }
 console.log(`\n${fetched} fetched · ${carded} carded · ${miss} unresolved · ${Math.round((Date.now() - t0) / 1000)}s`);
 console.log("next: pnpm embed && pnpm relate 2000 6");
+await invalidate();   // rebuild the read snapshot every process serves from
 await closeRedis();

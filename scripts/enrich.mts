@@ -4,6 +4,7 @@
  * Model: CANDY_MODEL env (default claude-haiku-4-5-20251001)
  */
 import { enrich } from "../src/lib/enrich/index.ts";
+import { invalidate } from "../src/lib/corpus/api";
 import { MODEL } from "../src/lib/enrich/llm.ts";
 import { closeRedis } from "../src/lib/store/redis.ts";
 
@@ -16,4 +17,5 @@ const s = await enrich(n, conc);
 // Haiku 4.5 list price: $1/M in, $5/M out. Adjust if you switch models.
 const cost = (s.inputTokens * 1 + s.outputTokens * 5) / 1e6;
 console.log(`\ndone ${s.done}  failed ${s.failed}  tokens in ${s.inputTokens} out ${s.outputTokens}  ≈$${cost.toFixed(3)}  ${((Date.now() - t0) / 1000).toFixed(1)}s`);
+await invalidate();   // rebuild the read snapshot every process serves from
 await closeRedis();

@@ -8,6 +8,7 @@
  * Budgets via env: CRAWL_PER_CYCLE=100 ENRICH_PER_CYCLE=50 CYCLE_MIN=10 DISCOVER_EVERY_MIN=60 LLM_USD_PER_DAY=5
  */
 import { appendFile, mkdir } from "node:fs/promises";
+import { invalidate } from "../src/lib/corpus/api";
 import { crawl } from "../src/lib/crawl/index.ts";
 import { discoverers } from "../src/lib/discover/index.ts";
 import { enrich } from "../src/lib/enrich/index.ts";
@@ -83,4 +84,5 @@ do {
   if (!once) await new Promise((res) => setTimeout(res, CYCLE_MIN * 60_000));
 } while (!once);
 
+await invalidate();   // rebuild the read snapshot every process serves from
 await closeRedis();

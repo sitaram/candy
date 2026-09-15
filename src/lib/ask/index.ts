@@ -7,11 +7,12 @@
  * Cost: a 60k README is ~15k tokens → ~$0.015 on Haiku per question. Cache-friendly: the repo
  * context is the system prompt and is stable across questions on the same repo.
  */
+import { env } from "../env";
 import Anthropic from "@anthropic-ai/sdk";
 import { getItemDetail } from "../corpus/api";
 import { getRaw } from "../store/raw";
 
-const MODEL = process.env.CANDY_ASK_MODEL ?? process.env.CANDY_MODEL ?? "claude-haiku-4-5-20251001";
+const MODEL = env.CANDY_ASK_MODEL;
 let client: Anthropic | null = null;
 const anthropic = () => (client ??= new Anthropic());
 

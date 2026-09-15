@@ -1,3 +1,4 @@
+import { env } from "../env";
 import type { Discovery } from "../store/types";
 import { daysAgo, getJson } from "./util";
 
@@ -11,7 +12,7 @@ interface GhRepo {
 
 export function ghHeaders(): Record<string, string> {
   const h: Record<string, string> = { Accept: "application/vnd.github+json" };
-  if (process.env.GITHUB_TOKEN) h.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
+  if (env.GITHUB_TOKEN) h.Authorization = `Bearer ${env.GITHUB_TOKEN}`;
   return h;
 }
 

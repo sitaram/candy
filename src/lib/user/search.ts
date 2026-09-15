@@ -35,12 +35,12 @@ export interface SearchResponse {
 const STOP = new Set("a an the i want to build build a for with that which what should use using of in on and or is it my me some something tool library framework app project thing things want need looking like best good".split(" "));
 
 /** Keywords for the lexical lane: drop stop-words, keep 2+ char tokens, dedupe. */
-function keywords(q: string): string[] {
+export function keywords(q: string): string[] {
   return Array.from(new Set(q.toLowerCase().replace(/[^a-z0-9+#./ -]/g, " ").split(/\s+/).filter((t) => t.length >= 2 && !STOP.has(t))));
 }
 
 /** Does the query read like a repo reference? owner/name, or one token with no spaces. */
-function looksLikeName(q: string): boolean {
+export function looksLikeName(q: string): boolean {
   const t = q.trim();
   return /^[\w.-]+\/[\w.-]+$/.test(t) || (/^[\w.-]+$/.test(t) && t.length >= 3);
 }

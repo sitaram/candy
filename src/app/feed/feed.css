@@ -276,6 +276,8 @@
 .feed-empty { flex: 1; display: flex; align-items: center; justify-content: center; text-align: center; color: var(--ink-3); line-height: 1.6; padding: 24px; font-size: 16px; }
 .feed-empty.small { flex: 0; padding: 40px 0; }
 .feed-empty a { color: var(--accent); }
+.feed-retry { font: inherit; font-size: 15px; font-weight: 600; margin-top: 14px; padding: 9px 18px; border-radius: 999px; border: none; background: var(--accent); color: var(--bg); cursor: pointer; }
+.feed-retry:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 
 /* ===== detail: mobile sheet ===== */
 .detail-host { position: fixed; inset: 0; z-index: 20; display: flex; flex-direction: column; justify-content: flex-end; }

@@ -1,3 +1,4 @@
+import { safeJson } from "../util/json";
 import { corpusIds, getMentions, getRepos } from "../store/corpus";
 import { K, normId } from "../store/keys";
 import { getRaw } from "../store/raw";
@@ -134,7 +135,7 @@ export async function enrich(limit: number, concurrency = 4, log = console.log, 
           getRaw(repo.id, "releases"),
           getMentions(repo.id),
         ]);
-        const releases = relRaw ? (JSON.parse(relRaw) as Parameters<typeof enrichOne>[2]) : [];
+        const releases = safeJson<Parameters<typeof enrichOne>[2]>(relRaw, [], "releases");
         const e = await enrichOne(repo, readme, releases, mentions);
         await saveCard(repo.id, e.card, {
           readmeHash: repo.readmeHash,

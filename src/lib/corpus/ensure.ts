@@ -3,6 +3,7 @@
  * and enriching synchronously if needed (~3-6 s cold). The only place product
  * code is allowed to trigger network + LLM, and only for a single named repo.
  */
+import { safeJson } from "../util/json";
 import { fetchRepo } from "../crawl/fetchRepo";
 import { getCard, saveCard } from "../enrich";
 import { enrichOne } from "../enrich/llm";
@@ -60,7 +61,7 @@ async function doEnsure(id: string, wantCard: boolean): Promise<EnsureResult> {
     if (!card || (repo.readmeHash && card.readmeHash !== repo.readmeHash)) {
       const r = redis();
       const [readme, relRaw, mentions] = await Promise.all([getRaw(repo.id, "readme"), getRaw(repo.id, "releases"), getMentions(repo.id)]);
-      const e = await enrichOne(repo, readme ?? "", relRaw ? JSON.parse(relRaw) : [], mentions);
+      const e = await enrichOne(repo, readme ?? "", safeJson(relRaw, [], "releases"), mentions);
       await saveCard(repo.id, e.card, {
         readmeHash: repo.readmeHash,
         model: e.model,

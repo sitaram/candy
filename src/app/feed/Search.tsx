@@ -1,6 +1,8 @@
 "use client";
 
+import { api, report, ApiError } from "./api";
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
+import { HUE } from "./logic";
 import type { SearchResponse, SearchResult } from "@/lib/user/search";
 import { useVoice } from "./useVoice";
 import { guarded } from "@/lib/voice/trace";
@@ -23,12 +25,6 @@ const CAT_LABEL: Record<string, string> = {
   "languages-compilers": "Languages", mobile: "Mobile", desktop: "Desktop", "games-graphics": "Games · Graphics",
   science: "Science", productivity: "Productivity", "learning-resource": "Learning", "awesome-list": "Curated List", other: "Other",
 };
-const HUE: Record<string, number> = {
-  "ai-llm": 268, "ai-agents": 280, "ml-infra": 255, "dev-tools": 205, cli: 195, "web-framework": 330, frontend: 340,
-  backend: 215, database: 30, "data-eng": 45, "devops-infra": 175, security: 0, networking: 185, systems: 20,
-  "languages-compilers": 300, mobile: 320, desktop: 240, "games-graphics": 355, science: 150, productivity: 95,
-  "learning-resource": 60, "awesome-list": 70, other: 230,
-};
 const fmt = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}k` : String(n));
 
 const TRY = ["mcp server", "local llm runtime", "e2e browser testing", "rust cli for logs", "voice agent framework", "terminal file manager"];
@@ -45,6 +41,7 @@ const I = {
 export function Search({ open, onClose, onPick, autoVoice }: { open: boolean; onClose: () => void; onPick: (r: SearchResult) => void; autoVoice?: boolean }) {
   const [q, setQ] = useState("");
   const [res, setRes] = useState<SearchResponse | null>(null);
+  const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [heard, setHeard] = useState("");   // what the user said, until the model's query lands
   const inputRef = useRef<HTMLInputElement>(null);
@@ -58,11 +55,13 @@ export function Search({ open, onClose, onPick, autoVoice }: { open: boolean; on
     if (query.trim().length < 2) { setRes(null); return null; }
     setBusy(true);
     try {
-      const r = await fetch(`/api/search?q=${encodeURIComponent(query)}&n=20`);
-      const j = (await r.json()) as SearchResponse;
+      const j = await api<SearchResponse>(`/api/search?q=${encodeURIComponent(query)}&n=20`);
       if (my !== seq.current) return null;
-      setRes(j);
+      setErr(null); setRes(j);
       return j;
+    } catch (e) {
+      if (my === seq.current) { report(e, "search"); setErr(e instanceof ApiError ? e.message : "Search failed."); }
+      return null;
     } finally {
       if (my === seq.current) setBusy(false);
     }
@@ -163,7 +162,8 @@ export function Search({ open, onClose, onPick, autoVoice }: { open: boolean; on
               <div className="s-try">{TRY.map((t) => <button key={t} className="chip" onClick={() => setQ(t)}>{t}</button>)}</div>
             </div>
           )}
-          {res && res.results.length === 0 && !busy && (
+          {err && !busy && <div className="s-empty" role="alert">{err}<br /><span>Check your connection and try again.</span></div>}
+          {res && res.results.length === 0 && !busy && !err && (
             <div className="s-empty">Nothing close to “{res.q}”.<br /><span>Try different words, or describe what it should do.</span></div>
           )}
           {res && res.results.length > 0 && (

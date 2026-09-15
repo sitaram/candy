@@ -5,37 +5,18 @@ import { flushSync } from "react-dom";
 import type { Feed, FeedItem } from "@/lib/user/feed";
 import type { Action, Reaction } from "@/lib/user/state";
 import { Detail } from "./Detail";
+import { hueOf, fmt, agoShort, splitWhy, THRESH, VTHRESH, AXIS_LOCK } from "./logic";
 import { useVoice } from "./useVoice";
 import { guarded } from "@/lib/voice/trace";
 import { VoiceBoundary } from "./VoiceBoundary";
 import { VoiceLog } from "./VoiceLog";
 import { Search } from "./Search";
 import type { SearchResponse, SearchResult } from "@/lib/user/search";
+import { api, post as apiPost, report, ApiError } from "./api";
 import "./feed.css";
 
 type Decision = "like" | "skip";
-const THRESH = 100;      // px to commit a horizontal decision
-const VTHRESH = 90;      // px to commit a vertical page
-const AXIS_LOCK = 10;    // px before we pick an axis
-
-/** Category -> hue for the page gradient. Adjacent categories get nearby hues. */
-const HUE: Record<string, number> = {
-  "ai-llm": 268, "ai-agents": 280, "ml-infra": 255, "dev-tools": 205, cli: 195, "web-framework": 330, frontend: 340,
-  backend: 215, database: 30, "data-eng": 45, "devops-infra": 175, security: 0, networking: 185, systems: 20,
-  "languages-compilers": 300, mobile: 320, desktop: 240, "games-graphics": 355, science: 150, productivity: 95,
-  "learning-resource": 60, "awesome-list": 70, other: 230,
-};
-function hueOf(f?: FeedItem): number {
-  return f?.item.card ? HUE[f.item.card.category] ?? 230 : 230;
-}
-
-function fmt(n: number): string {
-  return n >= 1000 ? `${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}k` : String(n);
-}
-
-function post(id: string, kind: Action) {
-  return fetch("/api/react", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ id, kind }) });
-}
+function post(id: string, kind: Action) { apiPost("/api/react", { id, kind }); }
 
 /* ---------- icons (inline, no deps) ---------- */
 const I = {
@@ -64,19 +45,6 @@ const HOOK_LABEL: Record<string, string> = {
   "novel-approach": "Novel approach", "fills-gap": "Fills a gap", "new-project": "Brand new",
 };
 
-function agoShort(iso: string): string {
-  if (!iso) return "";
-  const d = (Date.now() - Date.parse(iso)) / 86_400_000;
-  if (d < 1) return "today";
-  if (d < 2) return "1d";
-  if (d < 30) return `${Math.round(d)}d`;
-  if (d < 365) return `${Math.round(d / 30)}mo`;
-  return `${(d / 365).toFixed(d < 730 ? 1 : 0)}y`;
-}
-function splitWhy(why: string[]): { fit: string | null; rest: string[] } {
-  const fit = why.find((w) => w.startsWith("matches your interest")) ?? null;
-  return { fit: fit ? fit.replace("matches your interest in ", "") : null, rest: why.filter((w) => w !== fit && !w.startsWith("outside your usual")) };
-}
 
 function Card({
   f, style, className, debug, saved, reaction, onSave, onOpen, onVoice, voice,
@@ -208,7 +176,10 @@ export function FeedClient() {
   const [idx, setIdx] = useState(-1);   // −1 = splash
   const [since, setSince] = useState<Feed["since"] | null>(null);
   const [profileSize, setProfileSize] = useState(0);
+  const idxRef = useRef(idx); idxRef.current = idx;
+  const itemsRef = useRef(items); itemsRef.current = items;
   const [loading, setLoading] = useState(true);
+  const [loadErr, setLoadErr] = useState<string | null>(null);
   const [count, setCount] = useState({ like: 0, skip: 0 });
   const [drag, setDrag] = useState<{ dx: number; dy: number; axis: "x" | "y" | null; active: boolean }>({ dx: 0, dy: 0, axis: null, active: false });
   const [settle, setSettle] = useState(0);          // vertical page offset in px, animates to 0
@@ -242,7 +213,15 @@ export function FeedClient() {
     if (fetching.current) return;
     fetching.current = true;
     const ex = Array.from(seenRef.current).map((id) => `exclude=${encodeURIComponent(id)}`).join("&");
-    const f = (await (await fetch(`/api/feed?n=30${ex ? "&" + ex : ""}`)).json()) as Feed;
+    let f: Feed;
+    try { f = await api<Feed>(`/api/feed?n=30${ex ? "&" + ex : ""}`); }
+    catch (e) {
+      // First load failing is a wall; later loads failing just means the rail stops growing — the user still has cards.
+      report(e, "feed"); fetching.current = false;
+      if (initial || !itemsRef.current.length) { setLoadErr(e instanceof ApiError ? e.message : "Couldn’t load the feed."); setLoading(false); }
+      return;
+    }
+    setLoadErr(null);
     setItems((q) => {
       const have = new Set(q.map((x) => x.id));
       return [...q, ...f.items.filter((it) => !have.has(it.id))];
@@ -396,13 +375,10 @@ export function FeedClient() {
   }, [saved]);
 
   /* ---- voice: realtime conversation about the card on screen ---- */
-  const idxRef = useRef(idx); idxRef.current = idx;
-  const itemsRef = useRef(items); itemsRef.current = items;
   const briefOf = useCallback(async (f: FeedItem | undefined) => {
     if (!f) return null;
     const q = new URLSearchParams({ id: f.id }); for (const w of f.why) q.append("why", w);
-    const r = await fetch(`/api/voice/brief?${q}`);
-    return r.ok ? ((await r.json()) as { brief: string }).brief : null;
+    try { return (await api<{ brief: string }>(`/api/voice/brief?${q}`)).brief; } catch (e) { report(e, "brief"); return null; }
   }, []);
   /** Hand a card to the rail right after the current one and page onto it. Used by search picks and voice's show_repo. */
   const insertAndGo = useCallback((r: FeedItem) => {
@@ -426,9 +402,8 @@ export function FeedClient() {
     if (!q) return null;
     const have = itemsRef.current.findIndex((x) => x.id.toLowerCase() === q.toLowerCase());
     if (have >= 0) { go(have); return itemsRef.current[have]; }
-    const r = await fetch(`/api/search?q=${encodeURIComponent(q)}&n=3`);
-    if (!r.ok) return null;
-    const res = (await r.json()) as SearchResponse;
+    let res: SearchResponse;
+    try { res = await api<SearchResponse>(`/api/search?q=${encodeURIComponent(q)}&n=3`); } catch (e) { report(e, "show_repo"); return null; }
     const hit = (res.exact && res.results.find((x) => x.id === res.exact))
       ?? res.results.find((x) => x.id.toLowerCase() === q.toLowerCase())
       ?? res.results.find((x) => x.match === "name")
@@ -603,7 +578,13 @@ export function FeedClient() {
 
       <div className="deck-wrap">
         <div className="deck">
-          {loading && !intro && <div className="feed-empty">loading…</div>}
+          {loading && !intro && <div className="feed-empty" role="status">loading…</div>}
+          {loadErr && !intro && !items.length && (
+            <div className="feed-empty" role="alert">
+              {loadErr}<br />
+              <button type="button" className="feed-retry" onClick={() => { setLoading(true); setLoadErr(null); void load(true); }}>try again</button>
+            </div>
+          )}
           {!loading && !intro && !cur && <div className="feed-empty">You’ve seen everything ranked for you today.<br /><a href="/browse">Browse the corpus</a> or come back tomorrow.</div>}
           {(cur || intro) && (
             <div className="stack" ref={stackRef}>

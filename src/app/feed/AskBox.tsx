@@ -1,4 +1,5 @@
 "use client";
+import { api, report, ApiError } from "./api";
 import { useEffect, useRef, useState } from "react";
 
 const STARTERS = ["How does it actually work?", "What changed in the last release?", "What are its limits?", "Is it production-ready?", "How do I install it?"];
@@ -18,11 +19,10 @@ export function AskBox({ id }: { id: string }) {
     if (!t || busy) return;
     setBusy(true); setErr(null); setQ("");
     try {
-      const r = await fetch("/api/ask", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ id, question: t, history: thread }) });
-      const j = (await r.json()) as { answer?: string; error?: string };
-      if (!r.ok || !j.answer) throw new Error(j.error ?? `ask ${r.status}`);
+      const j = await api<{ answer?: string }>("/api/ask", { method: "POST", body: { id, question: t, history: thread }, timeout: 30_000 });
+      if (!j.answer) throw new Error("no answer");
       setThread((th) => [...th, { q: t, a: j.answer! }]);
-    } catch (e) { setErr((e as Error).message); }
+    } catch (e) { report(e, "ask"); setErr(e instanceof ApiError ? e.message : (e as Error).message); setQ(t); }
     finally { setBusy(false); }
   };
 

@@ -1,5 +1,6 @@
 "use client";
 
+import { api, report, ApiError } from "./api";
 import { AskBox } from "./AskBox";
 import { useEffect, useState } from "react";
 import type { ItemDetail } from "@/lib/corpus/api";
@@ -34,17 +35,15 @@ export function Detail({ id, onClose, onOpen }: { id: string; onClose: () => voi
   useEffect(() => {
     setD(null); setRel(null); setErr(null);
     const ac = new AbortController();
-    fetch(`/api/items/${id}`, { signal: ac.signal })
-      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`${r.status}`))))
-      .then((j: Data) => setD(j))
-      .catch((e: Error) => { if (e.name !== "AbortError") setErr(e.message); });
-    fetch(`/api/items/${id}/related`, { signal: ac.signal })
-      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`${r.status}`))))
-      .then((j: Related) => {
+    api<Data>(`/api/items/${id}`, { signal: ac.signal })
+      .then((j) => setD(j))
+      .catch((e: Error) => { if (e.name !== "AbortError") { report(e, "item"); setErr(e instanceof ApiError ? e.message : e.message); } });
+    api<Related>(`/api/items/${id}/related`, { signal: ac.signal })
+      .then((j) => {
         setRel(j);
         // Tail on demand: the server queued this repo's missing alternatives; kick the worker from here so
         // the slow part (GitHub + Claude) never sits on a request the page waits for. keepalive survives navigation.
-        if (j.pending) fetch("/api/backfill", { method: "POST", keepalive: true }).catch(() => {});
+        if (j.pending) api("/api/backfill", { method: "POST", keepalive: true, retry: false }).catch((e) => report(e, "backfill"));
       })
       .catch(() => setRel({ similar: [], labelled: false, pending: 0, groups: [] }));
     return () => ac.abort();

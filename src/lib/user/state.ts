@@ -116,7 +116,7 @@ export async function unsave(uid: string, item: Item): Promise<void> {
   p.zrem(UK.saved(uid), item.repo.id);
   writeProfile(p, uid, profile, now);
   p.hincrby(UK.meta(uid), "n_save", -1);
-  await Promise.all([p.exec(), nudgeTaste(uid, item.repo.id, -DELTA.save)]);
+  await Promise.all([p.exec(), nudgeTaste(uid, item.repo.id, -DELTA.save, { reverse: true })]);
 }
 
 /** Revert a like/skip: un-see the item, reverse the profile delta. */
@@ -134,7 +134,7 @@ export async function undo(uid: string, item: Item): Promise<boolean> {
   writeProfile(p, uid, profile, now);
   p.hincrby(UK.meta(uid), "reactions", -1);
   p.hincrby(UK.meta(uid), `n_${prev}`, -1);
-  await Promise.all([p.exec(), nudgeTaste(uid, id, -DELTA[prev])]);
+  await Promise.all([p.exec(), nudgeTaste(uid, id, -DELTA[prev], { reverse: true })]);
   return true;
 }
 

@@ -177,14 +177,21 @@ export function rank(items: Item[], profile: Profile, opts: RankOpts): Ranked[] 
     return true;
   };
 
-  for (let i = 0; i < nMain; i++) if (!pickOne(() => true)) break;
-  // Explore slots: good items the profile does not already like.
+  // Explore slots first: good items the profile does not already like. Reserve them before the main
+  // pass, or the main pass (with its diversity bonus) takes the very items explore was meant to
+  // surface, and the slot — and its "outside your usual" line — silently goes unused.
+  const explore: Ranked[] = [];
   for (let i = 0; i < nExplore; i++) {
     const ok = pickOne((r) => r.fit < 0.15 && (r.item.card?.interest ?? 0) >= 6);
     if (!ok) break;
-    const last = picked[picked.length - 1];
-    last.explore = true;
-    last.why = ["outside your usual — exploring", ...last.why].slice(0, 3);
+    const e = picked.pop()!;
+    e.explore = true;
+    e.why = ["outside your usual — exploring", ...e.why].slice(0, 3);
+    explore.push(e);
   }
-  return picked;
+  for (let i = 0; i < nMain + (nExplore - explore.length); i++) if (!pickOne(() => true)) break;
+  // Interleave: explore items land in the back half so the deck opens with the sure things.
+  const out = [...picked];
+  explore.forEach((e, i) => out.splice(Math.min(out.length, Math.floor(out.length / 2) + i * 2 + 1), 0, e));
+  return out;
 }

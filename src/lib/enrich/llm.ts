@@ -2,7 +2,9 @@ import Anthropic from "@anthropic-ai/sdk";
 import type { Mention, Repo } from "../store/types";
 import { CATEGORIES, type Card } from "./card";
 
-export const MODEL = process.env.CANDY_MODEL ?? "claude-haiku-4-5-20251001";
+import { env } from "../env";
+
+export const MODEL = env.CANDY_MODEL;
 
 let client: Anthropic | undefined;
 export function ai(): Anthropic {

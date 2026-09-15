@@ -1,3 +1,4 @@
+import { safeJson } from "../util/json";
 import { redis } from "./redis";
 import { K, normId, type EdgeType } from "./keys";
 import { boundReleases, encodeRaw, MAX_README } from "./raw";
@@ -67,7 +68,7 @@ export async function saveRepo(
   if (raw.releases != null) {
     let rel = raw.releases;
     try {
-      rel = JSON.stringify(boundReleases(JSON.parse(raw.releases) as { body: string | null }[]));
+      rel = JSON.stringify(boundReleases(safeJson<{ body: string | null }[]>(raw.releases, [], "releases")));
     } catch {
       /* store as-is */
     }
@@ -119,7 +120,7 @@ export async function getRepos(ids: string[]): Promise<Repo[]> {
 
 export async function getMentions(id: string): Promise<Mention[]> {
   const rows = await redis().lrange(K.mentions(normId(id)), 0, -1);
-  return rows.map((s) => JSON.parse(s) as Mention);
+  return rows.map((s) => safeJson<Mention | null>(s, null, "mention")).filter((m): m is Mention => !!m);
 }
 
 export async function getTags(id: string): Promise<string[]> {

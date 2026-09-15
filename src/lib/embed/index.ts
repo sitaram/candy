@@ -2,8 +2,13 @@
  * Embeddings: one vector per card, one taste vector per user.
  *
  * emb:{id}          Buffer   Float32 x DIM, the card's text embedding (offline)
- * u:{uid}:taste     Buffer   Float32 x DIM, running weighted mean of reacted cards (online)
- * u:{uid}:tastew    STRING   total |weight| behind the taste vector
+ * u:{uid}:taste     Buffer   Float32 x DIM, Σ delta·card over reacted cards — UNnormalized (online)
+ * u:{uid}:tastew    STRING   Σ |delta| behind the taste vector (confidence)
+ *
+ * The taste vector is stored as a raw weighted sum and normalized on read. That makes every nudge
+ * exactly reversible: undo passes −delta and the sum returns to what it was. A stored running
+ * *mean* (the first version) could not be undone — renormalizing after each step loses the scale
+ * the reversal needs, and the "undone" like left a 0.28 ghost in the vector.
  *
  * The term-vector profile stays the source of *reasons*; this is the source of *score*.
  * Provider is picked from env: OPENAI_API_KEY → text-embedding-3-small at 512 dims (the model
@@ -11,6 +16,7 @@
  * for the whole corpus). Else VOYAGE_API_KEY → voyage-3-lite, also 512. Same DIM either way,
  * but vectors from the two are NOT comparable — run `pnpm embed --force` if you switch.
  */
+import { env, need } from "../env";
 import { redis } from "../store/redis";
 import type { Item } from "../corpus/api";
 
@@ -37,15 +43,15 @@ export function cardText(it: Item): string {
 }
 
 export function provider(): "openai" | "voyage" {
-  if (process.env.OPENAI_API_KEY) return "openai";
-  if (process.env.VOYAGE_API_KEY) return "voyage";
+  if (env.OPENAI_API_KEY) return "openai";
+  if (env.VOYAGE_API_KEY) return "voyage";
   throw new Error("set OPENAI_API_KEY or VOYAGE_API_KEY");
 }
 
 export async function embedTexts(texts: string[], inputType: "document" | "query" = "document"): Promise<Float32Array[]> {
   const prov = provider();
   const url = prov === "openai" ? "https://api.openai.com/v1/embeddings" : "https://api.voyageai.com/v1/embeddings";
-  const key = prov === "openai" ? process.env.OPENAI_API_KEY : process.env.VOYAGE_API_KEY;
+  const key = prov === "openai" ? need("OPENAI_API_KEY") : need("VOYAGE_API_KEY");
   const body = prov === "openai"
     ? { model: "text-embedding-3-small", input: texts, dimensions: DIM, encoding_format: "float" }
     : { model: "voyage-3-lite", input: texts, input_type: inputType, truncation: true };
@@ -121,29 +127,32 @@ export async function hasEmbedding(ids: string[]): Promise<Set<string>> {
 
 export interface Taste { v: Float32Array; w: number }
 
+/** The user's taste as a unit vector plus the evidence weight behind it. null until the first embedded reaction. */
 export async function getTaste(uid: string): Promise<Taste | null> {
   const [b, w] = await Promise.all([redis().getBuffer(EK.taste(uid)), redis().get(EK.tastew(uid))]);
-  const v = fromBuf(b);
-  return v ? { v, w: Number(w ?? 0) } : null;
+  const sum = fromBuf(b);
+  if (!sum) return null;
+  const weight = Number(w ?? 0);
+  // All evidence cancelled (e.g. like then undo): no taste, rather than a random direction from float dust.
+  if (weight <= 0 || !sum.some((x) => Math.abs(x) > 1e-6)) return null;
+  return { v: normalize(sum), w: weight };
 }
 
 /**
- * Move the taste vector toward (delta>0) or away from (delta<0) a card.
- * Running weighted mean: taste' = (taste*w + card*delta) / (w + |delta|), then renormalized.
- * Skips push away gently; likes and saves pull. Idempotent-ish under undo (pass -delta).
+ * Move the taste toward (delta>0) or away from (delta<0) a card: sum += delta·card, weight += |delta|.
+ * Undo passes −delta; the sum reverts exactly, the weight is reduced by the same |delta|.
+ * Skips push away gently; likes and saves pull.
  */
-export async function nudgeTaste(uid: string, cardId: string, delta: number): Promise<void> {
+export async function nudgeTaste(uid: string, cardId: string, delta: number, opts: { reverse?: boolean } = {}): Promise<void> {
   const r = redis();
   const [cb, tb, tw] = await Promise.all([r.getBuffer(EK.emb(cardId)), r.getBuffer(EK.taste(uid)), r.get(EK.tastew(uid))]);
   const card = fromBuf(cb);
   if (!card) return;                       // card not embedded yet; term profile still learns
-  const taste = fromBuf(tb) ?? new Float32Array(DIM);
-  const w = Number(tw ?? 0);
-  const next = new Float32Array(DIM);
-  for (let i = 0; i < DIM; i++) next[i] = taste[i] * w + card[i] * delta;
-  const nw = Math.max(0, w + Math.abs(delta));
+  const sum = fromBuf(tb) ?? new Float32Array(DIM);
+  for (let i = 0; i < DIM; i++) sum[i] += card[i] * delta;
+  const w = Math.max(0, Number(tw ?? 0) + (opts.reverse ? -Math.abs(delta) : Math.abs(delta)));
   const p = r.pipeline();
-  p.set(EK.taste(uid), toBuf(nw > 0 ? normalize(next) : next));
-  p.set(EK.tastew(uid), String(nw));
+  p.set(EK.taste(uid), toBuf(sum));
+  p.set(EK.tastew(uid), String(w));
   await p.exec();
 }

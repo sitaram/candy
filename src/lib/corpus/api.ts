@@ -3,6 +3,7 @@
  * Reads Redis only. Never calls GitHub or an LLM. Product code imports this and
  * nothing under store/, crawl/, or enrich/ directly.
  */
+import { safeJson } from "../util/json";
 import { CK, getCards, type StoredCard } from "../enrich";
 import type { Category, Flag, Hook } from "../enrich/card";
 import { collectionMembers } from "../store/collections";
@@ -186,7 +187,7 @@ export async function getItemDetail(id: string): Promise<ItemDetail | null> {
   return {
     ...item,
     readme,
-    releases: relRaw ? (JSON.parse(relRaw) as Release[]) : [],
+    releases: safeJson<Release[]>(relRaw, [], "releases"),
     mentions,
     edges: { links, alt, buildsOn, awesomeSiblings },
   };

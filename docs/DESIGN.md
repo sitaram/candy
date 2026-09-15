@@ -4,7 +4,7 @@
 
 **Idea.** Bring it. Candy is a deck you swipe, a guide you talk to, and a reason under every recommendation, built on a corpus that knows why each project matters. It asks for ten minutes a day and gives back a personal, navigable, deep view of what is moving in open source.
 
-It does three things with one corpus. It helps you **discover**: the feed fuses GitHub, Hacker News, newsletters and awesome lists, ranks them for you, and learns from every swipe. It helps you **understand**: every card says why it is here, and opening one shows what the project does, what it competes with, and what shipped. And it lets you **ask**: you can search for projects that fit what you are building, or put a hard question to one, because it has read the README. Two modalities carry all three. You swipe when you have a screen and talk when you don't.
+It does three things with one corpus, and the splash names them. **Discover**: see what is new and rising across GitHub, Hacker News, newsletters and the awesome lists, and swipe to shape what you see next. **Search**: describe what you are building in your own words and find the repos that fit. **Ask**: pick any repo and get real answers about how it works, what changed, its limits and whether it is ready, on screen or out loud. Two modalities carry all three. You swipe when you have a screen and talk when you don't.
 
 ## What is novel
 

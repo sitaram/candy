@@ -5,7 +5,9 @@ import remarkGfm from "remark-gfm";
 import "./about.css";
 import { DocVoice } from "./DocVoice";
 
-export const dynamic = "force-static";
+// Rendered per request, not at build: the CSP nonce is per response, and a prerendered page would ship
+// inline scripts without it — the browser would then refuse to hydrate. Reading one markdown file is ~1 ms.
+export const dynamic = "force-dynamic";
 
 /** The design doc, rendered in-app. Same tokens as the feed; no context switch. */
 export default async function About() {

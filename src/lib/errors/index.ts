@@ -9,6 +9,7 @@
  * No third-party sink. When one is wanted, `record()` is the only function to change.
  */
 import { redis } from "../store/redis";
+import { alert, ERR_SPIKE } from "./alert";
 
 export interface ErrorRecord {
   at: number;
@@ -42,9 +43,12 @@ export async function record(e: ErrorRecord): Promise<void> {
     const p = r.pipeline();
     p.lpush("err:log", JSON.stringify(e));
     p.ltrim("err:log", 0, CAP - 1);
-    p.hincrby(`err:count:${day}`, fingerprint(e), 1);
+    const fp = fingerprint(e);
+    p.hincrby(`err:count:${day}`, fp, 1);
     p.expire(`err:count:${day}`, 14 * 86_400);
-    await p.exec();
+    const res = await p.exec();
+    const n = Number(res?.[2]?.[1] ?? 0);
+    if (n === ERR_SPIKE) alert("error-spike", `"${fp}" has happened ${n}× today (last: ${e.msg.slice(0, 120)})`, `error-spike:${fp}`);
   } catch (err) {
     // The error reporter must never be the thing that throws.
     console.error("[errors] could not record:", (err as Error).message);

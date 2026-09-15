@@ -171,7 +171,10 @@ export function FeedClient() {
           )}
           {!loading && !intro && !cur && <div className="feed-empty">You’ve seen everything ranked for you today.<br /><a href="/browse">Browse the corpus</a> or come back tomorrow.</div>}
           {(cur || intro) && (
-            <div className="stack" ref={stackRef}>
+            // The deck is a Tab stop. The global key handler already maps arrows/Enter/b/z; this makes them
+            // discoverable (the a11y tree reads aria-keyshortcuts) and gives the deck a visible focus ring.
+            <div className="stack" ref={stackRef} tabIndex={0} role="group" aria-label={cur ? `Card ${idx + 1} of ${items.length}: ${cur.id.split("/")[1]}` : "Discovery deck"}
+              aria-keyshortcuts="ArrowRight ArrowLeft ArrowUp ArrowDown Enter b v z" aria-roledescription="swipe deck">
               {idx === 0 && <Splash style={prevStyle} onStart={() => {}} />}
               {prev && <Card key={prev.id} f={prev} style={prevStyle} className="rail" saved={saved.has(prev.id)} reaction={reacted.current.get(prev.id)} />}
               {next && <Card key={next.id} f={next} style={nextStyle} className="rail" saved={saved.has(next.id)} reaction={reacted.current.get(next.id)} />}
@@ -183,7 +186,7 @@ export function FeedClient() {
                 </div>
               )}
               <div className={`drag-layer${pendingDir ? ` hint-${pendingDir}` : ""}${hint.hinting && !drag.active ? " breathing" : ""}`} style={{ "--p": pr } as CSSProperties}
-                onPointerDown={g.onDown} onPointerMove={g.onMove} onPointerUp={g.onUp} onPointerCancel={g.onUp}>
+                onPointerDown={g.onDown} onPointerMove={g.onMove} onPointerUp={g.onUp} onPointerCancel={g.onCancel}>
                 {cur ? (
                   <Card key={cur.id} f={cur} style={curStyle} debug={debug} saved={saved.has(cur.id)} reaction={reacted.current.get(cur.id)}
                     onSave={() => toggleSave(cur.id)} onOpen={() => openDetail(cur.id)}

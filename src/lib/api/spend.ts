@@ -15,6 +15,7 @@
  */
 import { redis } from "@/lib/store/redis";
 import { HttpError } from "./guard";
+import { alert } from "@/lib/errors/alert";
 
 export type SpendBucket = "ask" | "voice" | "embed" | "card";
 
@@ -55,6 +56,7 @@ export async function charge(bucket: SpendBucket, cost = COST[bucket]): Promise<
     const now = new Date();
     const midnight = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1);
     console.warn(`[spend] daily cap $${DAILY_USD} reached (${bucket}); refusing until UTC midnight`);
+    alert("spend-cap", `daily model budget $${DAILY_USD} reached; ${bucket} refused. Refusing until UTC midnight.`);
     throw new HttpError(503, "daily model budget reached; try again tomorrow", { "Retry-After": String(Math.ceil((midnight - now.getTime()) / 1000)) });
   }
   return total;

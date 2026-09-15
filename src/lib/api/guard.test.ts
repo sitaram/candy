@@ -19,7 +19,8 @@ const req = (url: string, init?: RequestInit & { json?: unknown }) => {
 const ctx = (params: Record<string, string> = {}) => ({ params: Promise.resolve(params) });
 const body = async (r: Response) => ({ status: r.status, json: await r.json().catch(() => null), rid: r.headers.get("x-request-id") });
 
-beforeEach(() => { jar.uid = "abcdef1234567890"; jar.header = undefined; });
+// A legacy (unsigned, 20-hex) cookie: verify() accepts it. Signed cookies are covered in user/sign.test.ts.
+beforeEach(() => { jar.uid = "abcdef1234567890abcd"; jar.header = undefined; });
 
 describe("route()", () => {
   it("403s a mutation whose Origin names another host; same host, absent Origin, and GETs pass", async () => {
@@ -46,9 +47,14 @@ describe("route()", () => {
     const h = route({}, async ({ uid }) => Response.json({ uid }));
     expect((await body(await h(req("/x"), ctx()))).json).toEqual({ uid: "freshfreshfresh1" });
   });
-  it("rejects a malformed session id", async () => {
-    jar.uid = "<script>";
+  it("a cookie that is not one we minted is no session at all (401), not a 400 — verify() drops it before the shape check", async () => {
     const h = route({}, async () => Response.json({}));
+    for (const bad of ["<script>", "abcdef1234567890abcd.badsig000000", "ABCDEF1234567890ABCD"]) {
+      jar.uid = bad;
+      expect((await body(await h(req("/x"), ctx()))).status).toBe(401);
+    }
+    // The header path is middleware's, already verified; a malformed value there is a 400 (it should be impossible).
+    jar.uid = undefined; jar.header = "<script>";
     expect((await body(await h(req("/x"), ctx()))).status).toBe(400);
   });
   it("parses query, body and params; 400 names the field", async () => {

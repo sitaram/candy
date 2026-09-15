@@ -1,4 +1,5 @@
 import { cookies, headers } from "next/headers";
+import { verify } from "./sign";
 
 export const UID_COOKIE = "cuid";
 
@@ -13,5 +14,5 @@ export async function getUid(): Promise<string> {
   const fromHeader = h.get("x-candy-uid");
   if (fromHeader) return fromHeader;
   const c = await cookies();
-  return c.get(UID_COOKIE)?.value ?? `nocookie-${crypto.randomUUID().slice(0, 8)}`;
+  return (await verify(c.get(UID_COOKIE)?.value))?.id ?? `nocookie-${crypto.randomUUID().slice(0, 8)}`;
 }

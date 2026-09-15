@@ -19,8 +19,10 @@ import { cookies, headers } from "next/headers";
 import type { ZodTypeAny, z } from "zod";
 import { ZodError } from "zod";
 import { UID_COOKIE } from "@/lib/user/uid";
+import { verify } from "@/lib/user/sign";
 import { rateLimit, type Bucket } from "./ratelimit";
 import { recordServer } from "@/lib/errors";
+import { observe } from "./metrics";
 
 export class HttpError extends Error {
   constructor(public status: number, message: string, public headers: Record<string, string> = {}) { super(message); }
@@ -59,7 +61,10 @@ export function route<Q extends ZodTypeAny | undefined = undefined, B extends Zo
     const t0 = Date.now();
     let res: Response;
     try {
-      const uid = (await headers()).get("x-candy-uid") ?? (await cookies()).get(UID_COOKIE)?.value ?? "";
+      // Middleware verified the cookie's signature and put the bare id on the header. The cookie fallback is
+      // for a handler reached without middleware (tests, an unusual matcher); it verifies the same way.
+      let uid = (await headers()).get("x-candy-uid") ?? "";
+      if (!uid) uid = (await verify((await cookies()).get(UID_COOKIE)?.value))?.id ?? "";
       if (!uid && !spec.anon) throw new HttpError(401, "no session cookie");
       if (uid && !/^[a-z0-9]{8,40}$/i.test(uid)) throw new HttpError(400, "bad session cookie");
       // Cross-site mutation guard. SameSite=lax already keeps the cookie off cross-site POSTs in every
@@ -93,7 +98,9 @@ export function route<Q extends ZodTypeAny | undefined = undefined, B extends Zo
       res = toResponse(e, rid, req);
     }
     res.headers.set("x-request-id", rid);
-    if (res.status >= 500) console.error(`[api] ${rid} ${req.method} ${new URL(req.url).pathname} → ${res.status} ${Date.now() - t0}ms`);
+    const ms = Date.now() - t0, path = new URL(req.url).pathname;
+    if (res.status >= 500) console.error(`[api] ${rid} ${req.method} ${path} → ${res.status} ${ms}ms`);
+    observe(path, ms, res.status);
     return res;
   };
 }

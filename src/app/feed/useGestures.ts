@@ -63,6 +63,19 @@ export function useGestures(h: GestureHandlers) {
     }
   };
 
+  /**
+   * The browser took the pointer (iOS scroll takeover, a system gesture, the tab losing focus mid-drag).
+   * Nothing the finger did after that is known, so nothing is decided: glide back from wherever we were.
+   * Treating this like a release once let a scroll takeover register as a tap and open the deep dive.
+   */
+  const onCancel = (e: PE) => {
+    const st = start.current;
+    if (!st || st.id !== e.pointerId) return;
+    const dy = e.clientY - st.y;
+    reset();
+    if (st.axis === "y") h.onRelease(dy);
+  };
+
   /** Handlers for the peek strip: a tap pages forward; a drag hands off to the card so "swipe up from the peek" still works. */
   const peek = {
     onPointerDown: (e: PE) => { peekDown.current = { x: e.clientX, y: e.clientY }; onDown(e); },
@@ -72,8 +85,8 @@ export function useGestures(h: GestureHandlers) {
       if (p && Math.hypot(e.clientX - p.x, e.clientY - p.y) < 10) { reset(); h.onPage(1, 0); return; }
       onUp(e);
     },
-    onPointerCancel: (e: PE) => { peekDown.current = null; onUp(e); },
+    onPointerCancel: (e: PE) => { peekDown.current = null; onCancel(e); },
   };
 
-  return { drag, onDown, onMove, onUp, peek, isDragging: () => !!start.current };
+  return { drag, onDown, onMove, onUp, onCancel, peek, isDragging: () => !!start.current };
 }

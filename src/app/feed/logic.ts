@@ -28,6 +28,14 @@ export function agoShort(iso: string, now = Date.now()): string {
   return `${(d / 365).toFixed(d < 730 ? 1 : 0)}y`;
 }
 
+/** Longer form for the deep dive: "yesterday", "12d ago", "3mo ago". */
+export function agoLong(iso: string, now = Date.now()): string {
+  if (!iso) return "";
+  const d = Math.round((now - Date.parse(iso)) / 86_400_000);
+  if (Number.isNaN(d)) return "";
+  return d < 1 ? "today" : d === 1 ? "yesterday" : d < 60 ? `${d}d ago` : `${Math.round(d / 30)}mo ago`;
+}
+
 /** Separate the personal-fit reason from the rest; the UI shows fit as a chip and hides the explore marker. */
 export function splitWhy(why: string[]): { fit: string | null; rest: string[] } {
   const fit = why.find((w) => w.startsWith("matches your interest")) ?? null;

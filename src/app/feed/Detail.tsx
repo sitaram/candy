@@ -4,25 +4,14 @@ import { api, report, ApiError } from "./api";
 import { AskBox } from "./AskBox";
 import { useEffect, useRef, useState } from "react";
 import type { ItemDetail } from "@/lib/corpus/api";
+import { HUE, fmt as fmtStars, agoLong as ago } from "./logic";
 
 type Sim = { id: string; score: number; why: string[]; pitch?: string };
 type RelItem = { id: string; name: string; owner: string; pitch: string; stars: number; lang: string | null; category: string };
-const HUE: Record<string, number> = {
-  "ai-llm": 268, "ai-agents": 280, "ml-infra": 255, "dev-tools": 205, cli: 195, "web-framework": 330, frontend: 340,
-  backend: 215, database: 30, "data-eng": 45, "devops-infra": 175, security: 0, networking: 185, systems: 20,
-  "languages-compilers": 300, mobile: 320, desktop: 240, "games-graphics": 355, science: 150, productivity: 95,
-};
 
 type Data = ItemDetail;
 type Related = { similar: Sim[]; labelled: boolean; pending: number; groups: { label: string; items: RelItem[] }[] };
 
-const fmtStars = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}k` : String(n));
-
-function ago(iso: string): string {
-  if (!iso) return "";
-  const d = Math.round((Date.now() - Date.parse(iso)) / 86_400_000);
-  return d < 1 ? "today" : d === 1 ? "yesterday" : d < 60 ? `${d}d ago` : `${Math.round(d / 30)}mo ago`;
-}
 
 /** In-feed detail view. Sheet on mobile, side panel on desktop. Fetches /api/items/:id lazily. */
 export function Detail({ id, onClose, onOpen }: { id: string; onClose: () => void; onOpen: (id: string) => void }) {

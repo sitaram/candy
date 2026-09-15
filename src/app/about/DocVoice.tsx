@@ -14,6 +14,12 @@ function Inner() {
   const on = voice.active;
   return (
     <span className="doc-voice">
+      {/* Left of the main button: this cluster is right-anchored, so the main button stays put when mute appears. */}
+      {on && (
+        <button className={`hv sub${voice.muted ? " off" : ""}`} onClick={voice.toggleMute} aria-label="Mute microphone" aria-pressed={voice.muted} title={voice.muted ? "Unmute" : "Mute"}>
+          {voice.muted ? I.micOff : I.mic}
+        </button>
+      )}
       <button
         className={`hv${on ? ` on ${voice.state}` : ""}`}
         style={{ "--lvl": voice.level } as React.CSSProperties}
@@ -23,11 +29,6 @@ function Inner() {
         title={on ? "End" : "Summarize and discuss, by voice"}>
         {on ? <span className="stop" aria-hidden /> : I.voice}
       </button>
-      {on && (
-        <button className={`hv sub${voice.muted ? " off" : ""}`} onClick={voice.toggleMute} aria-label="Mute microphone" aria-pressed={voice.muted} title={voice.muted ? "Unmute" : "Mute"}>
-          {voice.muted ? I.micOff : I.mic}
-        </button>
-      )}
       {voice.error && <span className="doc-voice-err" role="alert">{voice.error}</span>}
     </span>
   );

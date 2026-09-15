@@ -41,6 +41,7 @@ export function useVoice(handlers: VoiceHandlers) {
   const [level, setLevel] = useState(0);          // 0..1, whoever is louder (mic or model) — drives the button ring
   const [micLevel, setMicLevel] = useState(0);    // 0..1, you only — drives "hearing you"
   const [muted, setMuted] = useState(false);       // mic track disabled; the model hears silence
+  const autoMuted = useRef(false);                 // muted by us for the opening take; released when that audio finishes playing
   const [transcript, setTranscript] = useState(""); // last thing the model said (for the sheet)
   const [error, setError] = useState<string | null>(null);
 
@@ -69,7 +70,7 @@ export function useVoice(handlers: VoiceHandlers) {
     void ctx.current?.close();
     if (audioEl.current) { audioEl.current.srcObject = null; audioEl.current.remove(); }
     pc.current = null; dc.current = null; mic.current = null; ctx.current = null; audioEl.current = null;
-    setLevel(0); setMicLevel(0); speaking.current = false; setMuted(false);
+    setLevel(0); setMicLevel(0); speaking.current = false; setMuted(false); autoMuted.current = false;
     setState("idle");
     if (reason && !opts?.quiet) setError(reason);
   }, []);
@@ -115,6 +116,13 @@ export function useVoice(handlers: VoiceHandlers) {
   }, [send]);
 
   const seenTypes = useRef(new Set<string>());
+  const setMic = useCallback((on: boolean) => {
+    const t = mic.current?.getAudioTracks()[0];
+    if (!t) return;
+    t.enabled = on;
+    setMuted(!on);
+  }, []);
+
   const onEvent = useCallback((ev: RTEvent) => {
     if (!seenTypes.current.has(ev.type) && !ev.type.endsWith(".delta")) { seenTypes.current.add(ev.type); console.info(`[voice] ev ${ev.type}`); }
     switch (ev.type) {
@@ -133,7 +141,10 @@ export function useVoice(handlers: VoiceHandlers) {
         setState("speaking"); speaking.current = true; bumpSilence(); break;
       case "output_audio_buffer.stopped":            // …and finished playing. THIS is when the model is done talking.
       case "output_audio_buffer.cleared":
-        speaking.current = false; setState("listening"); bumpSilence(); break;
+        speaking.current = false; setState("listening"); bumpSilence();
+        // The opening take has been heard in full: open the mic. (A manual unmute mid-take already cleared this.)
+        if (autoMuted.current) { autoMuted.current = false; setMic(true); }
+        break;
       case "response.output_audio_transcript.delta":
         setTranscript((t) => (t.length > 600 ? "" : t) + String(ev.delta ?? "")); break;
       case "response.output_audio_transcript.done":
@@ -159,7 +170,7 @@ export function useVoice(handlers: VoiceHandlers) {
         setError(String((ev.error as { message?: string })?.message ?? "voice error"));
         break;
     }
-  }, [bumpSilence, runTool]);
+  }, [bumpSilence, runTool, setMic]);
 
   const start = useCallback(async (opts: VoiceStart) => {
     if (pc.current) return;
@@ -195,6 +206,8 @@ export function useVoice(handlers: VoiceHandlers) {
         setState("listening");
         bumpSilence();
         // Both modes open with a line: card mode a 20 s take on the repo, search mode a one-sentence invitation.
+        // Card mode: mic off for the take so it is not interruptible by room noise; released when the audio finishes.
+        if (opts.mode === "card") { autoMuted.current = true; setMic(false); }
         send({ type: "response.create" });
       };
       d.onclose = () => { if (dc.current === d) stop("ended by server"); };
@@ -252,11 +265,10 @@ export function useVoice(handlers: VoiceHandlers) {
   }, []);
 
   const toggleMute = useCallback(() => {
+    autoMuted.current = false;                     // a manual touch ends the automatic phase either way
     const t = mic.current?.getAudioTracks()[0];
-    if (!t) return;
-    t.enabled = !t.enabled;
-    setMuted(!t.enabled);
-  }, []);
+    if (t) setMic(!t.enabled);
+  }, [setMic]);
 
   return { state, level, micLevel, transcript, error, start, stop, inject, muted, toggleMute, active: state !== "idle" && state !== "error" };
 }

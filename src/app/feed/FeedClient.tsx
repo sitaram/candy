@@ -6,6 +6,9 @@ import type { Feed, FeedItem } from "@/lib/user/feed";
 import type { Action, Reaction } from "@/lib/user/state";
 import { Detail } from "./Detail";
 import { useVoice } from "./useVoice";
+import { guarded } from "@/lib/voice/trace";
+import { VoiceBoundary } from "./VoiceBoundary";
+import { VoiceLog } from "./VoiceLog";
 import { Search } from "./Search";
 import type { SearchResponse, SearchResult } from "@/lib/user/search";
 import "./feed.css";
@@ -149,6 +152,7 @@ function Card({
 
       <div className="fcard-actions" onPointerDown={stop}>
         <button className="act dive" onClick={onOpen} aria-label="Deep dive" title="Deep dive (enter, or tap the card)">{I.open}</button>
+        <VoiceBoundary where="card-actions" fallback={<button className="act voice" disabled aria-label="Voice unavailable" title="Voice unavailable">{I.voice}</button>}>
         <div className={`voice-cluster${voice && voice.state !== "idle" ? " on" : ""}`}>
           <button className={`act voice${voice && voice.state !== "idle" ? ` on ${voice.state}` : ""}`}
             onClick={(e) => { e.stopPropagation(); onVoice?.(); }} aria-label={voice && voice.state !== "idle" ? "End conversation" : "Talk about this"} title={voice && voice.state !== "idle" ? "End (v)" : "Talk about this (v)"}>
@@ -160,6 +164,7 @@ function Card({
             </button>
           )}
         </div>
+        </VoiceBoundary>
       </div>
       <div className="stamp like">YES</div>
       <div className="stamp skip">NOPE</div>
@@ -443,20 +448,20 @@ export function FeedClient() {
 
   const voice = useVoice({
     currentId: () => itemsRef.current[idxRef.current]?.id ?? null,
-    onShowRepo: async (raw) => {
+    onShowRepo: guarded("show_repo", async (raw: string) => {
       const hit = await showRepo(raw);
       if (!hit) return null;
       await new Promise((r) => setTimeout(r, 160));
       return briefOf(hit);
-    },
-    onNextCard: async () => {
+    }),
+    onNextCard: guarded("next_card", async () => {
       const to = idxRef.current + 1;
       if (to >= itemsRef.current.length) return null;
       go(to);
       await new Promise((r) => setTimeout(r, 120));
       return briefOf(itemsRef.current[to]);
-    },
-    onReact: async (kind) => {
+    }),
+    onReact: guarded("react", async (kind: "like" | "skip" | "save") => {
       const f = itemsRef.current[idxRef.current];
       if (!f) return "No card on screen.";
       if (kind === "save") { if (!saved.has(f.id)) toggleSave(f.id); return `Saved ${f.id.split("/")[1]}.`; }
@@ -465,7 +470,7 @@ export function FeedClient() {
       const nxt = itemsRef.current[idxRef.current];
       const b = await briefOf(nxt);
       return `${kind === "like" ? "Liked" : "Skipped"} ${f.id.split("/")[1]}.${b ? `\n${b}` : "\nNo more cards."}`;
-    },
+    }),
   });
   const toggleVoice = useCallback(() => {
     if (voice.active) voice.stop();
@@ -643,6 +648,7 @@ export function FeedClient() {
             </div>
           )}
           {voice.error && <div className="toast err">{voice.error}<button onClick={() => voice.stop()}>ok</button></div>}
+          <VoiceLog />
           {undo && (
             <div className="toast">
               {undo.kind === "like" ? "Marked interesting" : "Skipped"} <b>{undo.item.id.split("/")[1]}</b>

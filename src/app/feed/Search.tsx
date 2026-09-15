@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import type { SearchResponse, SearchResult } from "@/lib/user/search";
 import { useVoice } from "./useVoice";
+import { guarded } from "@/lib/voice/trace";
+import { VoiceBoundary } from "./VoiceBoundary";
 
 /**
  * Search sheet: the feed with a query.
@@ -88,8 +90,8 @@ export function Search({ open, onClose, onPick, autoVoice }: { open: boolean; on
   /* ---- voice: same transport, search mode ---- */
   const voice = useVoice({
     silenceMs: 20_000,   // measured from the end of the model's *playback*; 8 s was ending sessions while people were still deciding what to say
-    onUserTranscript: (t) => { if (t) setHeard(t); },
-    onSearch: async (query) => {
+    onUserTranscript: (t) => { try { if (t) setHeard(t); } catch { /* never let UI state throw into the event loop */ } },
+    onSearch: guarded("search", async (query: string) => {
       setHeard("");
       setQ(query);
       inputRef.current?.blur();          // keyboard down; results take the screen
@@ -97,8 +99,8 @@ export function Search({ open, onClose, onPick, autoVoice }: { open: boolean; on
       if (!j || !j.results.length) return `No results for "${query}".`;
       return `${j.results.length} results for "${query}" (best first):\n` +
         j.results.slice(0, 6).map((r, i) => `${i + 1}. ${r.item.repo.id} — ${r.item.card?.pitch ?? r.item.repo.description} (${fmt(r.item.repo.stars)}★; ${r.why[0]})`).join("\n");
-    },
-    onOpenResult: async (which) => {
+    }),
+    onOpenResult: guarded("open_result", async (which: string) => {
       const list = resRef.current?.results ?? [];
       if (!list.length) return "Nothing on screen to open.";
       const n = parseInt(which, 10);
@@ -108,7 +110,7 @@ export function Search({ open, onClose, onPick, autoVoice }: { open: boolean; on
       if (!pick) return `No result matching "${which}".`;
       onPick(pick);
       return `Opened ${pick.item.repo.name}.`;
-    },
+    }),
   });
   const toggleVoice = () => { if (voice.active) voice.stop(); else void voice.start({ mode: "search", query: q || undefined }); };
   useEffect(() => { if (!open && voice.active) voice.stop(); }, [open, voice]);
@@ -133,6 +135,7 @@ export function Search({ open, onClose, onPick, autoVoice }: { open: boolean; on
             autoCapitalize="off" autoCorrect="off" spellCheck={false} enterKeyHint="search"
             onKeyDown={(e) => { if (e.key === "Escape") onClose(); if (e.key === "Enter") { inputRef.current?.blur(); void run(q); } }} />
           {q && !listening && <button className="s-clear" onClick={() => { setQ(""); setRes(null); inputRef.current?.focus(); }} aria-label="Clear">{I.x}</button>}
+          <VoiceBoundary where="search-bar" fallback={null}>
           {listening && (
             <button className={`s-voice sub mute${voice.muted ? " off" : ""}`} onClick={voice.toggleMute} aria-label={voice.muted ? "Unmute" : "Mute"} title={voice.muted ? "Unmute" : "Mute"}>
               {voice.muted ? I.micOff : I.mic}
@@ -142,11 +145,14 @@ export function Search({ open, onClose, onPick, autoVoice }: { open: boolean; on
             onClick={toggleVoice} aria-label={listening ? "Stop listening" : "Search by voice"} title={listening ? "Stop" : "Search by voice"}>
             {I.voice}
           </button>
+          </VoiceBoundary>
         </div>
 
-        {voice.error && <div className="s-note err">{voice.error}</div>}
-        {listening && heard && !voice.transcript && <div className="s-note heard">“{heard}”</div>}
-        {listening && voice.transcript && <div className="s-note">{voice.transcript}</div>}
+        <VoiceBoundary where="search-notes" fallback={null}>
+          {voice.error && <div className="s-note err">{voice.error}</div>}
+          {listening && heard && !voice.transcript && <div className="s-note heard">“{heard}”</div>}
+          {listening && voice.transcript && <div className="s-note">{voice.transcript}</div>}
+        </VoiceBoundary>
 
         <div className="s-body">
           {showTry && (

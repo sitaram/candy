@@ -150,7 +150,9 @@
 /* actions */
 /* dive · voice. While talking, a 48px mute disc sits beside the voice button — separate, its own target,
    but visibly paired (accent border). The row keeps 64px between dive and voice; the extra width goes right. */
-.fcard-actions { display: flex; justify-content: center; align-items: center; gap: 64px; }
+/* dive · voice, with the mute hanging off the voice's right while live. Nudged left so the mute lands ~24px from the
+   card edge (the card's own padding) instead of touching it; gap widened from 64 so the two buttons breathe. */
+.fcard-actions { display: flex; justify-content: center; align-items: center; gap: 72px; padding-right: 24px; }
 .voice-cluster { position: relative; width: 64px; height: 64px; }
 .voice-cluster .act.voice { position: absolute; left: 0; top: 0; }
 .voice-cluster .act.sub.mute { position: absolute; left: calc(100% + 14px); top: 8px; width: 48px; height: 48px; border-color: color-mix(in srgb, var(--accent) 55%, transparent); background: var(--fill); color: var(--ink-2); }

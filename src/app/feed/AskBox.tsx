@@ -12,7 +12,9 @@ export function AskBox({ id }: { id: string }) {
   const [err, setErr] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
   useEffect(() => { setThread([]); setQ(""); setErr(null); }, [id]);
-  useEffect(() => { endRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" }); }, [thread.length, busy]);
+  // Follow the thread as answers arrive — but not on mount: with nothing asked yet, scrolling to the box
+  // nudged the whole deep dive down by the height of the header the moment it opened.
+  useEffect(() => { if (thread.length || busy) endRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" }); }, [thread.length, busy]);
 
   const ask = async (question: string) => {
     const t = question.trim();

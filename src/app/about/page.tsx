@@ -14,7 +14,7 @@ export default async function About() {
     <main className="about">
       <nav className="about-nav">
         <a href="/">← feed</a>
-        <span>how it works</span>
+        <span className="about-label">how it works</span>
         <DocVoice />
       </nav>
       <article className="prose">

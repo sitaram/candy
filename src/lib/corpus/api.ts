@@ -4,10 +4,11 @@
  * nothing under store/, crawl/, or enrich/ directly.
  */
 import { safeJson } from "../util/json";
-import { CK, getCards, type StoredCard } from "../enrich";
+import { CK, getCards, parseCard, type StoredCard } from "../enrich";
 import type { Category, Flag, Hook } from "../enrich/card";
 import { collectionMembers } from "../store/collections";
-import { corpusIds, getEdges, getMentions, getRepos, getTags } from "../store/corpus";
+import { corpusIds, getRepos } from "../store/corpus";
+import { parseRepo } from "../store/types";
 import { K, normId } from "../store/keys";
 import { getRaw } from "../store/raw";
 import { redis } from "../store/redis";
@@ -64,7 +65,7 @@ export type Sort = "interest" | "velocity" | "released" | "priority" | "stars" |
 const DEFAULT_EXCLUDE: Flag[] = ["spam-suspect", "no-substance"];
 
 let cache: { at: number; items: Item[] } | null = null;
-const TTL = 30_000;
+const TTL = 300_000;   // 5 min; invalidate() on any write (ensureItem), so staleness is only ever the crawl's
 
 /** All items, cached 30s in-process. Cheap enough to scan for now (< 10k). */
 export async function allItems(): Promise<Item[]> {
@@ -158,10 +159,26 @@ export async function getItems(filter: Filter = {}, sort: Sort = "interest", lim
   return sortItems(all.filter((it) => matches(it, filter)), sort).slice(0, limit);
 }
 
+/**
+ * One item, one Redis round trip. Serves from the corpus cache when warm; otherwise fetches just this
+ * repo rather than loading all 1,200+ (which is ~1 s to a remote Redis, and was what every deep dive
+ * paid whenever a backfill had invalidated the cache).
+ */
 export async function getItem(id: string): Promise<Item | null> {
   const nid = normId(id);
-  const all = await allItems();
-  return all.find((it) => it.repo.id === nid) ?? null;
+  if (cache && Date.now() - cache.at < TTL) return cache.items.find((it) => it.repo.id === nid) ?? null;
+  const r = redis();
+  const res = await r.pipeline().hgetall(K.repo(nid)).hgetall(CK.card(nid)).zscore(K.frontier, nid).smembers(K.tags(nid)).exec();
+  const repo = parseRepo((res?.[0]?.[1] as Record<string, string>) ?? {});
+  if (!repo) return null;
+  const card = parseCard((res?.[1]?.[1] as Record<string, string>) ?? {});
+  const tags = (res?.[3]?.[1] as string[]) ?? [];
+  return {
+    repo, card,
+    sources: tags.filter((t) => t.startsWith("src:")).map((t) => t.slice(4)),
+    awesome: tags.filter((t) => t.startsWith("awesome:")).map((t) => t.slice(8)),
+    priority: Number(res?.[2]?.[1] ?? 0),
+  };
 }
 
 export async function getItemDetail(id: string): Promise<ItemDetail | null> {
@@ -169,20 +186,21 @@ export async function getItemDetail(id: string): Promise<ItemDetail | null> {
   if (!item) return null;
   const r = redis();
   const nid = item.repo.id;
-  const [readme, relRaw, mentions, links, alt, buildsOn, awesomeTags] = await Promise.all([
+  // Everything in one pipeline: this Redis is ~250 ms away, so round trips, not bytes, are the cost.
+  const [readme, relRaw, mentionsRaw, links, alt, buildsOn] = await Promise.all([
     getRaw(nid, "readme"),
     getRaw(nid, "releases"),
-    getMentions(nid),
-    getEdges(nid, "links"),
+    r.lrange(K.mentions(nid), 0, -1),
+    r.smembers(K.edges(nid, "links")),
     r.smembers(CK.alt(nid)),
     r.smembers(CK.builds(nid)),
-    getTags(nid).then((t) => t.filter((x) => x.startsWith("awesome:")).map((x) => x.slice(8))),
   ]);
-  // Siblings: other corpus repos in the same awesome lists (capped).
+  const mentions = mentionsRaw.map((x) => safeJson<Mention | null>(x, null, "mention")).filter((m): m is Mention => !!m);
+  // Siblings: other corpus repos in the same awesome lists (capped). Tags already on the item.
   let awesomeSiblings: string[] = [];
-  if (awesomeTags.length) {
-    const sets = await Promise.all(awesomeTags.map((l) => r.sinter(K.awesome(l), K.corpus)));
-    awesomeSiblings = Array.from(new Set(sets.flat())).filter((x) => x !== nid).slice(0, 30);
+  if (item.awesome.length) {
+    const sets = (await r.pipeline(item.awesome.map((l) => ["sinter", K.awesome(l), K.corpus])).exec()) ?? [];
+    awesomeSiblings = Array.from(new Set(sets.flatMap((x) => (x[1] as string[]) ?? []))).filter((x) => x !== nid).slice(0, 30);
   }
   return {
     ...item,

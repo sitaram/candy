@@ -43,7 +43,8 @@ export function Detail({ id, onClose, onOpen }: { id: string; onClose: () => voi
         setRel(j);
         // Tail on demand: the server queued this repo's missing alternatives; kick the worker from here so
         // the slow part (GitHub + Claude) never sits on a request the page waits for. keepalive survives navigation.
-        if (j.pending) api("/api/backfill", { method: "POST", keepalive: true, retry: false }).catch((e) => report(e, "backfill"));
+        // No timeout and no report: this can legitimately take 30 s (GitHub + a Claude card) and nobody is waiting on it.
+        if (j.pending) fetch("/api/backfill", { method: "POST", keepalive: true }).catch(() => {});
       })
       .catch(() => setRel({ similar: [], labelled: false, pending: 0, groups: [] }));
     return () => ac.abort();

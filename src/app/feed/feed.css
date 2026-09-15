@@ -153,7 +153,10 @@
 /* dive · voice, with the mute hanging off the voice's right while live. Nudged left so the mute lands ~24px from the
    card edge (the card's own padding) instead of touching it; gap widened from 64 so the two buttons breathe. */
 .fcard-actions { display: flex; justify-content: center; align-items: center; gap: 72px; padding-right: 24px; }
-.voice-cluster { position: relative; width: 64px; height: 64px; }
+.voice-cluster { position: relative; width: 64px; height: 64px; display: flex; }
+/* The tooltip wrapper is the voice button's positioning parent. It must fill the cluster: as a bare inline-flex
+   span it sat on the line box's baseline, and the button inherited a ~10px drop below the dive button. */
+.voice-cluster > .tip-wrap { width: 100%; height: 100%; }
 .voice-cluster .act.voice { position: absolute; left: 0; top: 0; }
 .voice-cluster .act.sub.mute { position: absolute; left: calc(100% + 14px); top: 8px; width: 48px; height: 48px; border-color: color-mix(in srgb, var(--accent) 55%, transparent); background: var(--fill); color: var(--ink-2); }
 .act.sub svg { width: 22px; height: 22px; }

@@ -37,7 +37,7 @@ export function Detail({ id, onClose, onOpen }: { id: string; onClose: () => voi
     const ac = new AbortController();
     api<Data>(`/api/items/${id}`, { signal: ac.signal })
       .then((j) => setD(j))
-      .catch((e: Error) => { if (e.name !== "AbortError") { report(e, "item"); setErr(e instanceof ApiError ? e.human : e.message); } });
+      .catch((e: Error) => { if (e.name !== "AbortError") { report(e, "item"); setErr(e instanceof ApiError ? e.message : e.message); } });
     api<Related>(`/api/items/${id}/related`, { signal: ac.signal })
       .then((j) => {
         setRel(j);

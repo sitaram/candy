@@ -22,7 +22,7 @@ export function AskBox({ id }: { id: string }) {
       const j = await api<{ answer?: string }>("/api/ask", { method: "POST", body: { id, question: t, history: thread }, timeout: 30_000 });
       if (!j.answer) throw new Error("no answer");
       setThread((th) => [...th, { q: t, a: j.answer! }]);
-    } catch (e) { report(e, "ask"); setErr(e instanceof ApiError ? e.human : (e as Error).message); setQ(t); }
+    } catch (e) { report(e, "ask"); setErr(e instanceof ApiError ? e.message : (e as Error).message); setQ(t); }
     finally { setBusy(false); }
   };
 

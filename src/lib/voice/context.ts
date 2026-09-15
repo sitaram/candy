@@ -100,6 +100,19 @@ export const TOOLS = [
   },
   {
     type: "function",
+    name: "ask_repo",
+    description: "Answer a hard or specific question about one repo by reading its FULL README, manifest, release notes, and mentions — far more than the brief you have. Use for: how does it actually work, does it support X, how do I install/configure it, what changed in the last release, what are its limits, how does it compare to Y, is it production-ready, who maintains it, what's the license catch. Takes 3-6 seconds; say 'let me read' first. Returns a spoken-length answer you should relay nearly verbatim.",
+    parameters: {
+      type: "object",
+      properties: {
+        id: { type: "string", description: "owner/name of the repo. Defaults to the one on screen." },
+        question: { type: "string", description: "The user's question, restated precisely." },
+      },
+      required: ["question"],
+    },
+  },
+  {
+    type: "function",
     name: "show_repo",
     description: "Put a repository's card on the user's screen. Call this whenever you start talking about a repo other than the one on screen — an alternative, a related project, a find_repos result the user picked, anything you name by name — so what they see matches what they hear. Inserts the card right after the current one and pages to it; the user can swipe back. Returns the card's brief.",
     parameters: {
@@ -162,6 +175,7 @@ Answer from the brief directly. Do not reason at length for simple lookups.
 - The current repo is fully described below; do not call get_repo for it.
 - Related repos are listed with one-line pitches; you can discuss them from that. Call get_repo only when the user wants real depth on one.
 - Call find_repos for "what else", "alternatives", "anything for <topic>". Say what you are doing in a few words while it runs ("let me look").
+- Call ask_repo when the user asks something the brief cannot answer — how it works internally, install/config, a specific feature, what changed, limits, licensing, production readiness, a comparison. Do not guess from the brief; the brief is a summary and the user wants the bottom of it. Say "let me read" (2-3 words) and call it. Relay the answer; do not pad it.
 - Call show_repo the moment you shift to talking about a different repo — an alternative, a related project, one result from find_repos, anything you name. The screen should always show the repo you are describing. Do not ask permission; do not announce it. If the user says "show me that" or "put it up", it is the same tool.
 - Call next_card when the user says next / move on / what else is in my feed. After it returns, give the new card the same 20-second opening.
 - Call react when the user expresses a decision: "like that", "not for me", "save it", "bookmark". Confirm in 3-5 words. like and skip move to the next card; treat that like next_card.

@@ -170,7 +170,7 @@ function Splash({ style, onStart }: { style?: CSSProperties; onStart: () => void
 
       <ul className="sp-claims">
         <li><b>Discover.</b> New and rising projects from GitHub, Hacker News, newsletters, and the awesome lists.</li>
-        <li><b>Ask.</b> Building something? Search or just say it — find the repos that fit.</li>
+        <li><b>Ask.</b> Building something? Search or say it. Then interrogate any repo — it reads the whole README and release notes to answer.</li>
         <li><b>Decide.</b> Swipe like Tinder, browse like TikTok. It learns what you like.</li>
       </ul>
 
@@ -402,22 +402,41 @@ export function FeedClient() {
     // Let the insert render, then page onto it with the usual bounce.
     setTimeout(() => go(idxRef.current + 1), 30);
   }, [go]);
+  /**
+   * Put a repo's card on screen by id or bare name: page to it if it is already on the rail, otherwise
+   * resolve via search and insert it right after the current card. Returns the FeedItem now showing, or null.
+   * Used by voice's show_repo and by links inside the deep dive (similar, alternatives).
+   */
+  const showRepo = useCallback(async (raw: string): Promise<FeedItem | null> => {
+    const q = raw.trim().replace(/^https?:\/\/github\.com\//, "").replace(/\/+$/, "");
+    if (!q) return null;
+    const have = itemsRef.current.findIndex((x) => x.id.toLowerCase() === q.toLowerCase());
+    if (have >= 0) { go(have); return itemsRef.current[have]; }
+    const r = await fetch(`/api/search?q=${encodeURIComponent(q)}&n=3`);
+    if (!r.ok) return null;
+    const res = (await r.json()) as SearchResponse;
+    const hit = (res.exact && res.results.find((x) => x.id === res.exact))
+      ?? res.results.find((x) => x.id.toLowerCase() === q.toLowerCase())
+      ?? res.results.find((x) => x.match === "name")
+      ?? (q.includes("/") ? undefined : res.results[0]);
+    if (!hit) return null;
+    insertAndGo(hit);
+    return hit;
+  }, [go, insertAndGo]);
+
+  /** From inside the deep dive: close the sheet (popping its history entry) and bring that repo's card up. */
+  const jumpTo = useCallback((id: string) => {
+    const wasOpen = !!open;
+    if (wasOpen) history.back();                       // popstate → setOpen(null); one entry, so back never re-opens it
+    // Let the sheet's pop settle before the rail moves, so the page lands on a visible card.
+    setTimeout(() => { void showRepo(id); }, wasOpen ? 60 : 0);
+  }, [open, showRepo]);
+
   const voice = useVoice({
+    currentId: () => itemsRef.current[idxRef.current]?.id ?? null,
     onShowRepo: async (raw) => {
-      const q = raw.trim().replace(/^https?:\/\/github\.com\//, "").replace(/\/+$/, "");
-      if (!q) return null;
-      // Already on the rail? Just page to it.
-      const have = itemsRef.current.findIndex((x) => x.id.toLowerCase() === q.toLowerCase());
-      if (have >= 0) { go(have); await new Promise((r) => setTimeout(r, 120)); return briefOf(itemsRef.current[have]); }
-      const r = await fetch(`/api/search?q=${encodeURIComponent(q)}&n=3`);
-      if (!r.ok) return null;
-      const res = (await r.json()) as SearchResponse;
-      const hit = (res.exact && res.results.find((x) => x.id === res.exact))
-        ?? res.results.find((x) => x.id.toLowerCase() === q.toLowerCase())
-        ?? res.results.find((x) => x.match === "name")
-        ?? (q.includes("/") ? undefined : res.results[0]);
+      const hit = await showRepo(raw);
       if (!hit) return null;
-      insertAndGo(hit);
       await new Promise((r) => setTimeout(r, 160));
       return briefOf(hit);
     },
@@ -642,7 +661,7 @@ export function FeedClient() {
                 synthesized click then lands on this scrim (mounted under the still-lifted finger). A finger
                 that is already up never produces a new pointerdown, so this cannot close what it just opened. */}
             <div className="scrim" onPointerDown={closeDetail} />
-            <Detail id={open} onClose={closeDetail} onOpen={openDetail} />
+            <Detail id={open} onClose={closeDetail} onOpen={jumpTo} />
           </div>
         )}
       </div>

@@ -15,6 +15,8 @@ export interface VoiceHandlers {
   onNextCard?: () => Promise<string | null>;
   onReact?: (kind: "like" | "skip" | "save") => Promise<string | null>;
   /** Search mode: run the query in the UI and return what the model should say from. */
+  /** The card on screen, so server tools can default to it. */
+  currentId?: () => string | null;
   /** Called for show_repo — insert the card on the rail and page to it; returns its brief, or null if not found. */
   onShowRepo?: (id: string) => Promise<string | null>;
   onSearch?: (query: string) => Promise<string | null>;
@@ -95,7 +97,7 @@ export function useVoice(handlers: VoiceHandlers) {
       else if (name === "search") output = (await h.current.onSearch?.(String(args.query ?? ""))) ?? "Search is unavailable.";
       else if (name === "open_result") output = (await h.current.onOpenResult?.(String(args.which ?? "1"))) ?? "Could not open that.";
       else {
-        const r = await fetch("/api/voice/tool", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name, args }) });
+        const r = await fetch("/api/voice/tool", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name, args, current: h.current.currentId?.() ?? null }) });
         output = ((await r.json()) as { output?: string }).output ?? "No result.";
       }
     } catch (e) {

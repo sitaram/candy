@@ -1,5 +1,6 @@
 "use client";
 
+import { AskBox } from "./AskBox";
 import { useEffect, useState } from "react";
 import type { ItemDetail } from "@/lib/corpus/api";
 
@@ -77,6 +78,8 @@ export function Detail({ id, onClose, onOpen }: { id: string; onClose: () => voi
                 )}
               </>
             )}
+
+            <AskBox id={id} />
 
             {d.similar.length > 0 && (
               <>

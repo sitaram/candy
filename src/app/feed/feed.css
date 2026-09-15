@@ -290,6 +290,26 @@
 .detail-body .voice { font-size: 16px; line-height: 1.55; color: var(--ink-2); background: var(--fill); border-left: 3px solid var(--accent); padding: 10px 14px; border-radius: 6px; font-style: italic; }
 .detail-body .kv { font-size: 15px; color: var(--ink-2); }
 .detail-body .kv b { color: var(--ink); }
+
+/* ask this repo */
+.ask { margin-top: 8px; }
+.ask-sub { font-size: 13px; color: var(--ink-3); margin: -4px 0 12px; line-height: 1.4; }
+.ask-turn { margin: 0 0 14px; }
+.ask-q { font-size: 15px; font-weight: 600; color: var(--ink); margin-bottom: 6px; }
+.ask-a { font-size: 15px; line-height: 1.55; color: var(--ink-2); background: var(--fill); border-radius: 12px; padding: 12px 14px; }
+.ask-a p { margin: 0 0 8px; } .ask-a p:last-child { margin: 0; }
+.ask-wait { color: var(--ink-3); font-style: italic; animation: pulse 1.4s ease-in-out infinite; }
+@keyframes pulse { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
+.ask-err { font-size: 13px; color: var(--skip); margin-bottom: 10px; }
+.ask-starters { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.ask-starters button { font: inherit; font-size: 13px; color: var(--ink-2); background: var(--fill); border: 1px solid var(--line); border-radius: 999px; padding: 6px 11px; cursor: pointer; }
+.ask-starters button:hover { color: var(--ink); border-color: var(--ink-4); }
+.ask-form { display: flex; gap: 8px; align-items: center; }
+.ask-form input { flex: 1; font: inherit; font-size: 15px; color: var(--ink); background: var(--fill); border: 1px solid var(--line); border-radius: 999px; padding: 11px 16px; outline: none; min-width: 0; }
+.ask-form input:focus { border-color: var(--accent); }
+.ask-form input::placeholder { color: var(--ink-4); }
+.ask-form button { flex: 0 0 42px; height: 42px; border-radius: 50%; border: none; background: var(--accent); color: var(--bg); font-size: 18px; font-weight: 800; cursor: pointer; }
+.ask-form button:disabled { opacity: .35; cursor: default; }
 .detail-body .kv a, .detail-body a { color: var(--accent); }
 .detail-body .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
 .detail-body .tag { background: var(--fill); color: var(--ink-3); font-size: 12px; padding: 3px 9px; border-radius: 8px; }

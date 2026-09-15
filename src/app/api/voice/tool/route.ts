@@ -1,5 +1,6 @@
 import { getItemDetail, search, similar } from "@/lib/corpus/api";
 import { briefOf } from "@/lib/voice/context";
+import { askRepo } from "@/lib/ask";
 
 export const dynamic = "force-dynamic";
 
@@ -9,7 +10,7 @@ export const dynamic = "force-dynamic";
  * (next_card / react are executed in the client because they drive the UI.)
  */
 export async function POST(req: Request) {
-  const body = (await req.json().catch(() => ({}))) as { name?: string; args?: Record<string, unknown> };
+  const body = (await req.json().catch(() => ({}))) as { name?: string; args?: Record<string, unknown>; current?: string };
   const args = body.args ?? {};
   try {
     switch (body.name) {
@@ -24,6 +25,13 @@ export async function POST(req: Request) {
         }
         const rel = sims.length ? `\nRelated:\n${sims.map((s) => `  - ${s.item.repo.id}: ${s.item.card?.pitch ?? s.item.repo.description}`).join("\n")}` : "";
         return Response.json({ output: briefOf(detail, { full: true }) + rel });
+      }
+      case "ask_repo": {
+        const id = String(args.id ?? body.current ?? "").trim().replace(/^https?:\/\/github\.com\//, "").replace(/\/+$/, "");
+        const question = String(args.question ?? "").trim();
+        if (!id || !question) return Response.json({ output: "Need a repo and a question." });
+        const a = await askRepo({ id, question, spoken: true });
+        return Response.json({ output: a ? a.answer : `Not in the corpus: ${id}.` });
       }
       case "find_repos": {
         const q = String(args.query ?? "").trim();

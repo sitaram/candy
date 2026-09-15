@@ -65,3 +65,18 @@ GitHub knows *what* a repo is. Nobody has built the layer that knows **why it ma
 - Prompt the voice model like a style guide — labelled sections, a word budget per answer type, how to pronounce names — not a paragraph. The realtime handshake fails late (`client_secrets` mints with zero credits; only `/calls` refuses): surface the body or the button spins forever.
 - Show the reason, not the score. "Matches your interest in mcp, vs code" is what the user needs, and it checks that the model is learning the right thing.
 - A synchronous rAF hop before a CSS transition reads as a stall; commit start and end in one task with a style flush between. Two easing tempos on one deck make it read as a stack, not a sheet.
+
+## Code quality
+
+Hardening pass, after the prototype worked. One line each.
+
+- **Tests** — vitest, 97 cases on the pure logic: ranking, search fusion, user state, embeddings, API guard, rate limit, schemas, error sink.
+- **Validated front door** — one `guard()` per route: uid or 401, zod schema per query/body/params with the field named, 413 on oversize, 400 on non-JSON, 500 never leaks the message, `x-request-id` on everything.
+- **Rate limits** — per-caller per-bucket token bucket in Redis, `Retry-After` on 429, fails open when Redis is down.
+- **Env** — every `process.env` read in one typed object; `assertEnv()` at boot names missing keys in one message.
+- **Bounded Redis** — 5-try retry, 5 s connect timeout, error log at 1/s; `safeJson()` so one corrupt row costs one item, not the shared corpus cache.
+- **One client fetch** — `api()` turns non-2xx into `ApiError` with a human message and the request id; GET retries once; 12 s timeout; every failure has a visible state and a retry — no spinner forever.
+- **Error sink** — server 500s and client throws (fetch, window error, boundary) ship to a Redis ring buffer with fingerprint counts per day.
+- **Round trips, not bytes** — deep dive paints repo+card first, neighbours second; cold `getItem` is one pipeline, not a corpus load; backfill runs after the response.
+- **Accessibility** — AA contrast on tertiary text; one `:focus-visible` ring; global reduced-motion; deck is a named live region announcing each card; rail copies hidden from AT; toggles `aria-pressed`; detail is a focus-managed `dialog`; toasts are `status`/`alert`.
+- **Split `FeedClient`** — `Card` extracted; rail, gestures and keyboard next.

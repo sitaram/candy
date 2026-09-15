@@ -203,3 +203,21 @@ export async function hasRelated(ids: string[]): Promise<Set<string>> {
   const res = await p.exec();
   return new Set(ids.filter((_, i) => (res?.[i]?.[1] as number) === 1));
 }
+
+/**
+ * The voice's "related repos": neighbours with one human reason each, in priority order. Lives here
+ * (not in api.ts) so the dependency runs one way — api → related, never back.
+ */
+export async function similar(id: string, limit = 10): Promise<{ item: Item; score: number; why: string[] }[]> {
+  const ns = await neighbors(id, limit);
+  return ns.map((n) => {
+    const why: string[] = [];
+    if (n.signals.alt) why.push("named alternative");
+    if (n.signals.linksTo || n.signals.linkedFrom) why.push("linked from README");
+    if (n.signals.sameOwner) why.push("same author");
+    if (n.signals.shared.length) why.push(`shares ${n.signals.shared.slice(0, 3).join(", ")}`);
+    if ((n.signals.cos ?? 0) > 0.6 && !why.length) why.push("close in meaning");
+    if (n.signals.sameCategory && !why.length) why.push("same category");
+    return { item: n.item, score: n.score, why };
+  });
+}

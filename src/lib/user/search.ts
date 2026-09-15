@@ -47,7 +47,7 @@ export function looksLikeName(q: string): boolean {
 
 interface Hit { it: Item; lex: number; sem: number; match: SearchResult["match"] }
 
-export async function search(uid: string, qRaw: string, limit = 20): Promise<SearchResponse> {
+export async function search(uid: string, qRaw: string, limit = 20, opts: { semantic?: boolean } = {}): Promise<SearchResponse> {
   const q = qRaw.trim();
   if (q.length < 2) return { q, results: [], semantic: false, exact: null };
   const ql = q.toLowerCase();
@@ -55,7 +55,7 @@ export async function search(uid: string, qRaw: string, limit = 20): Promise<Sea
   const nameQuery = looksLikeName(q);
 
   // Start the OpenAI query embedding now so it overlaps the Redis reads instead of following them.
-  const semanticWanted = !nameQuery || q.includes(" ");
+  const semanticWanted = (opts.semantic ?? true) && (!nameQuery || q.includes(" "));
   const qvP = semanticWanted ? queryVector(q).catch((e: unknown) => { console.warn("[search] embed", (e as Error).message); return null; }) : Promise.resolve(null);
   const [items, u] = await Promise.all([allItems(), loadUser(uid)]);
   const { profile, saved: savedAll } = u;

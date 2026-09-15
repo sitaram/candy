@@ -40,6 +40,15 @@ export function itemTerms(it: Item): { term: string; w: number }[] {
   return out;
 }
 
+/**
+ * Anonymous profiles live as long as the cookie (a year) plus slack; every load refreshes the clock.
+ * Without this each cookie ever minted left its keys in Redis forever.
+ */
+export const USER_TTL = 400 * 86_400;
+export const USER_KEYS = (uid: string) => [UK.profile(uid), UK.seen(uid), UK.saved(uid), UK.react(uid), UK.meta(uid), `u:${uid}:taste`, `u:${uid}:tastew`];
+/** A person who has swiped past this many cards has a taste; the oldest "seen" marks can go. */
+export const SEEN_CAP = 5_000;
+
 export type Profile = Map<string, number>;
 
 export async function getProfile(uid: string): Promise<Profile> {
@@ -88,11 +97,19 @@ function writeProfile(p: ReturnType<Redis["pipeline"]>, uid: string, profile: Pr
   p.hset(UK.meta(uid), { profileUpdatedAt: now });
 }
 
-/** Record a reaction and update the profile. Fast: one pipeline. */
+/**
+ * Record a reaction and update the profile. Fast: one pipeline.
+ *
+ * Idempotent: the same (id, kind) twice is a no-op. The client's `post()` is fire-and-forget and a
+ * double tap, a retried beacon, or a replayed request must not apply the delta twice — a profile that
+ * compounds on replay is both a correctness bug and a way to poison a taste from outside.
+ */
 export async function react(uid: string, item: Item, kind: Reaction): Promise<void> {
   const r = redis();
   const id = item.repo.id;
   const now = Date.now();
+  const [prev, savedScore] = await Promise.all([r.hget(UK.react(uid), id), kind === "save" ? r.zscore(UK.saved(uid), id) : null]);
+  if (kind === "save" ? savedScore != null : prev === kind) return;
   const profile = await decayedProfile(uid, now);
   applyDelta(profile, item, DELTA[kind]);
 
@@ -100,6 +117,7 @@ export async function react(uid: string, item: Item, kind: Reaction): Promise<vo
   // Bookmarking does not dismiss the card, so it must not mark it seen.
   if (kind !== "save") {
     p.zadd(UK.seen(uid), now, id);
+    p.zremrangebyrank(UK.seen(uid), 0, -(SEEN_CAP + 1));   // keep the newest SEEN_CAP
     p.hset(UK.react(uid), id, kind);
   } else p.zadd(UK.saved(uid), now, id);
   writeProfile(p, uid, profile, now);
@@ -152,17 +170,21 @@ export async function isSaved(uid: string, ids: string[]): Promise<Set<string>> 
  * touchVisit's read-then-write is folded in (HGET then HSET in the same pipeline is fine — we want
  * the previous value, and the write orders after it).
  */
-export async function loadUser(uid: string): Promise<{ profile: Profile; seen: Set<string>; saved: Set<string>; lastVisit: number; tasteBuf: Buffer | null; tasteW: number }> {
+export async function loadUser(uid: string, opts: { touch?: boolean } = {}): Promise<{ profile: Profile; seen: Set<string>; saved: Set<string>; lastVisit: number; tasteBuf: Buffer | null; tasteW: number }> {
   const r = redis();
-  const res = await r.pipeline()
+  // `touch` is the feed's alone. Search and the voice session also load the user, and if they stamped
+  // lastVisit then typing a query and reloading would erase "since you were here" — the same bug
+  // react() once had, from the other direction.
+  const p = r.pipeline()
     .hgetall(UK.profile(uid))
     .zrange(UK.seen(uid), "0", "-1")
     .zrange(UK.saved(uid), "0", "-1")
     .hget(UK.meta(uid), "lastVisit")
-    .hset(UK.meta(uid), "lastVisit", Date.now())
+    .hset(UK.meta(uid), opts.touch ? { lastVisit: Date.now() } : { touched: Date.now() })
     .getBuffer(`u:${uid}:taste`)
-    .get(`u:${uid}:tastew`)
-    .exec();
+    .get(`u:${uid}:tastew`);
+  for (const k of USER_KEYS(uid)) p.expire(k, USER_TTL);
+  const res = await p.exec();
   const v = (i: number) => res?.[i]?.[1];
   return {
     profile: new Map(Object.entries((v(0) as Record<string, string>) ?? {}).map(([k, x]) => [k, Number(x)])),

@@ -59,6 +59,8 @@ export async function embedTexts(texts: string[], inputType: "document" | "query
     method: "POST",
     headers: { "content-type": "application/json", authorization: `Bearer ${key}` },
     body: JSON.stringify(body),
+    // A query embedding is ~200 ms; a batch of 100 cards a few seconds. Nothing legitimate takes 20.
+    signal: AbortSignal.timeout(20_000),
   });
   if (!res.ok) throw new Error(`embeddings(${prov}) ${res.status}: ${(await res.text()).slice(0, 200)}`);
   const j = (await res.json()) as { data: { index: number; embedding: number[] }[] };

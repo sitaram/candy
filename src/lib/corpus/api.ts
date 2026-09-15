@@ -284,20 +284,6 @@ export async function getItemDetail(id: string): Promise<ItemDetail | null> {
  * Flat "similar" list, used by voice context and the /r page. Same ranker as the labelled groups
  * (related.ts), so the two never disagree; `why` is derived from the signals.
  */
-export async function similar(id: string, limit = 10): Promise<{ item: Item; score: number; why: string[] }[]> {
-  const { neighbors } = await import("./related");
-  const ns = await neighbors(id, limit);
-  return ns.map((n) => {
-    const why: string[] = [];
-    if (n.signals.alt) why.push("named alternative");
-    if (n.signals.linksTo || n.signals.linkedFrom) why.push("linked from README");
-    if (n.signals.sameOwner) why.push("same author");
-    if (n.signals.shared.length) why.push(`shares ${n.signals.shared.slice(0, 3).join(", ")}`);
-    if ((n.signals.cos ?? 0) > 0.6 && !why.length) why.push("close in meaning");
-    if (n.signals.sameCategory && !why.length) why.push("same category");
-    return { item: n.item, score: n.score, why };
-  });
-}
 
 export async function categories(): Promise<{ category: string; count: number }[]> {
   const all = await allItems();

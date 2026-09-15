@@ -34,13 +34,13 @@ export function daysAgo(n: number): string {
 }
 
 export async function getJson<T>(url: string, headers: HeadersInit = {}): Promise<T> {
-  const res = await fetch(url, { headers: { ...UA, ...headers } });
+  const res = await fetch(url, { headers: { ...UA, ...headers }, signal: AbortSignal.timeout(30_000) });
   if (!res.ok) throw new Error(`${res.status} ${url}`);
   return (await res.json()) as T;
 }
 
 export async function getText(url: string, headers: HeadersInit = {}): Promise<string> {
-  const res = await fetch(url, { headers: { ...UA, ...headers } });
+  const res = await fetch(url, { headers: { ...UA, ...headers }, signal: AbortSignal.timeout(30_000) });
   if (!res.ok) throw new Error(`${res.status} ${url}`);
   return res.text();
 }

@@ -104,4 +104,12 @@ describe("search()", () => {
     expect(r.results).toHaveLength(2);
     for (const x of r.results) expect(x.score).toBe(Math.round(x.score * 100) / 100);
   });
+  it("opts.semantic=false skips the embedder entirely (the budget cap's fallback) and says so", async () => {
+    const embed = await import("@/lib/embed");
+    const spy = vi.spyOn(embed, "embedTexts");
+    const r = await search(U, "voice agents framework", 10, { semantic: false });
+    expect(spy).not.toHaveBeenCalled();
+    expect(r.semantic).toBe(false);
+    expect(r.results.length).toBeGreaterThan(0);
+  });
 });

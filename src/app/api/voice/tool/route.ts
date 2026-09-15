@@ -1,9 +1,12 @@
 import { route } from "@/lib/api/guard";
 import { RepoId, Text, VoiceToolBody } from "@/lib/api/schemas";
-import { getItemDetail, search, similar } from "@/lib/corpus/api";
+import { getItemDetail, search } from "@/lib/corpus/api";
+import { similar } from "@/lib/corpus/related";
 import { briefOf } from "@/lib/voice/context";
 import { askRepo } from "@/lib/ask";
 import { recordServer } from "@/lib/errors";
+import { charge } from "@/lib/api/spend";
+import { HttpError } from "@/lib/api/guard";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
@@ -41,6 +44,7 @@ export const POST = route({ body: VoiceToolBody, limit: "llm", maxBody: 8_192 },
         const id = RepoId.safeParse(args.id ?? body.current);
         const question = Text(1_000).parse(String(args.question ?? ""));
         if (!id.success || !question) return say("Need a repo and a question.");
+        try { await charge("ask"); } catch (e) { if (e instanceof HttpError) return say("The daily budget for deep questions is used up; answer from the brief."); throw e; }
         const a = await askRepo({ id: id.data, question, spoken: true });
         return say(a ? a.answer : `Not in the corpus: ${id.data}.`);
       }

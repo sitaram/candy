@@ -5,7 +5,8 @@
  * in your feed, alternatives, similar repos with one-line pitches) plus a compact profile, and three
  * tools that hit the same read-only corpus API the feed uses. No LLM on the tool path.
  */
-import { getItemDetail, similar, type Item, type ItemDetail } from "@/lib/corpus/api";
+import { getItemDetail, type Item, type ItemDetail } from "@/lib/corpus/api";
+import { similar } from "@/lib/corpus/related";
 import type { FeedItem } from "@/lib/user/feed";
 import type { Me } from "@/lib/user/state";
 

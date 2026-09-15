@@ -22,9 +22,11 @@ export type Bucket = "read" | "embed" | "write" | "llm" | "voice" | "fetch" | "b
  * but not a fresh IP. Sized so an office NAT of ~20 people does not trip it.
  */
 const LIMITS: Record<Bucket, { n: number; windowSec: number; ip?: number }> = {
-  read:   { n: 240, windowSec: 60 },
+  // read/write cost only Redis, but without an IP ceiling a caller who drops the cookie each request has
+  // no limit at all (fresh uid, fresh bucket). Sized for an office NAT of ~20 heavy users.
+  read:   { n: 240, windowSec: 60,  ip: 2_400 },
   embed:  { n: 60,  windowSec: 60,  ip: 300 },   // search: one embeddings call each (~$0.00002, but a call)
-  write:  { n: 90,  windowSec: 60 },
+  write:  { n: 90,  windowSec: 60,  ip: 900 },
   llm:    { n: 20,  windowSec: 60,  ip: 120 },
   voice:  { n: 10,  windowSec: 600, ip: 60 },
   fetch:  { n: 30,  windowSec: 600, ip: 120 },

@@ -1,6 +1,7 @@
 import { HttpError, route } from "@/lib/api/guard";
 import { ItemParams, RepoId } from "@/lib/api/schemas";
-import { getItem, similar } from "@/lib/corpus/api";
+import { getItem } from "@/lib/corpus/api";
+import { similar } from "@/lib/corpus/related";
 import { enqueueBackfill, missingAlternatives } from "@/lib/corpus/backfill";
 import { getRelated } from "@/lib/corpus/related";
 

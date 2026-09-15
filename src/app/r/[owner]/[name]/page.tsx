@@ -1,4 +1,5 @@
-import { getItemDetail, getItems, similar } from "@/lib/corpus/api";
+import { getItemDetail, getItems } from "@/lib/corpus/api";
+import { similar } from "@/lib/corpus/related";
 import { ensureItem } from "@/lib/corpus/ensure";
 import { collectionsOf } from "@/lib/store/collections";
 import { notFound } from "next/navigation";

@@ -89,7 +89,8 @@ export async function connect(opts: VoiceStart, cb: TransportCallbacks): Promise
     ]);
     ms = stream;
     const track = ms.getAudioTracks()[0];
-    tlog("mic+secret ok", { tracks: ms.getAudioTracks().map((t) => ({ label: t.label, enabled: t.enabled, muted: t.muted, settings: t.getSettings?.() })) });
+    // Not the device label: "Sitaram's AirPods Pro" is a name, and this trace leaves the device.
+    tlog("mic+secret ok", { tracks: ms.getAudioTracks().map((t) => ({ enabled: t.enabled, muted: t.muted, settings: t.getSettings?.() })) });
     track?.addEventListener("ended", () => tlog("mic.track.ended"));
     track?.addEventListener("mute", () => tlog("mic.track.mute"));
     track?.addEventListener("unmute", () => tlog("mic.track.unmute"));

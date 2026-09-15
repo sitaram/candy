@@ -13,6 +13,7 @@ import { ensureItem } from "./ensure";
 import { ghHeaders } from "../discover/github";
 import { getJson } from "../discover/util";
 import { cardText, embedTexts, putEmbeddings, writeMatrix } from "../embed";
+import { charge } from "../api/spend";
 
 const BF = (id: string) => `bf:${id}`;
 const RESOLVE = (name: string) => `bfname:${name}`;   // name → owner/repo or "-" (unresolvable), 30 d
@@ -52,6 +53,13 @@ export async function missingAlternatives(id: string): Promise<{ missing: string
     if (!al || SKIP.test(al) || ids.has(al) || names.has(al.split("/").pop()!)) continue;
     if (al.includes("/")) missing.push(al); else unresolved.push(al);
   }
+  // A bare name we already looked up and could not resolve is not pending — otherwise a card naming a
+  // hosted product the SKIP list missed would re-enqueue this repo every week, forever.
+  if (unresolved.length) {
+    const r = redis();
+    const cached = await r.mget(...unresolved.map(RESOLVE));
+    for (let i = unresolved.length - 1; i >= 0; i--) if (cached[i] === "-") unresolved.splice(i, 1);
+  }
   return { missing, unresolved };
 }
 
@@ -61,13 +69,20 @@ export async function missingAlternatives(id: string): Promise<{ missing: string
  */
 const QUEUE = "bf:queue";
 
-/** O(1): remember that this repo wants backfilling. Idempotent, once a week per repo. */
+/** The queue is drained one job per deep-dive beacon; more than this waiting means nobody is draining it. */
+export const QUEUE_CAP = 500;
+
+/** O(1): remember that this repo wants backfilling. Idempotent, once a week per repo; bounded. */
 export async function enqueueBackfill(id: string): Promise<boolean> {
   const r = redis();
   if (!(await r.set(BF(id), "1", "EX", 7 * 86_400, "NX"))) return false;
-  await r.rpush(QUEUE, id);
+  const n = await r.rpush(QUEUE, id);
+  if (n > QUEUE_CAP) await r.ltrim(QUEUE, -QUEUE_CAP, -1);   // drop the oldest; their BF marks expire and they re-queue next week
   return true;
 }
+
+/** Depth of the queue, for stats. */
+export async function queueDepth(): Promise<number> { return redis().llen(QUEUE); }
 
 /** Pop one job and run it. Called from /api/backfill by a client beacon or a cron. */
 export async function drainOne(): Promise<{ id: string; added: string[] } | null> {
@@ -84,6 +99,7 @@ export async function backfillAlternatives(id: string, max = 4): Promise<{ added
   const added: string[] = [];
   for (const t of targets.slice(0, max)) {
     try {
+      await charge("card");                         // over budget → throws; caught below, and the repo stays queued for another day
       const res = await ensureItem(t, { enrich: true });
       if (res.exists) added.push(res.id);
     } catch (e) { console.warn("[backfill]", t, (e as Error).message); }

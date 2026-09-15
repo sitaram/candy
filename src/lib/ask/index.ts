@@ -14,7 +14,8 @@ import { getRaw } from "../store/raw";
 
 const MODEL = env.CANDY_ASK_MODEL;
 let client: Anthropic | null = null;
-const anthropic = () => (client ??= new Anthropic());
+// 45 s: the ask route is 60 s and the voice tool route 30 s; the SDK default of 10 min would outlive both while the tokens still bill.
+const anthropic = () => (client ??= new Anthropic({ timeout: 45_000, maxRetries: 1 }));
 
 export interface Ask { id: string; question: string; history?: { q: string; a: string }[]; spoken?: boolean }
 export interface Answer { answer: string; model: string; contextChars: number }

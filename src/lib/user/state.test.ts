@@ -39,9 +39,12 @@ describe("react", () => {
     expect((await prof()).mcp).toBe(1.5);
   });
   it("accumulates across reactions and prunes terms that decay to |w| < 0.05", async () => {
+    // Two cards with the same terms: like one, skip both. 1 − 0.5 − 0.5 = 0 → pruned. (Reacting to the
+    // same card twice with the same kind is a no-op now, so the second skip must come from a sibling.)
+    const A2 = item("a/b2", { card: { tags: ["mcp", "cli", "node"], category: "dev-tools" }, repo: { language: "TypeScript" } });
     await react(U, A, "like");
     await react(U, A, "skip");
-    await react(U, A, "skip");   // 1 − 0.5 − 0.5 = 0 → pruned
+    await react(U, A2, "skip");
     expect(await prof()).toEqual({});
   });
   it("decays the profile by 0.98/day between reactions", async () => {
@@ -77,6 +80,30 @@ describe("react", () => {
     await react(U, A, "like");
     expect(await getTaste(U)).toBeNull();
     expect((await prof()).mcp).toBe(1);
+  });
+  it("is idempotent: the same (id, kind) twice applies the delta once (replay / double tap / retried beacon)", async () => {
+    await react(U, item("a/b", { card: { tags: ["t1"] } }), "like");
+    const once = await mockRedis.hgetall(UK.profile(U));
+    const n1 = await mockRedis.hget(UK.meta(U), "reactions");
+    await react(U, item("a/b", { card: { tags: ["t1"] } }), "like");
+    expect(await mockRedis.hgetall(UK.profile(U))).toEqual(once);
+    expect(await mockRedis.hget(UK.meta(U), "reactions")).toBe(n1);
+    // A *different* kind on the same id still counts (a like after a skip is a change of mind).
+    await react(U, item("a/b", { card: { tags: ["t1"] } }), "skip");
+    expect(await mockRedis.hget(UK.react(U), "a/b")).toBe("skip");
+    // Saving twice is one save.
+    await react(U, item("c/d"), "save"); await react(U, item("c/d"), "save");
+    expect(await mockRedis.hget(UK.meta(U), "n_save")).toBe("1");
+  });
+  it("keeps only the newest SEEN_CAP seen marks", async () => {
+    const { SEEN_CAP } = await import("./state");
+    const args: (string | number)[] = [];
+    for (let i = 0; i < SEEN_CAP + 10; i++) args.push(i, `old/${i}`);
+    await mockRedis.zadd(UK.seen(U), ...args);
+    await react(U, item("new/one"), "like");
+    expect(await mockRedis.zcard(UK.seen(U))).toBe(SEEN_CAP);
+    expect(await mockRedis.zscore(UK.seen(U), "new/one")).not.toBeNull();
+    expect(await mockRedis.zscore(UK.seen(U), "old/0")).toBeNull();
   });
 });
 
@@ -152,11 +179,12 @@ describe("me", () => {
     expect(m.firstSeen).toBe(NOW);
   });
   it("avoidTerms lists negatives, most negative first", async () => {
+    const A2 = item("a/b2", { card: { tags: ["mcp", "cli", "node"], category: "dev-tools" }, repo: { language: "TypeScript" } });
     await react(U, A, "skip");
-    await react(U, A, "skip");
+    await react(U, A2, "skip");
     await react(U, B, "skip");
     const m = await me(U);
-    // A's terms were skipped twice (−1 each), B's once (−0.5): the A terms come first.
+    // A's terms were skipped twice (−1 total, via two cards sharing them), B's once (−0.5): the A terms come first.
     expect(m.avoidTerms.slice(0, 3).map((t) => t.w)).toEqual([-1, -1, -1]);
     expect(m.avoidTerms.map((t) => t.term)).toContain("bio");
     expect(m.avoidTerms.every((t) => t.w < 0)).toBe(true);
@@ -212,10 +240,25 @@ describe("loadUser", () => {
     expect(u1.saved.has("c/d")).toBe(true);
     expect(u1.tasteBuf?.length).toBe(512 * 4);
     expect(u1.tasteW).toBeGreaterThan(0);
-    // The pipeline reads lastVisit *then* writes now: the second call sees the first's stamp.
+    // Without `touch` nothing is stamped: search and voice load the user but are not visits.
+    expect(await mockRedis.hget(UK.meta("u"), "lastVisit")).toBeNull();
+    expect(u1.lastVisit).toBe(0);
+    // With it, the pipeline reads lastVisit *then* writes now: the next call sees this call's stamp.
+    await loadUser("u", { touch: true });
     const stamp = Number(await mockRedis.hget(UK.meta("u"), "lastVisit"));
-    const u2 = await loadUser("u");
+    expect(stamp).toBeGreaterThan(0);
+    const u2 = await loadUser("u", { touch: true });
     expect(u2.lastVisit).toBe(stamp);
+    // Every load refreshes the profile's lease (regression: user keys never expired).
+    expect(await mockRedis.ttl(UK.profile("u"))).toBeGreaterThan(300 * 86_400);
+    expect(await mockRedis.ttl(UK.seen("u"))).toBeGreaterThan(300 * 86_400);
+  });
+  it("search-shaped loads (no touch) never move lastVisit — the bug react() once had, from the other side", async () => {
+    await loadUser("u", { touch: true });
+    const stamp = await mockRedis.hget(UK.meta("u"), "lastVisit");
+    vi.setSystemTime(NOW + 60_000);
+    await loadUser("u"); await loadUser("u");
+    expect(await mockRedis.hget(UK.meta("u"), "lastVisit")).toBe(stamp);
   });
   it("is all-empty for an unknown user and does not throw", async () => {
     const u = await loadUser("nobody");

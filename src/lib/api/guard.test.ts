@@ -22,6 +22,18 @@ const body = async (r: Response) => ({ status: r.status, json: await r.json().ca
 beforeEach(() => { jar.uid = "abcdef1234567890"; jar.header = undefined; });
 
 describe("route()", () => {
+  it("403s a mutation whose Origin names another host; same host, absent Origin, and GETs pass", async () => {
+    const h = route({}, async () => Response.json({ ok: 1 }));
+    const post = (origin?: string) => new Request("http://t/x", { method: "POST", headers: { host: "t", ...(origin ? { origin } : {}) } });
+    expect((await h(post("https://evil.example"), ctx())).status).toBe(403);
+    expect((await h(post("http://t"), ctx())).status).toBe(200);
+    expect((await h(post(), ctx())).status).toBe(200);                    // sendBeacon from some browsers
+    expect((await h(new Request("http://t/x", { headers: { host: "t", origin: "https://evil.example" } }), ctx())).status).toBe(200);   // GET: Origin is not consulted
+    // Behind Vercel the public host is x-forwarded-host, not host.
+    const fwd = new Request("http://t/x", { method: "POST", headers: { host: "lambda.internal", "x-forwarded-host": "candy.example", origin: "https://candy.example" } });
+    expect((await h(fwd, ctx())).status).toBe(200);
+  });
+
   it("401 without a session, unless anon", async () => {
     jar.uid = undefined;
     const h = route({}, async () => Response.json({ ok: 1 }));

@@ -6,8 +6,12 @@
  * of a failure is a console line on a phone that has already reloaded.
  *
  * What goes in: every state change, every data-channel event type (deltas collapsed to a count),
- * connection/ICE states, tool calls with args and outcome, handler exceptions, the stop reason.
- * What does not: audio, transcripts of what the user said (only their length).
+ * connection/ICE states, tool calls (repo ids and enums; free-text args reduced to a length), the
+ * first 160 chars of each tool's *output*, handler exceptions, the stop reason, the tail of what the
+ * *model* said (to see a cut-off take).
+ * What does not: audio, the user's words (search queries, questions), the microphone's device name.
+ * It is shipped to /api/voice/trace and kept 7 days per uid; treat it as a transport log, not a record
+ * of the conversation.
  */
 
 export interface TraceEntry { t: number; k: string; d?: unknown }

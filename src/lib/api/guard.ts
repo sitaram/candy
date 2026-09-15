@@ -62,6 +62,15 @@ export function route<Q extends ZodTypeAny | undefined = undefined, B extends Zo
       const uid = (await headers()).get("x-candy-uid") ?? (await cookies()).get(UID_COOKIE)?.value ?? "";
       if (!uid && !spec.anon) throw new HttpError(401, "no session cookie");
       if (uid && !/^[a-z0-9]{8,40}$/i.test(uid)) throw new HttpError(400, "bad session cookie");
+      // Cross-site mutation guard. SameSite=lax already keeps the cookie off cross-site POSTs in every
+      // current browser; this is the belt for the braces, and it costs one header compare. Origin is
+      // absent on same-origin GETs and on sendBeacon from some browsers, so only its *presence with a
+      // different host* is refused.
+      if (req.method !== "GET" && req.method !== "HEAD") {
+        const origin = req.headers.get("origin");
+        const host = req.headers.get("x-forwarded-host") ?? req.headers.get("host");
+        if (origin && host && new URL(origin).host !== host) throw new HttpError(403, "cross-site request refused");
+      }
 
       if (spec.limit) {
         const rl = await rateLimit(spec.limit, uid || ipOf(req), ipOf(req));

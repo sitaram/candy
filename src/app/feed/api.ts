@@ -28,7 +28,10 @@ export async function api<T>(url: string, opts: Opts = {}): Promise<T> {
   const attempt = async (): Promise<T> => {
     const ac = new AbortController();
     const t = setTimeout(() => ac.abort(), timeout);
-    init.signal?.addEventListener("abort", () => ac.abort(), { once: true });
+    // Forward the caller's abort; removed in `finally` so a retry does not leave the first attempt's
+    // listener on a long-lived signal (the Detail sheet's controller lives as long as the sheet).
+    const fwd = () => ac.abort();
+    init.signal?.addEventListener("abort", fwd, { once: true });
     let r: Response;
     try {
       r = await fetch(url, {
@@ -40,7 +43,7 @@ export async function api<T>(url: string, opts: Opts = {}): Promise<T> {
       if (init.signal?.aborted) throw e;
       const timedOut = (e as Error).name === "AbortError";
       throw new ApiError(0, timedOut ? "That took too long. Try again." : typeof navigator !== "undefined" && navigator.onLine === false ? "You’re offline." : "Couldn’t reach the server.");
-    } finally { clearTimeout(t); }
+    } finally { clearTimeout(t); init.signal?.removeEventListener("abort", fwd); }
     if (r.ok) return (r.status === 204 ? undefined : await r.json()) as T;
     const j = (await r.json().catch(() => ({}))) as { error?: string; rid?: string };
     const ra = Number(r.headers.get("retry-after") ?? 0);

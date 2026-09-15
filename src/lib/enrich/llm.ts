@@ -8,7 +8,7 @@ export const MODEL = env.CANDY_MODEL;
 
 let client: Anthropic | undefined;
 export function ai(): Anthropic {
-  if (!client) client = new Anthropic();
+  if (!client) client = new Anthropic({ timeout: 60_000, maxRetries: 2 });   // one card; the default 10 min would hold a backfill function open for nothing
   return client;
 }
 

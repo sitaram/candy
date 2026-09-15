@@ -39,7 +39,7 @@ export class RateLimited extends Error {
 }
 
 async function gh<T>(path: string): Promise<T | null> {
-  const res = await fetch(`https://api.github.com${path}`, { headers: { ...UA, ...ghHeaders() } });
+  const res = await fetch(`https://api.github.com${path}`, { headers: { ...UA, ...ghHeaders() }, signal: AbortSignal.timeout(20_000) });
   if (res.status === 404 || res.status === 451) return null; // gone / DMCA
   if (res.status === 403 || res.status === 429) {
     const reset = Number(res.headers.get("x-ratelimit-reset") ?? 0) * 1000;
@@ -51,7 +51,7 @@ async function gh<T>(path: string): Promise<T | null> {
 
 /** Raw file via raw.githubusercontent.com: no API rate limit. */
 async function rawFile(id: string, branch: string, file: string): Promise<string | null> {
-  const res = await fetch(`https://raw.githubusercontent.com/${id}/${branch}/${file}`, { headers: UA });
+  const res = await fetch(`https://raw.githubusercontent.com/${id}/${branch}/${file}`, { headers: UA, signal: AbortSignal.timeout(20_000) });
   if (res.status === 404) return null;
   if (!res.ok) return null;
   return res.text();

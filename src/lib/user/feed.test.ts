@@ -54,7 +54,9 @@ describe("feed", () => {
       { id: "n/ear", card: { interest: 5, tags: ["r"] }, vec: at(0.75) },
       { id: "f/ar", card: { interest: 5.5, tags: ["s"] }, vec: at(0.1) },
     ]);
-    for (let i = 0; i < 6; i++) { await react(U, (await getItem("l/iked"))!, "like"); }   // weight 6 → full confidence
+    // Six likes of the *same* card are now one like (idempotent); use six identical-vector cards for weight 6 → full confidence.
+    await seed([1, 2, 3, 4, 5].map((i) => ({ id: `l/iked${i}`, card: { interest: 5, tags: ["q"] }, vec: vec(0) })));
+    for (const id of ["l/iked", "l/iked1", "l/iked2", "l/iked3", "l/iked4", "l/iked5"]) await react(U, (await getItem(id))!, "like");
     const f = await feed(U);
     expect(f.items.map((i) => i.id)).toEqual(["n/ear", "f/ar"]);
     expect(f.items[0].fit).toBeGreaterThan(0.5);                 // 0.4·terms + 0.6·cos-fit(≈1)

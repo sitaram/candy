@@ -28,7 +28,7 @@ export interface SinceLastVisit {
 }
 
 export async function feed(uid: string, n = 30, exclude: string[] = []): Promise<Feed> {
-  const [items, u] = await Promise.all([allItems(), loadUser(uid)]);
+  const [items, u] = await Promise.all([allItems(), loadUser(uid, { touch: true })]);
   const { profile, seen, saved } = u;
   const taste = tasteFrom(u.tasteBuf, u.tasteW);
   const ex = new Set([...seen, ...exclude]);

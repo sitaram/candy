@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeAll, afterAll, beforeEach } from "vitest";
-import { allItems, getItem, getItemDetail, getItems, matches, sortItems, similar, categories, search, invalidate, upsertSnapshotItem, assembleItems } from "./api";
+import { allItems, getItem, getItemDetail, getItems, matches, sortItems, categories, search, invalidate, upsertSnapshotItem, assembleItems } from "./api";
 import { readSnapshot, writeSnapshot } from "./snapshot";
+import { similar } from "./related";
 import { saveRepo } from "@/lib/store/corpus";
 import { saveCard } from "@/lib/enrich";
 import { parseCard, getCard, getCards, CK } from "@/lib/enrich";

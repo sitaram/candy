@@ -1,17 +1,34 @@
-import { readFile } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import path from "node:path";
-import ReactMarkdown from "react-markdown";
+import type { ReactNode } from "react";
+import { MarkdownAsync } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import "./about.css";
 import { DocVoice } from "./DocVoice";
 
 // Rendered per request, not at build: the CSP nonce is per response, and a prerendered page would ship
-// inline scripts without it — the browser would then refuse to hydrate. Reading one markdown file is ~1 ms.
+// inline scripts without it — the browser would then refuse to hydrate.
 export const dynamic = "force-dynamic";
+
+// …but the expensive part — parsing 22 KB of markdown through remark/rehype into a React tree — is the same
+// every request. Cached per process (the file is read-only in a deployment); only the nonced shell is per-request.
+// Cold: ~60–100 ms. Warm: the tree is a constant. Dev re-reads the file when its mtime changes.
+let cached: { mtime: number; tree: ReactNode } | null = null;
+async function doc(): Promise<ReactNode> {
+  const file = path.join(process.cwd(), "docs", "DESIGN.md");
+  const mtime = process.env.NODE_ENV === "development" ? (await stat(file)).mtimeMs : 0;
+  if (cached && cached.mtime === mtime) return cached.tree;
+  const md = await readFile(file, "utf8");
+  // MarkdownAsync parses *now* and returns plain <h2>/<p>/<ul> elements — so what we cache is the parsed tree,
+  // not a <ReactMarkdown> element that would re-parse on every render.
+  const tree = await MarkdownAsync({ remarkPlugins: [remarkGfm], children: md });
+  cached = { mtime, tree };
+  return tree;
+}
 
 /** The design doc, rendered in-app. Same tokens as the feed; no context switch. */
 export default async function About() {
-  const md = await readFile(path.join(process.cwd(), "docs", "DESIGN.md"), "utf8");
+  const tree = await doc();
   return (
     <main className="about">
       <header className="feed-head about-head" role="banner">
@@ -22,9 +39,7 @@ export default async function About() {
         <span className="head-label">how it works</span>
         <DocVoice />
       </header>
-      <article className="prose">
-        <ReactMarkdown remarkPlugins={[remarkGfm]}>{md}</ReactMarkdown>
-      </article>
+      <article className="prose">{tree}</article>
     </main>
   );
 }

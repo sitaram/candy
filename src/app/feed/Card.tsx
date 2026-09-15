@@ -1,6 +1,7 @@
 "use client";
 
 import type { CSSProperties } from "react";
+import Link from "next/link";
 import type { FeedItem } from "@/lib/user/feed";
 import { hueOf, fmt, agoShort, splitWhy } from "./logic";
 import { VoiceBoundary } from "./VoiceBoundary";
@@ -159,7 +160,9 @@ export function Splash({ style, onStart }: { style?: CSSProperties; onStart: () 
       </div>
 
       <div className="sp-bottom">
-        <a className="sp-more" href="/about" onPointerDown={stop}>How it works <span aria-hidden>→</span></a>
+        {/* Link, not <a>: prefetched while the splash is on screen, and a client transition instead of a full
+            document reload — the reload was the visible half-second (new HTML, CSS, JS, hydrate). */}
+        <Link className="sp-more" href="/about" prefetch onPointerDown={stop}>How it works <span aria-hidden>→</span></Link>
         <button className="sp-start" onClick={onStart}><span className="sp-arrow">↑</span>swipe up to start</button>
       </div>
     </section>

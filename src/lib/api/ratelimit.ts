@@ -9,8 +9,9 @@
  *   fetch  — may hit GitHub + Claude to bring a new repo into the corpus. Pennies each, unbounded
  *            in aggregate if a URL scanner walks /api/items/*, so it is the tightest.
  *
- * Fails open: if Redis is down the limit is skipped and the request proceeds — a down cache must
- * not take the read path with it. The failure is logged once a minute.
+ * Redis down: read/write/beacon fail OPEN (a down cache must not take the read path with it); the
+ * buckets that cost money — llm, voice, fetch, embed — fail CLOSED, since without the counter we
+ * cannot bound anything. Logged once a minute either way.
  */
 import { redis } from "@/lib/store/redis";
 
@@ -33,6 +34,7 @@ const LIMITS: Record<Bucket, { n: number; windowSec: number; ip?: number }> = {
   beacon: { n: 30,  windowSec: 60,  ip: 120 },
 };
 
+const MONEY = new Set<Bucket>(["llm", "voice", "fetch", "embed"]);
 let lastWarn = 0;
 
 export async function rateLimit(bucket: Bucket, who: string, ip?: string): Promise<{ ok: true } | { ok: false; retryAfter: number }> {
@@ -51,8 +53,9 @@ export async function rateLimit(bucket: Bucket, who: string, ip?: string): Promi
     if (count <= n && (!ipCap || ipCount <= ipCap)) return { ok: true };
     return { ok: false, retryAfter: (win + 1) * windowSec - now };
   } catch (e) {
-    if (Date.now() - lastWarn > 60_000) { lastWarn = Date.now(); console.warn("[ratelimit] redis unavailable; failing open", (e as Error).message); }
-    return { ok: true };
+    const closed = MONEY.has(bucket);
+    if (Date.now() - lastWarn > 60_000) { lastWarn = Date.now(); console.warn(`[ratelimit] redis unavailable; failing ${closed ? "closed" : "open"} for ${bucket}`, (e as Error).message); }
+    return closed ? { ok: false, retryAfter: 60 } : { ok: true };
   }
 }
 

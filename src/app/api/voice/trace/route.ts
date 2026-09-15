@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
  * A bad trace is a 204, not a 400: sendBeacon cannot act on the answer and we do not want a
  * console error on every page unload for a diagnostic.
  */
-export const POST = route({ body: VoiceTrace, limit: "beacon", maxBody: 200_000 }, async ({ uid, body: t }) => {
+export const POST = route({ body: VoiceTrace, limit: "beacon", maxBody: 48_000 }, async ({ uid, body: t }) => {
   const r = redis();
   const p = r.pipeline();
   // Store what was parsed, not the raw text: a valid envelope with junk inside still can't smuggle 200 KB of anything.

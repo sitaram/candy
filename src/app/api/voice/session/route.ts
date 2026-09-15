@@ -2,7 +2,7 @@ import { env } from "@/lib/env";
 import { createHash } from "node:crypto";
 import { HttpError, route } from "@/lib/api/guard";
 import { recordServer } from "@/lib/errors";
-import { charge } from "@/lib/api/spend";
+import { charge, refund } from "@/lib/api/spend";
 import { VoiceSessionBody } from "@/lib/api/schemas";
 import { resolveMode } from "@/lib/voice/mode";
 
@@ -17,13 +17,15 @@ const VOICE = env.REALTIME_VOICE;
  * and our function tools attached. The browser uses the returned `value` to open WebRTC directly
  * with OpenAI; the standard key never leaves this server. `voice` bucket: 10 sessions / 10 min.
  */
-export const POST = route({ body: VoiceSessionBody, limit: "voice", maxBody: 8_192 }, async ({ uid, body }) => {
+export const POST = route({ body: VoiceSessionBody, limit: "voice", maxBody: 8_192 }, async ({ uid, ip, body }) => {
   const t0 = Date.now();
   const key = env.OPENAI_API_KEY;
   if (!key) throw new HttpError(503, "voice not configured");
-  await charge("voice");
 
+  // Resolve before charging: a 404 for an unknown repo must not cost budget.
   const { instructions, tools, maxOutputTokens } = await resolveMode(uid, body);
+  const who = { uid, ip };
+  await charge("voice", who);
 
   const r = await fetch("https://api.openai.com/v1/realtime/client_secrets", {
     method: "POST",
@@ -60,6 +62,7 @@ export const POST = route({ body: VoiceSessionBody, limit: "voice", maxBody: 8_1
     const txt = await r.text();
     console.error("[voice] client_secrets", r.status, txt.slice(0, 300));
     recordServer("voice/session:client_secrets", new Error(`${r.status} ${txt.slice(0, 200)}`), { status: r.status });
+    await refund("voice", who);
     throw new HttpError(502, "could not start voice session");
   }
   const data = (await r.json()) as { value: string; expires_at: number };

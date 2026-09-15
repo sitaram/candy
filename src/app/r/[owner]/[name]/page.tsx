@@ -29,12 +29,16 @@ export default async function RepoPage({ params }: { params: Promise<{ owner: st
   // `fetch` bucket and the daily budget. Server components have no guard(), so it is spelled out here.
   const known = await isKnown(id);
   if (known === "absent") notFound();
-  if (known === "frontier") {
+  // Same gate as the API item route, for every uncarded id (frontier or corpus-without-card): both can cost
+  // a GitHub call and a Claude card.
+  const fast = await getItemDetail(id);
+  if (!fast?.card) {
     const h = await headers();
     const ip = (h.get("x-forwarded-for") ?? "").split(",")[0].trim() || "ip:unknown";
-    const rl = await rateLimit("fetch", await getUid(), ip);
+    const uid = await getUid();
+    const rl = await rateLimit("fetch", uid, ip);
     if (!rl.ok) notFound();
-    await charge("card").catch(() => notFound());
+    await charge("card", { uid, ip }).catch(() => notFound());
   }
   const ens = await ensureItem(id);
   if (!ens.exists) notFound();

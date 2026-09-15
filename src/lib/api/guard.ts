@@ -44,6 +44,8 @@ interface Spec<Q, B, P> {
 interface Ctx<Q, B, P> {
   req: Request;
   uid: string;
+  /** Client IP from the edge; "ip:unknown" if absent. For per-IP spend caps. */
+  ip: string;
   rid: string;
   query: Infer<Q>;
   body: Infer<B>;
@@ -93,7 +95,7 @@ export function route<Q extends ZodTypeAny | undefined = undefined, B extends Zo
         body = spec.body.parse(parsed);
       }
 
-      res = await handler({ req, uid: uid || "anon", rid, query: query as Infer<Q>, body: body as Infer<B>, params: params as Infer<P> });
+      res = await handler({ req, uid: uid || "anon", ip: ipOf(req), rid, query: query as Infer<Q>, body: body as Infer<B>, params: params as Infer<P> });
     } catch (e) {
       res = toResponse(e, rid, req);
     }

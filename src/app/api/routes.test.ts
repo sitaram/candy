@@ -85,12 +85,22 @@ describe("GET /api/search", () => {
 });
 
 describe("GET /api/health", () => {
-  it("is 200 with redis latency, corpus version, spend, queue and routes — and needs no session", async () => {
+  it("is 200 with redis latency and corpus version, needs no session, and does NOT publish spend/queue/routes", async () => {
     jar.header = undefined;
-    const j = await (await health.GET()).json();
+    const j = await (await health.GET(new Request("http://x/api/health"))).json();
     expect(j.ok).toBe(true);
     expect(j.redisMs).toBeGreaterThanOrEqual(0);
-    expect(j.spend).toMatchObject({ capUsd: expect.any(Number) });
-    expect(Array.isArray(j.routes)).toBe(true);
+    expect(j.spend).toBeUndefined();     // distance-to-503 is not for anonymous callers
+    expect(j.routes).toBeUndefined();
+  });
+  it("returns the dashboard only with the admin token", async () => {
+    process.env.CANDY_ADMIN_TOKEN = "t0k";
+    try {
+      const no = await (await health.GET(new Request("http://x/api/health", { headers: { "x-candy-admin": "wrong" } }))).json();
+      expect(no.spend).toBeUndefined();
+      const j = await (await health.GET(new Request("http://x/api/health", { headers: { "x-candy-admin": "t0k" } }))).json();
+      expect(j.spend).toMatchObject({ capUsd: expect.any(Number) });
+      expect(Array.isArray(j.routes)).toBe(true);
+    } finally { delete process.env.CANDY_ADMIN_TOKEN; }
   });
 });

@@ -93,13 +93,20 @@ export const VoiceToolBody = z.object({
 
 export const VoiceBriefQuery = z.object({ id: RepoId, why: Why });
 
+/**
+ * Voice session trace (src/lib/voice/trace.ts). The client caps itself at 400 entries and ~600 chars per
+ * detail; these bounds are that shape plus slack, so a valid trace always fits and a fabricated one cannot
+ * be large. Total body is capped at 48 KB by the route.
+ */
 export const VoiceTrace = z.object({
-  id: z.string().min(1).max(64),
-  reason: z.string().max(64).optional(),
+  id: z.string().regex(/^[a-z0-9_-]{1,64}$/i, "trace id"),
+  reason: z.string().max(160).optional(),
   mode: z.string().max(16).optional(),
   startedAt: z.number().optional(),
   endedAt: z.number().optional(),
-  entries: z.array(z.unknown()).max(5_000).optional(),
+  ua: z.string().max(300).optional(),
+  deltas: z.record(z.string().max(64), z.number().int().min(0)).optional(),
+  entries: z.array(z.object({ t: z.number(), k: z.string().max(120), d: z.unknown().optional() })).max(450).optional(),
 });
 
 /** Client error beacon. Everything bounded; the client is not trusted to be brief. */

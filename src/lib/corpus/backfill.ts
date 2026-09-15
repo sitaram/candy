@@ -85,10 +85,10 @@ export async function enqueueBackfill(id: string): Promise<boolean> {
 export async function queueDepth(): Promise<number> { return redis().llen(QUEUE); }
 
 /** Pop one job and run it. Called from /api/backfill by a client beacon or a cron. */
-export async function drainOne(): Promise<{ id: string; added: string[] } | null> {
+export async function drainOne(max = 4): Promise<{ id: string; added: string[] } | null> {
   const id = await redis().lpop(QUEUE);
   if (!id) return null;
-  return { id, ...(await backfillAlternatives(id)) };
+  return { id, ...(await backfillAlternatives(id, max)) };
 }
 
 export async function backfillAlternatives(id: string, max = 4): Promise<{ added: string[] }> {

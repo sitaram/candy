@@ -20,7 +20,7 @@ export const maxDuration = 30;
  * re-validated here with the same schemas as the typed routes. A tool failure is a 200 with an
  * `output` telling the model to say so: a 500 here would just make the voice go silent.
  */
-export const POST = route({ body: VoiceToolBody, limit: "llm", maxBody: 8_192 }, async ({ body }) => {
+export const POST = route({ body: VoiceToolBody, limit: "llm", maxBody: 8_192 }, async ({ uid, ip, body }) => {
   const t0 = Date.now();
   const { name, args } = body;
   console.info(`[voice/tool] ${name} ${JSON.stringify(args).slice(0, 120)}${body.current ? ` @${body.current}` : ""}`);
@@ -44,7 +44,7 @@ export const POST = route({ body: VoiceToolBody, limit: "llm", maxBody: 8_192 },
         const id = RepoId.safeParse(args.id ?? body.current);
         const question = Text(1_000).parse(String(args.question ?? ""));
         if (!id.success || !question) return say("Need a repo and a question.");
-        try { await charge("ask"); } catch (e) { if (e instanceof HttpError) return say("The daily budget for deep questions is used up; answer from the brief."); throw e; }
+        try { await charge("ask", { uid, ip }); } catch (e) { if (e instanceof HttpError) return say("The daily budget for deep questions is used up; answer from the brief."); throw e; }
         const a = await askRepo({ id: id.data, question, spoken: true });
         return say(a ? a.answer : `Not in the corpus: ${id.data}.`);
       }

@@ -16,13 +16,13 @@ if (!pref) {
     const uid = l.slice(3); const id = (await r.lindex(l, 0))!; const raw = await r.get(`vt:${uid}:${id}`); if (!raw) continue;
     const t = JSON.parse(raw) as T;
     const bad = t.entries.filter((e) => /throw|error|dropped|window\.|unhandled/.test(e.k)).length;
-    console.log(`${uid.slice(0, 8)}  ${new Date(t.startedAt).toISOString().slice(5, 19)}  ${t.mode.padEnd(6)} ${String(t.endedAt ? Math.round((t.endedAt - t.startedAt) / 1000) : "?").padStart(4)}s  ${(t.reason ?? "NO END").slice(0, 40).padEnd(40)} ${bad ? `⚠ ${bad} errors` : ""}  ${t.ua.includes("iPhone") ? "iPhone" : t.ua.includes("Android") ? "Android" : "desktop"}`);
+    console.log(`${uid.slice(0, 8)}  ${new Date(t.startedAt).toISOString().slice(5, 19)}  ${t.mode.padEnd(6)} ${String(t.endedAt ? Math.round((t.endedAt - t.startedAt) / 1000) : "?").padStart(4)}s  ${(t.reason ?? "NO END").slice(0, 40).padEnd(40)} ${bad ? `⚠ ${bad} errors` : ""}  ${(t.ua ?? "").includes("iPhone") ? "iPhone" : (t.ua ?? "").includes("Android") ? "Android" : t.ua ? "desktop" : "?"}`);
   }
 } else {
   const l = lists.find((x) => x.slice(3).startsWith(pref)); if (!l) { console.log("no such user"); process.exit(1); }
   const id = await r.lindex(l, Number(nth ?? 0)); const raw = id && await r.get(`${l}:${id}`); if (!raw) { console.log("no trace"); process.exit(1); }
   const t = JSON.parse(raw) as T;
-  console.log(`${t.mode} · ${new Date(t.startedAt).toISOString()} · ${t.endedAt ? Math.round((t.endedAt - t.startedAt) / 1000) + "s" : "no end"} · ${t.reason ?? "NO END REASON"}\n${t.ua}\ndeltas: ${Object.entries(t.deltas).map(([k, n]) => `${k}×${n}`).join("  ")}\n`);
+  console.log(`${t.mode} · ${new Date(t.startedAt).toISOString()} · ${t.endedAt ? Math.round((t.endedAt - t.startedAt) / 1000) + "s" : "no end"} · ${t.reason ?? "NO END REASON"}\n${t.ua}\ndeltas: ${Object.entries(t.deltas ?? {}).map(([k, n]) => `${k}×${n}`).join("  ") || "n/a"}\n`);
   for (const e of t.entries) console.log(`${fmt(e.t)}  ${e.k}${e.d !== undefined ? "  " + JSON.stringify(e.d) : ""}`);
 }
 await closeRedis();

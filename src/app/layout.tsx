@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 import "./globals.css";
+import { CrashLog } from "./CrashLog";
 
 export const metadata: Metadata = {
   title: "candy",
@@ -21,7 +22,7 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body><CrashLog />{children}</body>
     </html>
   );
 }

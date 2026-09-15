@@ -39,7 +39,7 @@ GitHub knows *what* a repo is. Nobody has built the layer that knows **why it ma
 
 **Nothing is transcribed to the screen.** While a session runs the only visual change is the button: an accent disc with a stop glyph and a ring that breathes with whoever is louder. The card stays the visual, the voice stays the audio. A running transcript would turn it into a chat, and the point is that you are not reading.
 
-**Cost is bounded.** Sessions end after 30 s of silence (8 s in search). Audio is $32 / $64 per M tokens in / out, so a 3-minute conversation is ~$0.20; the 3k-token context is cached at $0.40 / M on reconnect. `gpt-realtime-2.1-mini` is a drop-in if quality allows.
+**Cost is bounded.** Sessions end after 3 min with neither side speaking (8 s in search). Idle time is cheap — the meter runs on audio tokens, not wall clock — so a long timeout costs little and a short one ends conversations mid-thought. Audio is $32 / $64 per M tokens in / out, so a 3-minute conversation is ~$0.20; the 3k-token context is cached at $0.40 / M on reconnect. `gpt-realtime-2.1-mini` is a drop-in if quality allows.
 - **The screen follows the voice.** When the model shifts to talking about another repo — an alternative, a related project, a search result — it calls `show_repo`, which puts that card on the rail right after the current one and pages to it. What you hear and what you see stay the same thing; swipe down to return.
 
 ## Search

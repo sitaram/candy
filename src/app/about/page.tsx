@@ -13,7 +13,7 @@ export default async function About() {
     <main className="about">
       <nav className="about-nav">
         <a href="/">← feed</a>
-        <span>read more</span>
+        <span>how it works</span>
       </nav>
       <article className="prose">
         <ReactMarkdown remarkPlugins={[remarkGfm]}>{md}</ReactMarkdown>

@@ -29,35 +29,83 @@ export interface Related { groups: { label: string; items: Item[] }[]; labelled:
 
 const RK = (id: string) => `rel:${id}`;
 
-/** Candidate neighbours from every signal, scored, best first. */
+/** Tags that co-occur with everything and say nothing about *what* a repo is. Never count them as shared. */
+const NOISE_TAGS = new Set([
+  "openai", "chatgpt", "anthropic", "claude", "cursor", "vs-code", "vscode", "local-first", "open-source", "self-hosted",
+  "ai", "llm", "ai-automation", "productivity", "developer-tools", "dev-tools", "cli", "terminal", "python", "typescript",
+  "javascript", "rust", "go", "api", "sdk", "framework", "library", "tool", "tools", "mcp", "agents", "ai-agents",
+  "openai-api", "nodejs", "node", "nextjs", "react", "web", "github", "docker", "linux", "macos", "windows", "webui", "gui",
+]);
+
+/** Tag IDF over the corpus: a tag shared by 5 repos is worth a lot more than one shared by 300. Cached per process. */
+let idfCache: { at: number; idf: Map<string, number> } | null = null;
+function tagIdf(all: Item[]): Map<string, number> {
+  if (idfCache && Date.now() - idfCache.at < 300_000) return idfCache.idf;
+  const df = new Map<string, number>();
+  let n = 0;
+  for (const it of all) { if (!it.card) continue; n++; for (const t of new Set([...it.card.tags, ...it.card.ecosystem].map((x) => x.toLowerCase()))) df.set(t, (df.get(t) ?? 0) + 1); }
+  const idf = new Map<string, number>();
+  for (const [t, d] of df) idf.set(t, Math.log((n + 1) / (d + 1)));
+  idfCache = { at: Date.now(), idf };
+  return idf;
+}
+
+/**
+ * Candidate neighbours from every signal, scored, best first.
+ *
+ * Scoring principles (learned the hard way — the first version surfaced a 4★ toy above the 30k★ peer):
+ *  - A named alternative is the strongest signal we have; it dominates.
+ *  - Shared tags are weighted by IDF and noise tags ("openai", "cursor", "local-first") count for nothing.
+ *  - Embedding cosine is a *gate and a tiebreaker*, not the score: below .52 a candidate needs another
+ *    reason to be here at all; above it, it adds modestly.
+ *  - Stars matter — log-scaled, so a 30k★ peer beats a 30★ one but 100k doesn't crush 10k. A neighbour
+ *    nobody uses is rarely the one you want to hear about.
+ *  - Same category alone is worth almost nothing; half the corpus is ai-agents.
+ */
 export async function neighbors(id: string, limit = 24): Promise<Neighbor[]> {
   const me = await getItem(id);
   if (!me?.card) return [];
   const r = redis();
   const [all, altIds, links] = await Promise.all([allItems(), r.smembers(CK.alt(me.repo.id)), getEdges(me.repo.id, "links")]);
-  const alt = new Set(altIds), out = new Set(links);
-  const myTags = new Set([...me.card.tags, ...me.card.ecosystem].map((t) => t.toLowerCase()));
+  const idf = tagIdf(all);
   const carded = all.filter((it) => it.card && it.repo.id !== me.repo.id);
-  // Who links to me? One scan over edges is too many round trips; use the reverse-link set if present, else skip.
+  // Alternatives by id, and by bare name when the card only names them ("aider", "cline").
+  const byName = new Map<string, string>();
+  for (const it of carded) { const nm = it.repo.name.toLowerCase(); if (!byName.has(nm) || it.repo.stars > (all.find((x) => x.repo.id === byName.get(nm))?.repo.stars ?? 0)) byName.set(nm, it.repo.id); }
+  const alt = new Set(altIds.map((x) => x.toLowerCase()));
+  for (const a of me.card.alternatives) { const al = a.toLowerCase(); if (al.includes("/")) alt.add(al); else { const hit = byName.get(al) ?? byName.get(al.replace(/\s+/g, "-")); if (hit) alt.add(hit); } }
+  const out = new Set(links);
   const inbound = new Set(await r.smembers(`edges:${me.repo.id}:linked-by`).catch(() => [] as string[]));
+  const myTags = new Set([...me.card.tags, ...me.card.ecosystem].map((t) => t.toLowerCase()).filter((t) => !NOISE_TAGS.has(t)));
   const emb = await getEmbeddings([me.repo.id, ...carded.map((it) => it.repo.id)]);
   const mine = emb.get(me.repo.id);
+  const meNamesMe = (it: Item) => it.card!.alternatives.some((a) => { const al = a.toLowerCase(); return al === me.repo.id || al === me.repo.name.toLowerCase(); });
 
   const res: Neighbor[] = [];
   for (const it of carded) {
     const c = it.card!;
     const s: Neighbor["signals"] = { shared: [] };
     let score = 0;
-    if (alt.has(it.repo.id)) { s.alt = true; score += 5; }
-    if (out.has(it.repo.id)) { s.linksTo = true; score += 2; }
-    if (inbound.has(it.repo.id)) { s.linkedFrom = true; score += 2; }
+    const isAlt = alt.has(it.repo.id) || meNamesMe(it);
+    if (isAlt) { s.alt = true; score += 8; }
+    if (out.has(it.repo.id)) { s.linksTo = true; score += 2.5; }
+    if (inbound.has(it.repo.id)) { s.linkedFrom = true; score += 2.5; }
     if (it.repo.owner.toLowerCase() === me.repo.owner.toLowerCase()) { s.sameOwner = true; score += 1.5; }
-    if (c.category === me.card.category) { s.sameCategory = true; score += 1; }
+    if (c.category === me.card.category) { s.sameCategory = true; score += 0.3; }
     const shared = Array.from(new Set([...c.tags, ...c.ecosystem].map((t) => t.toLowerCase()).filter((t) => myTags.has(t))));
-    s.shared = shared; score += Math.min(3, shared.length);
+    s.shared = shared;
+    score += Math.min(4, shared.reduce((a, t) => a + (idf.get(t) ?? 1), 0) * 0.8);
     const v = emb.get(it.repo.id);
-    if (mine && v) { const cos = dot(mine, v); s.cos = cos; if (cos > 0.45) score += (cos - 0.45) * 12; }   // .55 → +1.2, .70 → +3
-    if (score >= 1.5 || (s.cos ?? 0) > 0.5) res.push({ item: it, score, signals: s });
+    const cos = mine && v ? dot(mine, v) : 0;
+    if (cos) s.cos = cos;
+    if (cos > 0.50) score += (cos - 0.50) * 12;                          // .60 → +1.2, .70 → +2.4
+    else if (cos && cos < 0.42) score -= (0.42 - cos) * 15;              // .30 → −1.8: text says "unrelated"; tags alone can't rescue it
+    // Popularity: log10 stars, centred so 1k★ is neutral. 30k★ → +1.5, 30★ → −1.5.
+    score += (Math.log10(Math.max(1, it.repo.stars)) - 3) * 1.0;
+    // Admission: a hard edge, OR meaning + a specific shared tag, OR very close meaning alone.
+    const hard = isAlt || s.linksTo || s.linkedFrom || s.sameOwner;
+    const hasReason = hard || (cos > 0.50 && shared.length >= 1) || cos > 0.58;
+    if (hasReason && score >= 1.0) res.push({ item: it, score, signals: s });
   }
   return res.sort((a, b) => b.score - a.score).slice(0, limit);
 }
@@ -75,7 +123,7 @@ export function fallbackGroups(me: Item, ns: Neighbor[]): RelGroup[] {
   };
   const name = me.repo.name;
   const myLang = me.repo.language;
-  const strong = (n: Neighbor) => (n.signals.cos ?? 0) > 0.58;
+  const strong = (n: Neighbor) => (n.signals.cos ?? 0) > 0.60;
   // 1. Relationships we actually know.
   claim(`Does the same job as ${name}`, (n) => !!n.signals.alt);
   claim(`Built on ${name}`, (n) => !!n.signals.linkedFrom);
@@ -84,7 +132,7 @@ export function fallbackGroups(me: Item, ns: Neighbor[]): RelGroup[] {
   // 2. Closest by meaning, split by whether they share the stack — the difference is the interesting part.
   claim(`Same idea, not ${myLang}`, (n) => strong(n) && !!myLang && !!n.item.repo.language && n.item.repo.language !== myLang, 2, 5);
   claim(`Closest in spirit`, strong, 2, 5);
-  if (!groups.length) claim(`Closest in spirit`, (n) => (n.signals.cos ?? 0) > 0.5, 2, 5);
+  if (!groups.length) claim(`Closest in spirit`, (n) => (n.signals.cos ?? 0) > 0.52, 2, 5);
   // 3. The most common shared tag among what's left, phrased as what they have in common.
   const usedTag = new Set<string>();
   for (let k = 0; k < 2; k++) {

@@ -18,7 +18,8 @@
     "niche": "node --env-file-if-exists=.env.local --import tsx scripts/niche.mts",
     "compact": "node --env-file-if-exists=.env.local --import tsx scripts/compact.mts",
     "embed": "node --env-file-if-exists=.env.local --import tsx scripts/embed.mts",
-    "relate": "node --env-file-if-exists=.env.local --import tsx scripts/relate.mts"
+    "relate": "node --env-file-if-exists=.env.local --import tsx scripts/relate.mts",
+    "alts": "node --env-file-if-exists=.env.local --import tsx scripts/alts.mts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.124.0",

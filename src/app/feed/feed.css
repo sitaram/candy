@@ -430,6 +430,8 @@
 .s-bar.listening { border-color: color-mix(in srgb, var(--accent) 55%, transparent); }
 .s-ico { color: var(--ink-3); display: inline-flex; flex: 0 0 auto; }
 .s-input { flex: 1; min-width: 0; background: none; border: none; outline: none; color: var(--ink); font: inherit; font-size: 17px; letter-spacing: -.01em; padding: 10px 0; }
+/* The pill (.s-bar:focus-within) is the focus indicator; the generic .search :focus-visible ring would draw a second box inside it. */
+.search .s-input:focus-visible { outline: none; }
 .s-input::placeholder { color: var(--ink-4); }
 .s-clear { background: none; border: none; color: var(--ink-3); padding: 6px; display: inline-flex; cursor: pointer; border-radius: 8px; }
 .s-clear:hover { color: var(--ink); background: var(--fill); }

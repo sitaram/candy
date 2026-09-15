@@ -1,8 +1,9 @@
 /**
  * Tail on demand. The head of the corpus is crawled up front; the tail fills in behind the first
- * person who looks. Opening a deep dive enqueues the alternatives its card names but the corpus
- * lacks; they are fetched, carded and embedded *after the response is sent*, so the page is never
- * slower for it. The next reader sees them. Each repo is backfilled once (bf:{id} flag).
+ * person who looks. Opening a deep dive *enqueues* (one RPUSH) the repo; the client, once it has the
+ * JSON, fires a keepalive beacon at /api/backfill which pops one job and does the slow part: fetch,
+ * card, embed, invalidate labels. The detail response never waits — not even for the socket to
+ * close, which is what `after()` turned out to cost in dev (6–9 s). Each repo runs once a week.
  *
  * Cost: one Claude card per new repo (~$0.007); bounded by the number of distinct deep dives.
  */
@@ -58,9 +59,25 @@ export async function missingAlternatives(id: string): Promise<{ missing: string
  * Run after the response. Resolves names, fetches + cards + embeds up to `max` repos, then clears
  * the repo's related-groups label so `relate` redoes it with the fuller neighbour set.
  */
+const QUEUE = "bf:queue";
+
+/** O(1): remember that this repo wants backfilling. Idempotent, once a week per repo. */
+export async function enqueueBackfill(id: string): Promise<boolean> {
+  const r = redis();
+  if (!(await r.set(BF(id), "1", "EX", 7 * 86_400, "NX"))) return false;
+  await r.rpush(QUEUE, id);
+  return true;
+}
+
+/** Pop one job and run it. Called from /api/backfill by a client beacon or a cron. */
+export async function drainOne(): Promise<{ id: string; added: string[] } | null> {
+  const id = await redis().lpop(QUEUE);
+  if (!id) return null;
+  return { id, ...(await backfillAlternatives(id)) };
+}
+
 export async function backfillAlternatives(id: string, max = 4): Promise<{ added: string[] }> {
   const r = redis();
-  if (!(await r.set(BF(id), "1", "EX", 7 * 86_400, "NX"))) return { added: [] };   // once a week per repo, at most
   const { missing, unresolved } = await missingAlternatives(id);
   const targets = [...missing];
   for (const n of unresolved) { if (targets.length >= max) break; const rid = await resolveName(n); if (rid) targets.push(rid); }

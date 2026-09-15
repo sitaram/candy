@@ -1,8 +1,7 @@
 import { getItemDetail, similar } from "@/lib/corpus/api";
 import { getRelated } from "@/lib/corpus/related";
 import { ensureItem } from "@/lib/corpus/ensure";
-import { backfillAlternatives, missingAlternatives } from "@/lib/corpus/backfill";
-import { after } from "next/server";
+import { enqueueBackfill, missingAlternatives } from "@/lib/corpus/backfill";
 
 export const dynamic = "force-dynamic";
 
@@ -14,9 +13,9 @@ export async function GET(_req: Request, ctx: { params: Promise<{ owner: string;
   const id = ens.id;
   const [detail, sim, rel, miss] = await Promise.all([getItemDetail(id), similar(id, 10), getRelated(id), missingAlternatives(id)]);
   if (!detail) return Response.json({ error: "not found" }, { status: 404 });
-  // Tail on demand: fetch + card the alternatives this repo names but the corpus lacks, after the response is sent.
+  // Tail on demand: queue it (O(1)); the client beacons /api/backfill to do the slow part off this request.
   const pending = miss.missing.length + miss.unresolved.length;
-  if (pending) after(() => backfillAlternatives(id).catch((e) => console.warn("[backfill]", e)));
+  if (pending) await enqueueBackfill(id).catch(() => {});
   return Response.json({
     ...detail,
     similar: sim.map((s) => ({ id: s.item.repo.id, score: s.score, why: s.why, pitch: s.item.card?.pitch })),

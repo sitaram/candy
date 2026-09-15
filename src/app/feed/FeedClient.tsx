@@ -247,7 +247,13 @@ export function FeedClient() {
 
   // Splash renders immediately; the feed loads behind it. A start gesture before it lands is honored on arrival.
   const wantStart = useRef(false);
-  useEffect(() => { if (wantStart.current && intro && items.length) { wantStart.current = false; go(0); } }, [items.length, intro]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Deferred: go() uses flushSync, which must not run inside an effect while React is still committing.
+  useEffect(() => {
+    if (!(wantStart.current && intro && items.length)) return;
+    wantStart.current = false;
+    const t = setTimeout(() => go(0), 0);
+    return () => clearTimeout(t);
+  }, [items.length, intro]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // First content card: breathe once right after it lands, so the gesture is seen before it is needed.
   const breathed = useRef(false);

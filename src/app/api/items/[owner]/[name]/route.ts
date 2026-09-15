@@ -1,31 +1,31 @@
-import { getItemDetail, similar } from "@/lib/corpus/api";
-import { getRelated } from "@/lib/corpus/related";
+import { HttpError, route } from "@/lib/api/guard";
+import { rateLimit } from "@/lib/api/ratelimit";
+import { ItemParams, RepoId } from "@/lib/api/schemas";
+import { getItemDetail } from "@/lib/corpus/api";
 import { ensureItem } from "@/lib/corpus/ensure";
-import { enqueueBackfill, missingAlternatives } from "@/lib/corpus/backfill";
+import { isKnown } from "@/lib/corpus/known";
 
 export const dynamic = "force-dynamic";
 
-/** GET /api/items/:owner/:name  -> full detail + similar */
-export async function GET(_req: Request, ctx: { params: Promise<{ owner: string; name: string }> }) {
-  const { owner, name } = await ctx.params;
-  const ens = await ensureItem(`${owner}/${name}`);
-  if (!ens.exists) return Response.json({ error: "not found" }, { status: 404 });
-  const id = ens.id;
-  const [detail, sim, rel, miss] = await Promise.all([getItemDetail(id), similar(id, 10), getRelated(id), missingAlternatives(id)]);
-  if (!detail) return Response.json({ error: "not found" }, { status: 404 });
-  // Tail on demand: queue it (O(1)); the client beacons /api/backfill to do the slow part off this request.
-  const pending = miss.missing.length + miss.unresolved.length;
-  if (pending) await enqueueBackfill(id).catch(() => {});
-  return Response.json({
-    ...detail,
-    similar: sim.map((s) => ({ id: s.item.repo.id, score: s.score, why: s.why, pitch: s.item.card?.pitch })),
-    related: {
-      labelled: rel.labelled,
-      pending,
-      groups: rel.groups.map((g) => ({
-        label: g.label,
-        items: g.items.map((it) => ({ id: it.repo.id, name: it.repo.name, owner: it.repo.owner, pitch: it.card?.pitch ?? it.repo.description ?? "", stars: it.repo.stars, lang: it.repo.language, category: it.card?.category ?? "" })),
-      })),
-    },
-  });
-}
+/**
+ * GET /api/items/:owner/:name → detail (description, releases, why). The slow half — neighbours,
+ * labels, backfill — is /related, so this paints in ~150 ms.
+ *
+ * Fetching an unknown repo costs a GitHub call and a Claude card. We only do that for ids the corpus
+ * has *heard of* — frontier, README link, named alternative — and under the tight `fetch` bucket.
+ * Anything else is a plain 404, so walking /api/items/* with a wordlist cannot spend money.
+ */
+export const GET = route({ params: ItemParams, limit: "read" }, async ({ uid, params }) => {
+  const id = RepoId.parse(`${params.owner}/${params.name}`);
+  const known = await isKnown(id);
+  if (known === "absent") throw new HttpError(404, "not found");
+  if (known === "frontier") {
+    const rl = await rateLimit("fetch", uid);
+    if (!rl.ok) throw new HttpError(429, "too many new repos; try again shortly", { "Retry-After": String(rl.retryAfter) });
+  }
+  const ens = await ensureItem(id);
+  if (!ens.exists) throw new HttpError(404, "not found");
+  const detail = await getItemDetail(ens.id);
+  if (!detail) throw new HttpError(404, "not found");
+  return Response.json(detail);
+});

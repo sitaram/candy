@@ -324,6 +324,12 @@
 /* related: labelled groups, each a horizontal rail of small tinted cards. The label is the point. */
 .rel-group { margin: 0 0 18px; }
 .rel-pending { font-size: 13px; color: var(--ink-4); margin: -4px 0 14px; }
+/* Skeleton while /related streams in: same geometry as the real rail so nothing jumps when it lands. */
+.rel-skel { background: linear-gradient(90deg, var(--line) 0%, color-mix(in oklab, var(--line), #fff 6%) 50%, var(--line) 100%); background-size: 200% 100%; animation: skel 1.4s ease-in-out infinite; border-color: transparent; }
+.rel-label.rel-skel { width: 44%; height: 15px; border-radius: 6px; margin-bottom: 10px; }
+.rel-card.rel-skel { height: 118px; cursor: default; }
+@keyframes skel { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+@media (prefers-reduced-motion: reduce) { .rel-skel { animation: none; } }
 .rel-label { font-size: 15px; font-weight: 650; color: var(--ink); margin: 0 0 8px; letter-spacing: -.01em; }
 /* The rail bleeds to the right edge only: the left edge stays on the text column. Bleeding both sides
    with negative margins loses the start padding in iOS Safari once the row scrolls. */

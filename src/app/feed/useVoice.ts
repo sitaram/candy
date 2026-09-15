@@ -52,6 +52,7 @@ export function useVoice(handlers: VoiceHandlers) {
   const silenceT = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastActivity = useRef(0);
   const startedAt = useRef(0);
+  const speaking = useRef(false);   // model audio is playing on the device right now
   const h = useRef(handlers);
   h.current = handlers;
 
@@ -67,7 +68,7 @@ export function useVoice(handlers: VoiceHandlers) {
     void ctx.current?.close();
     if (audioEl.current) { audioEl.current.srcObject = null; audioEl.current.remove(); }
     pc.current = null; dc.current = null; mic.current = null; ctx.current = null; audioEl.current = null;
-    setLevel(0); setMicLevel(0);
+    setLevel(0); setMicLevel(0); speaking.current = false;
     setState("idle");
     if (reason && !opts?.quiet) setError(reason);
   }, []);
@@ -75,7 +76,12 @@ export function useVoice(handlers: VoiceHandlers) {
   const bumpSilence = useCallback(() => {
     lastActivity.current = Date.now();
     if (silenceT.current) clearTimeout(silenceT.current);
-    silenceT.current = setTimeout(() => stop("silence", { quiet: true }), h.current.silenceMs ?? SILENCE_MS);
+    const arm = () => {
+      // If audio is still playing when the timer lands, the clock hasn't started yet — try again after it stops.
+      if (speaking.current) { silenceT.current = setTimeout(arm, 1_000); return; }
+      stop("silence", { quiet: true });
+    };
+    silenceT.current = setTimeout(arm, h.current.silenceMs ?? SILENCE_MS);
   }, [stop]);
 
   const send = useCallback((ev: RTEvent) => {
@@ -107,7 +113,9 @@ export function useVoice(handlers: VoiceHandlers) {
     send({ type: "response.create" });
   }, [send]);
 
+  const seenTypes = useRef(new Set<string>());
   const onEvent = useCallback((ev: RTEvent) => {
+    if (!seenTypes.current.has(ev.type) && !ev.type.endsWith(".delta")) { seenTypes.current.add(ev.type); console.info(`[voice] ev ${ev.type}`); }
     switch (ev.type) {
       case "session.created":
       case "session.updated":
@@ -120,6 +128,11 @@ export function useVoice(handlers: VoiceHandlers) {
         setState("thinking"); break;
       case "response.output_audio.delta":
         setState("speaking"); bumpSilence(); break;
+      case "output_audio_buffer.started":            // WebRTC only: audio has begun playing on the device
+        setState("speaking"); speaking.current = true; bumpSilence(); break;
+      case "output_audio_buffer.stopped":            // …and finished playing. THIS is when the model is done talking.
+      case "output_audio_buffer.cleared":
+        speaking.current = false; setState("listening"); bumpSilence(); break;
       case "response.output_audio_transcript.delta":
         setTranscript((t) => (t.length > 600 ? "" : t) + String(ev.delta ?? "")); break;
       case "response.output_audio_transcript.done":
@@ -127,7 +140,8 @@ export function useVoice(handlers: VoiceHandlers) {
       case "conversation.item.input_audio_transcription.completed":
         h.current.onUserTranscript?.(String(ev.transcript ?? "").trim()); break;
       case "response.done": {
-        setState("listening"); bumpSilence();
+        if (!speaking.current) setState("listening");
+        bumpSilence();
         const resp = ev.response as { output?: { type: string; name?: string; arguments?: string; call_id?: string }[] } | undefined;
         for (const item of resp?.output ?? []) {
           if (item.type === "function_call" && item.name && item.call_id) {

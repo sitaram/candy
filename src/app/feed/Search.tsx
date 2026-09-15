@@ -85,7 +85,7 @@ export function Search({ open, onClose, onPick, autoVoice }: { open: boolean; on
 
   /* ---- voice: same transport, search mode ---- */
   const voice = useVoice({
-    silenceMs: 8_000,
+    silenceMs: 20_000,   // measured from the end of the model's *playback*; 8 s was ending sessions while people were still deciding what to say
     onUserTranscript: (t) => { if (t) setHeard(t); },
     onSearch: async (query) => {
       setHeard("");

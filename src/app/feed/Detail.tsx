@@ -2,7 +2,7 @@
 
 import { api, report, ApiError } from "./api";
 import { AskBox } from "./AskBox";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ItemDetail } from "@/lib/corpus/api";
 
 type Sim = { id: string; score: number; why: string[]; pitch?: string };
@@ -53,11 +53,20 @@ export function Detail({ id, onClose, onOpen }: { id: string; onClose: () => voi
   const c = d?.card;
   const r = d?.repo;
 
+  // Focus moves into the dialog on open and back to the deck on close; Escape closes (also handled by the feed).
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const opener = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    opener.current = document.activeElement as HTMLElement | null;
+    closeRef.current?.focus();
+    return () => { opener.current?.focus?.(); };
+  }, []);
+
   return (
-    <div className="detail">
+    <div className="detail" role="dialog" aria-modal="true" aria-labelledby="detail-title">
       <div className="detail-bar">
-        <button className="icon-btn" onClick={onClose} aria-label="Close">←</button>
-        <span className="detail-id">{id}</span>
+        <button ref={closeRef} className="icon-btn" onClick={onClose} aria-label="Close">←</button>
+        <h2 className="detail-id" id="detail-title">{id}</h2>
         <a className="icon-btn" href={`https://github.com/${id}`} target="_blank" rel="noreferrer" aria-label="Open on GitHub">↗</a>
       </div>
       <div className="detail-body">
@@ -101,7 +110,7 @@ export function Detail({ id, onClose, onOpen }: { id: string; onClose: () => voi
             <AskBox id={id} />
 
             {!rel ? (
-              <section className="rel rel-loading" aria-busy="true">
+              <section className="rel rel-loading" aria-busy="true" aria-label="Loading related projects">
                 <h3>Related</h3>
                 <div className="rel-label rel-skel" />
                 <div className="rel-row">{[0, 1, 2].map((i) => <div key={i} className="rel-card rel-skel" />)}</div>

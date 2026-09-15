@@ -84,12 +84,13 @@ function Card({
 
   const hue = hueOf(f);
   return (
-    <article className={`fcard ${className ?? ""}`} style={{ ...style, "--hue": hue, "--hue2": (hue + 40) % 360 } as CSSProperties}>
+    <article className={`fcard ${className ?? ""}`} style={{ ...style, "--hue": hue, "--hue2": (hue + 40) % 360 } as CSSProperties}
+      aria-hidden={className?.includes("rail") || undefined} aria-label={`${owner} ${name}`}>
       <header className="c-head">
         <span className="c-cat">{c ? CAT_LABEL[c.category] ?? c.category : ""}{r.language && <span className="c-lang"> · {r.language}</span>}</span>
         <span className="c-spacer" />
-        {reaction && <span className={`c-reacted ${reaction}`}>{reaction === "like" ? "👍" : "👎"}</span>}
-        <button className={`icon-btn bm${saved ? " on" : ""}`} onPointerDown={stop} onClick={(e) => { stop(e); onSave?.(); }} aria-label={saved ? "Remove bookmark" : "Bookmark"} title="Bookmark (b)">
+        {reaction && <span className={`c-reacted ${reaction}`} role="img" aria-label={reaction === "like" ? "You liked this" : "You passed"}>{reaction === "like" ? "👍" : "👎"}</span>}
+        <button className={`icon-btn bm${saved ? " on" : ""}`} onPointerDown={stop} onClick={(e) => { stop(e); onSave?.(); }} aria-label="Bookmark" aria-pressed={!!saved} title="Bookmark (b)">
           {I.bookmark(!!saved)}
         </button>
       </header>
@@ -100,6 +101,8 @@ function Card({
       </h1>
 
       <p className="c-pitch">{c?.pitch ?? r.description}</p>
+      {/* Screen readers get the four actions as text; sighted users learn them from the gesture hint. */}
+      <p className="sr-only">Swipe right or press right arrow to like. Left to pass. Up for the next project. Enter or tap to read more.</p>
 
       {reasons.length > 0 && (
         <div className="c-why">
@@ -127,15 +130,15 @@ function Card({
             {voice && voice.state !== "idle" ? <span className="stop" aria-hidden /> : I.voice}
           </button>
           {voice && voice.state !== "idle" && (
-            <button className={`act sub mute${voice.muted ? " off" : ""}`} onClick={(e) => { e.stopPropagation(); voice.toggleMute?.(); }} aria-label={voice.muted ? "Unmute" : "Mute"} title={voice.muted ? "Unmute" : "Mute"}>
+            <button className={`act sub mute${voice.muted ? " off" : ""}`} onClick={(e) => { e.stopPropagation(); voice.toggleMute?.(); }} aria-label="Mute microphone" aria-pressed={!!voice.muted} title={voice.muted ? "Unmute" : "Mute"}>
               {voice.muted ? I.micOff : I.mic}
             </button>
           )}
         </div>
         </VoiceBoundary>
       </div>
-      <div className="stamp like">YES</div>
-      <div className="stamp skip">NOPE</div>
+      <div className="stamp like" aria-hidden>YES</div>
+      <div className="stamp skip" aria-hidden>NOPE</div>
     </article>
   );
 }
@@ -558,7 +561,7 @@ export function FeedClient() {
 
   return (
     <div className={`feed${open ? " has-detail" : ""}`} style={{ "--hue": hue, "--hue2": (hue + 40) % 360 } as CSSProperties}>
-      <header className="feed-head">
+      <header className="feed-head" role="banner">
         <a href="/" className="brand">candy</a>
         <span className="feed-since">
           {since && since.lastVisit > 0 && (since.newInYourAreas > 0 || since.releasesOnSaved.length > 0 || since.newInCorpus > 0) ? (
@@ -587,12 +590,14 @@ export function FeedClient() {
           )}
           {!loading && !intro && !cur && <div className="feed-empty">You’ve seen everything ranked for you today.<br /><a href="/browse">Browse the corpus</a> or come back tomorrow.</div>}
           {(cur || intro) && (
-            <div className="stack" ref={stackRef}>
+            <div className="stack" ref={stackRef} role="region" aria-label="Project deck" aria-roledescription="swipeable deck" tabIndex={0}>
+              <div className="sr-only" aria-live="polite" aria-atomic="true">{cur ? `${idx + 1} of ${items.length}: ${cur.id}. ${cur.item.card?.pitch ?? ""}` : ""}</div>
               {idx === 0 && <Splash style={prevStyle} onStart={() => {}} />}
               {prev && <Card key={prev.id} f={prev} style={prevStyle} className="rail" saved={saved.has(prev.id)} reaction={reacted.current.get(prev.id)} />}
               {next && <Card key={next.id} f={next} style={nextStyle} className="rail" saved={saved.has(next.id)} reaction={reacted.current.get(next.id)} />}
               {next && !ghost && !intro && (
-                <div className="peek-strip" style={{ opacity: peekFade, "--peekhue": hueOf(next) } as CSSProperties} role="button" aria-label={`Next: ${next.id}`}
+                <div className="peek-strip" style={{ opacity: peekFade, "--peekhue": hueOf(next) } as CSSProperties} role="button" tabIndex={0} aria-label={`Next: ${next.id}`}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(idx + 1); } }}
                   onPointerDown={(e) => {
                     // A tap pages forward; a drag hands off to the card so "swipe up from the peek" still works.
                     peekDown.current = { x: e.clientX, y: e.clientY };
@@ -628,15 +633,15 @@ export function FeedClient() {
               )}
             </div>
           )}
-          {voice.error && <div className="toast err">{voice.error}<button onClick={() => voice.stop()}>ok</button></div>}
+          {voice.error && <div className="toast err" role="alert">{voice.error}<button onClick={() => voice.stop()}>ok</button></div>}
           <VoiceLog />
           {undo && (
-            <div className="toast">
+            <div className="toast" role="status">
               {undo.kind === "like" ? "Marked interesting" : "Skipped"} <b>{undo.item.id.split("/")[1]}</b>
               <button onClick={doUndo}>undo</button>
             </div>
           )}
-          <div className="keyhints">← pass · → like · ↑ ↓ browse · enter deep dive · v voice · / search · b bookmark · z undo</div>
+          <div className="keyhints" aria-label="Keyboard shortcuts">← pass · → like · ↑ ↓ browse · enter deep dive · v voice · / search · b bookmark · z undo</div>
         </div>
 
         <Search open={searchOpen} autoVoice={searchVoice} onClose={() => setSearchOpen(false)} onPick={pickResult} />

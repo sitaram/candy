@@ -163,21 +163,27 @@ function Splash({ style, onStart }: { style?: CSSProperties; onStart: () => void
   const stop = (e: React.SyntheticEvent) => e.stopPropagation();
   return (
     <section className="fcard splash" style={style}>
-      <div className="sp-mid">
+      <div className="sp-top">
         <div className="sp-brand">candy</div>
         <div className="sp-line">Open source worth your time.</div>
-        <p className="sp-how">
-          Candy watches GitHub, Hacker News, newsletters, and the awesome lists, and picks out the projects that are rising, launching, or becoming the standard — one card at a time. <b>TikTok-style cards, Tinder-style swipes</b>, and every card says why it’s here.
-        </p>
+      </div>
+
+      <ul className="sp-claims">
+        <li><b>Discover.</b> New and rising projects from GitHub, Hacker News, newsletters, and the awesome lists.</li>
+        <li><b>Ask.</b> Building something? Search or just say it — find the repos that fit.</li>
+        <li><b>Decide.</b> Swipe like Tinder, browse like TikTok. It learns what you like.</li>
+      </ul>
+
+      <div className="sp-bottom">
         <div className="sp-grid">
           <div><b>↑ ↓</b><span>browse</span></div>
           <div><b><i className="lk">→</i> <i className="pk">←</i></b><span>like · pass</span></div>
           <div><b>tap</b><span>deep dive</span></div>
           <div><b>talk</b><span>ask about it</span></div>
         </div>
-        <div className="sp-learn">Ten minutes a day. It learns from every swipe. <a className="sp-more" href="/about" onPointerDown={stop}>How it works →</a></div>
+        <a className="sp-more" href="/about" onPointerDown={stop}>How it works →</a>
+        <button className="sp-start" onClick={onStart}><span className="sp-arrow">↑</span>swipe up to start</button>
       </div>
-      <button className="sp-start" onClick={onStart}><span className="sp-arrow">↑</span>swipe up to start</button>
     </section>
   );
 }

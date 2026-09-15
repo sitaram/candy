@@ -181,29 +181,33 @@
 .icon-btn:hover { color: var(--ink); background: var(--fill); }
 .icon-btn.bm.on { color: #e6b422; }
 
-/* splash — page −1 */
-.fcard.splash { justify-content: space-between; align-items: center; text-align: center; padding-bottom: calc(24px + env(safe-area-inset-bottom)); --hue: 268; --hue2: 205; }
-.sp-mid { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 12px; width: 100%; max-width: 380px; padding-bottom: 6vh; }
+/* splash — page −1: three zones, space does the structuring */
+.fcard.splash { justify-content: space-between; align-items: center; text-align: center; padding-bottom: calc(18px + env(safe-area-inset-bottom)); --hue: 268; --hue2: 205; }
+.sp-top { display: flex; flex-direction: column; align-items: center; gap: 8px; padding-top: 7vh; }
 .sp-brand { font-family: var(--font-display); font-weight: 900; font-size: clamp(56px, 18vw, 84px); letter-spacing: -.05em; line-height: 1; color: var(--ink); }
-.sp-line { font-family: var(--font-display); font-size: clamp(20px, 5.6vw, 25px); font-weight: 700; letter-spacing: -.02em; color: var(--ink); margin-top: -4px; }
-.sp-how b { color: var(--ink); font-weight: 650; }
-.sp-how { margin: 6px 0 16px; font-size: clamp(15px, 4.1vw, 17px); color: var(--ink-2); max-width: 34ch; line-height: 1.5; text-wrap: pretty; }
+.sp-line { font-family: var(--font-display); font-size: clamp(19px, 5.4vw, 24px); font-weight: 700; letter-spacing: -.02em; color: var(--ink); }
 
-.sp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; width: 100%; }
-.sp-grid > div { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 14px 10px 12px; border-radius: 14px; background: var(--fill); }
-.sp-grid b { font-family: var(--font-display); font-size: 20px; font-weight: 800; color: var(--ink); line-height: 1; letter-spacing: .02em; }
+.sp-claims { list-style: none; margin: 4vh 0; padding: 0 6px; display: flex; flex-direction: column; gap: 12px; max-width: 340px; text-align: left; }
+.sp-claims li { font-size: clamp(14.5px, 3.9vw, 16px); line-height: 1.42; color: var(--ink-2); text-wrap: pretty; padding-left: 12px; border-left: 2px solid var(--line); }
+.sp-claims b { font-family: var(--font-display); font-weight: 800; letter-spacing: -.01em; color: var(--ink); margin-right: 4px; }
+
+.sp-bottom { display: flex; flex-direction: column; align-items: center; gap: 12px; width: 100%; max-width: 380px; }
+.sp-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; width: 100%; }
+.sp-grid > div { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 12px 4px 10px; border-radius: 12px; background: var(--fill); }
+.sp-grid b { font-family: var(--font-display); font-size: 18px; font-weight: 800; color: var(--ink); line-height: 1; letter-spacing: .02em; }
 .sp-grid b i { font-style: normal; }
 .sp-grid b .lk { color: var(--like); }
 .sp-grid b .pk { color: var(--skip); }
-.sp-grid span { font-size: 12.5px; color: var(--ink-3); white-space: nowrap; }
-.sp-learn { font-size: 13px; color: var(--ink-3); margin-top: 4px; line-height: 1.6; max-width: 34ch; text-wrap: balance; }
-.sp-learn .sp-more { margin-left: 4px; padding: 0; }
+.sp-grid span { font-size: 11.5px; color: var(--ink-3); white-space: nowrap; }
+.sp-more { font-size: 13px; color: var(--accent); text-decoration: none; font-weight: 600; white-space: nowrap; }
 
-.sp-start { background: none; border: none; color: var(--ink-2); font: inherit; font-size: 14px; font-weight: 600; letter-spacing: .04em; display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer; padding: 8px 16px; }
+.sp-start { background: none; border: none; color: var(--ink-2); font: inherit; font-size: 14px; font-weight: 600; letter-spacing: .04em; display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer; padding: 6px 16px 0; margin-top: 6px; }
 .sp-arrow { font-size: 22px; animation: bob 1.4s ease-in-out infinite; }
 @keyframes bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-7px); } }
-.sp-more { font-size: 13px; color: var(--accent); text-decoration: none; font-weight: 600; white-space: nowrap; }
 .fcard.splash.rail .sp-start { visibility: hidden; }
+
+@media (max-width: 360px) { .sp-grid span { font-size: 10.5px; } .sp-grid > div { padding: 10px 2px 8px; } }
+@media (min-height: 800px) { .sp-top { padding-top: 10vh; } .sp-claims { gap: 16px; } }
 
 /* gesture reminder: lean right (green), lean left (red), lift (peek), settle. ~3 s, once a minute. */
 .drag-layer.breathing { animation: breathe 3s cubic-bezier(.45,.05,.35,1) both; }   /* on the layer: the card's inline transform is the drag, this composes with it */

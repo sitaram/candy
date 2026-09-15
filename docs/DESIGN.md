@@ -68,7 +68,7 @@ GitHub knows *what* a repo is. Nobody has built the layer that knows **why it ma
 
 ## Code quality
 
-Hardening pass, after the prototype worked. One line each.
+Hardening pass, after the prototype worked.
 
 - **Tests** — vitest, 97 cases on the pure logic: ranking, search fusion, user state, embeddings, API guard, rate limit, schemas, error sink.
 - **Validated front door** — one `guard()` per route: uid or 401, zod schema per query/body/params with the field named, 413 on oversize, 400 on non-JSON, 500 never leaks the message, `x-request-id` on everything.

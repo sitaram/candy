@@ -198,7 +198,7 @@ export function useVoice(handlers: VoiceHandlers) {
           bumpSilence();
           // Both modes open with a line: card mode a 20 s take on the repo, search mode a one-sentence invitation.
           // Card mode: mic off for the take so it is not interruptible by room noise; released when the audio finishes.
-          if (opts.mode === "card") { autoMuted.current = true; setMic(false); }
+          if (opts.mode === "card" || opts.mode === "doc") { autoMuted.current = true; setMic(false); }
           send({ type: "response.create" });
         },
         onLost: (why) => { if (mine && tr.current === mine) stop(why); },

@@ -79,6 +79,7 @@ export const ItemParams = z.object({ owner: RepoSeg, name: RepoSeg });
 export const VoiceSessionBody = z.discriminatedUnion("mode", [
   z.object({ mode: z.literal("card"), id: RepoId, why: Why.optional() }),
   z.object({ mode: z.literal("search"), query: Text(200).optional() }),
+  z.object({ mode: z.literal("doc") }),
 ]).or(
   // Legacy: no mode means card.
   z.object({ mode: z.undefined(), id: RepoId, why: Why.optional() }).transform((b) => ({ ...b, mode: "card" as const })),

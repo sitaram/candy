@@ -12,7 +12,8 @@ export interface RTEvent { type: string; [k: string]: unknown }
 
 export type VoiceStart =
   | { mode: "card"; id: string; why: string[] }
-  | { mode: "search"; query?: string };
+  | { mode: "search"; query?: string }
+  | { mode: "doc" };
 
 export interface TransportCallbacks {
   onEvent: (ev: RTEvent) => void;

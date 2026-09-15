@@ -6,7 +6,9 @@ import { VoiceSessionBody } from "@/lib/api/schemas";
 import { getItem } from "@/lib/corpus/api";
 import { feed } from "@/lib/user/feed";
 import { me } from "@/lib/user/state";
-import { buildContext, buildSearchContext, SEARCH_TOOLS, TOOLS } from "@/lib/voice/context";
+import { buildContext, buildDocContext, buildSearchContext, SEARCH_TOOLS, TOOLS } from "@/lib/voice/context";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
 
 export const dynamic = "force-dynamic";
 
@@ -14,7 +16,7 @@ const MODEL = env.REALTIME_MODEL;
 const VOICE = env.REALTIME_VOICE;
 
 /**
- * POST /api/voice/session { mode: "card", id, why? } | { mode: "search", query? }
+ * POST /api/voice/session { mode: "card", id, why? } | { mode: "search", query? } | { mode: "doc" }
  * Mints an ephemeral Realtime client secret with the card's context baked into `instructions`
  * and our function tools attached. The browser uses the returned `value` to open WebRTC directly
  * with OpenAI; the standard key never leaves this server. `voice` bucket: 10 sessions / 10 min.
@@ -27,7 +29,12 @@ export const POST = route({ body: VoiceSessionBody, limit: "voice", maxBody: 8_1
   let instructions: string;
   let tools: readonly unknown[];
   let transcribeInput = false;
-  if (body.mode === "search") {
+  if (body.mode === "doc") {
+    // The design doc, read fresh so the guide describes what is deployed.
+    const md = await readFile(path.join(process.cwd(), "docs", "DESIGN.md"), "utf8");
+    instructions = buildDocContext(md);
+    tools = [];
+  } else if (body.mode === "search") {
     const meInfo = await me(uid).catch(() => null);
     instructions = buildSearchContext(meInfo, body.query);
     tools = SEARCH_TOOLS;
@@ -68,7 +75,7 @@ export const POST = route({ body: VoiceSessionBody, limit: "voice", maxBody: 8_1
           },
           output: { voice: VOICE, speed: 1.05 },
         },
-        max_output_tokens: 700,
+        max_output_tokens: body.mode === "doc" ? 1200 : 700,
       },
     }),
     signal: AbortSignal.timeout(15_000),
@@ -80,7 +87,7 @@ export const POST = route({ body: VoiceSessionBody, limit: "voice", maxBody: 8_1
     throw new HttpError(502, "could not start voice session");
   }
   const data = (await r.json()) as { value: string; expires_at: number };
-  const label = body.mode === "search" ? body.query ?? "" : body.id;
+  const label = body.mode === "search" ? body.query ?? "" : body.mode === "doc" ? "design.md" : body.id;
   console.info(`[voice/session] ${uid.slice(0, 8)} ${body.mode} ${label} · ${instructions.length} chars, ${tools.length} tools · ${Date.now() - t0}ms`);
   return Response.json({ secret: data.value, expiresAt: data.expires_at, model: MODEL });
 });

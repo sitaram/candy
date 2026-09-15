@@ -5,6 +5,7 @@
    collapses on scroll, and a header that pads by it resizes under your finger. */
 .about { min-height: 100dvh; padding-top: env(safe-area-inset-top); background: var(--bg); color: var(--ink); font-family: var(--font); -webkit-font-smoothing: antialiased; }
 /* The header is the feed's header, made sticky. Same height, brand, icon colour and spacing, so the two pages read as one app. */
+.about-back { margin-right: -6px; text-decoration: none; }
 .about-head { position: sticky; top: env(safe-area-inset-top); z-index: 2; background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border-bottom: 1px solid var(--line); }
 .doc-voice { display: inline-flex; align-items: center; gap: 2px; position: relative; margin-right: -6px; }
 .doc-voice-err { position: absolute; right: 0; top: calc(100% + 8px); white-space: nowrap; font-size: 12px; color: var(--skip); background: var(--bg-2); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; }

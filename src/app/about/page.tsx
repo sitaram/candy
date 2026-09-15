@@ -13,7 +13,10 @@ export default async function About() {
   return (
     <main className="about">
       <header className="feed-head about-head" role="banner">
-        <a href="/" className="brand" aria-label="Back to the feed">candy</a>
+        <a href="/" className="s-back about-back" aria-label="Back to the feed">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg>
+        </a>
+        <a href="/" className="brand">candy</a>
         <span className="head-label">how it works</span>
         <DocVoice />
       </header>

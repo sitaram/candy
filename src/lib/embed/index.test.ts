@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { cardText, normalize, dot, provider, embedTexts, putEmbeddings, getEmbeddings, getEmbeddingsCached, hasEmbedding, getTaste, nudgeTaste, DIM } from "./index";
+import { cardText, normalize, dot, provider, embedTexts, putEmbeddings, getEmbeddings, getEmbeddingsCached, hasEmbedding, getTaste, nudgeTaste, DIM, writeMatrix, getMatrix, rowOf, topK, _resetMatrixCache } from "./index";
 import { item, vec } from "@/test/fixtures";
 
 describe("cardText", () => {
@@ -86,14 +86,47 @@ describe("storage", () => {
     await mockRedis.set("emb:bad/dim", Buffer.alloc(16));
     expect((await getEmbeddings(["bad/dim"])).size).toBe(0);
   });
-  it("getEmbeddingsCached serves from memory within 60s for the same id signature", async () => {
+});
+
+describe("matrix", () => {
+  it("writeMatrix packs every emb:* vector into one key; getMatrix reads it back with row lookup", async () => {
+    _resetMatrixCache();
+    await putEmbeddings([{ id: "a/b", v: vec(0) }, { id: "c/d", v: vec(1) }]);
+    const ver = await writeMatrix();
+    expect(ver).toBeGreaterThan(0);
+    const m = await getMatrix();
+    expect(m.ids).toEqual(["a/b", "c/d"]);
+    expect(m.ver).toBe(ver);
+    expect(Array.from(rowOf(m, "a/b")!)).toEqual(Array.from(vec(0)));
+    expect(rowOf(m, "nope/x")).toBeNull();
+  });
+  it("getMatrix builds the matrix on first read when the key is absent, and serves from memory after", async () => {
+    _resetMatrixCache();
     await putEmbeddings([{ id: "a/b", v: vec(0) }]);
-    const first = await getEmbeddingsCached(["a/b"]);
-    await putEmbeddings([{ id: "a/b", v: vec(1) }]);
-    const second = await getEmbeddingsCached(["a/b"]);
-    expect(second).toBe(first);                                   // same Map instance: cache hit
-    const third = await getEmbeddingsCached(["a/b", "c/d"]);      // different signature: refetch
-    expect(third).not.toBe(first);
+    const m1 = await getMatrix();
+    expect(m1.ids).toEqual(["a/b"]);
+    await putEmbeddings([{ id: "c/d", v: vec(1) }]);        // not in the matrix until writeMatrix()
+    const m2 = await getMatrix();
+    expect(m2).toBe(m1);                                     // same object: in-process cache, no Redis hop
+  });
+  it("topK returns the k most similar rows, best first, honouring skip", async () => {
+    _resetMatrixCache();
+    const q = normalize(new Float32Array(DIM).map((_, i) => (i === 0 ? 1 : i === 1 ? 0.5 : 0)));
+    await putEmbeddings([{ id: "near", v: vec(0) }, { id: "mid", v: vec(1) }, { id: "far", v: vec(2) }, { id: "self", v: q }]);
+    await writeMatrix();
+    const m = await getMatrix();
+    const top = topK(m, q, 2, new Set(["self"]));
+    expect(top.map((t) => t.id)).toEqual(["near", "mid"]);
+    expect(top[0].cos).toBeGreaterThan(top[1].cos);
+    expect(topK(m, q, 10).map((t) => t.id)[0]).toBe("self");
+  });
+  it("getEmbeddingsCached is a Map view over the matrix; absent ids are absent", async () => {
+    _resetMatrixCache();
+    await putEmbeddings([{ id: "a/b", v: vec(0) }]);
+    await writeMatrix();
+    const got = await getEmbeddingsCached(["a/b", "zz/zz"]);
+    expect(got.size).toBe(1);
+    expect(dot(got.get("a/b")!, vec(0))).toBeCloseTo(1);
   });
 });
 

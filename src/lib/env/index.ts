@@ -8,7 +8,6 @@
  * things this app depends on is legible without grepping.
  */
 
-const isProd = process.env.NODE_ENV === "production";
 const isServer = typeof window === "undefined";
 
 function str(name: string, dflt?: string): string | undefined {
@@ -16,25 +15,30 @@ function str(name: string, dflt?: string): string | undefined {
   return v === undefined || v === "" ? dflt : v;
 }
 
+/**
+ * Live view, not a snapshot: each property reads process.env when accessed. A snapshot would be
+ * marginally faster and would break every test that sets a key, and any runtime that injects secrets
+ * after module load. The cost is a property lookup; nothing here is on a hot path.
+ */
 export const env = {
-  NODE_ENV: process.env.NODE_ENV ?? "development",
-  isProd,
+  get NODE_ENV() { return process.env.NODE_ENV ?? "development"; },
+  get isProd() { return process.env.NODE_ENV === "production"; },
   /** Redis Cloud in prod; local otherwise. */
-  REDIS_URL: str("REDIS_URL", "redis://127.0.0.1:6379")!,
+  get REDIS_URL() { return str("REDIS_URL", "redis://127.0.0.1:6379")!; },
   /** Cards, ask, related labels. Required for anything that enriches. */
-  ANTHROPIC_API_KEY: str("ANTHROPIC_API_KEY"),
-  CANDY_MODEL: str("CANDY_MODEL", "claude-haiku-4-5-20251001")!,
-  CANDY_ASK_MODEL: str("CANDY_ASK_MODEL") ?? str("CANDY_MODEL", "claude-haiku-4-5-20251001")!,
+  get ANTHROPIC_API_KEY() { return str("ANTHROPIC_API_KEY"); },
+  get CANDY_MODEL() { return str("CANDY_MODEL", "claude-haiku-4-5-20251001")!; },
+  get CANDY_ASK_MODEL() { return str("CANDY_ASK_MODEL") ?? str("CANDY_MODEL", "claude-haiku-4-5-20251001")!; },
   /** Embeddings (preferred) and realtime voice. */
-  OPENAI_API_KEY: str("OPENAI_API_KEY"),
+  get OPENAI_API_KEY() { return str("OPENAI_API_KEY"); },
   /** Embedding fallback when no OpenAI key. */
-  VOYAGE_API_KEY: str("VOYAGE_API_KEY"),
-  REALTIME_MODEL: str("REALTIME_MODEL", "gpt-realtime-2.1")!,
-  REALTIME_VOICE: str("REALTIME_VOICE", "marin")!,
-  REALTIME_TRANSCRIBE: str("REALTIME_TRANSCRIBE", "gpt-4o-mini-transcribe")!,
+  get VOYAGE_API_KEY() { return str("VOYAGE_API_KEY"); },
+  get REALTIME_MODEL() { return str("REALTIME_MODEL", "gpt-realtime-2.1")!; },
+  get REALTIME_VOICE() { return str("REALTIME_VOICE", "marin")!; },
+  get REALTIME_TRANSCRIBE() { return str("REALTIME_TRANSCRIBE", "gpt-4o-mini-transcribe")!; },
   /** Raises GitHub's rate limit 60 → 5,000/h. Discovery is unusable without it. */
-  GITHUB_TOKEN: str("GITHUB_TOKEN"),
-} as const;
+  get GITHUB_TOKEN() { return str("GITHUB_TOKEN"); },
+};
 
 /** Keys the *product* (not the crawl) cannot serve requests without. */
 const REQUIRED_PROD: (keyof typeof env)[] = ["REDIS_URL"];
@@ -50,7 +54,7 @@ export function assertEnv(): void {
   if (!env.ANTHROPIC_API_KEY) soft.push("ANTHROPIC_API_KEY (cards, ask, related labels, backfill)");
   if (!env.OPENAI_API_KEY) soft.push("OPENAI_API_KEY (voice; embeddings unless VOYAGE_API_KEY)");
   if (!env.GITHUB_TOKEN) soft.push("GITHUB_TOKEN (crawl rate limit 60/h)");
-  if (soft.length && !isProd) console.warn(`[env] not set: ${soft.join(" · ")}`);
+  if (soft.length && !env.isProd) console.warn(`[env] not set: ${soft.join(" · ")}`);
 }
 
 /** For call sites that need a key or must refuse clearly: `need("OPENAI_API_KEY")`. */

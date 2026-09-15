@@ -3,6 +3,7 @@
  * Usage: pnpm crawl [n=50] [concurrency=4]
  */
 import { crawl } from "../src/lib/crawl/index.ts";
+import { invalidate } from "../src/lib/corpus/api";
 import { stats } from "../src/lib/store/corpus.ts";
 import { closeRedis } from "../src/lib/store/redis.ts";
 
@@ -20,4 +21,5 @@ if (r.rateLimitedUntil) {
   console.log(`rate limited; resets ${new Date(r.rateLimitedUntil).toLocaleTimeString()}`);
 }
 console.log(await stats());
+await invalidate();   // rebuild the read snapshot every process serves from
 await closeRedis();

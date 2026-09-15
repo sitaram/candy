@@ -13,7 +13,7 @@
  */
 import { redis } from "../store/redis";
 import { CK } from "../enrich";
-import { dot, getEmbeddings } from "../embed";
+import { dot, getMatrix, rowOf, topK } from "../embed";
 import { allItems, getItem, type Item } from "./api";
 import { getEdges } from "../store/corpus";
 
@@ -37,17 +37,33 @@ const NOISE_TAGS = new Set([
   "openai-api", "nodejs", "node", "nextjs", "react", "web", "github", "docker", "linux", "macos", "windows", "webui", "gui",
 ]);
 
-/** Tag IDF over the corpus: a tag shared by 5 repos is worth a lot more than one shared by 300. Cached per process. */
-let idfCache: { at: number; idf: Map<string, number> } | null = null;
-function tagIdf(all: Item[]): Map<string, number> {
-  if (idfCache && Date.now() - idfCache.at < 300_000) return idfCache.idf;
-  const df = new Map<string, number>();
+/**
+ * Inverted indexes over the corpus, rebuilt when the item array identity changes (i.e. on snapshot
+ * reload), so neighbours() never scans all items. byTag excludes noise tags; byName keeps the
+ * most-starred repo per bare name; namedBy inverts card.alternatives.
+ */
+interface CorpusIndex { items: Item[]; byId: Map<string, Item>; idf: Map<string, number>; byTag: Map<string, string[]>; byOwner: Map<string, string[]>; byName: Map<string, string>; namedBy: Map<string, string[]> }
+let idxCache: CorpusIndex | null = null;
+function corpusIndex(all: Item[]): CorpusIndex {
+  if (idxCache && idxCache.items === all) return idxCache;
+  const byId = new Map<string, Item>(), df = new Map<string, number>(), byTag = new Map<string, string[]>(), byOwner = new Map<string, string[]>(), byName = new Map<string, string>(), namedBy = new Map<string, string[]>();
   let n = 0;
-  for (const it of all) { if (!it.card) continue; n++; for (const t of new Set([...it.card.tags, ...it.card.ecosystem].map((x) => x.toLowerCase()))) df.set(t, (df.get(t) ?? 0) + 1); }
+  const push = (m: Map<string, string[]>, k: string, v: string) => { const a = m.get(k); if (a) a.push(v); else m.set(k, [v]); };
+  for (const it of all) {
+    byId.set(it.repo.id, it);
+    if (!it.card) continue;
+    n++;
+    push(byOwner, it.repo.owner.toLowerCase(), it.repo.id);
+    const nm = it.repo.name.toLowerCase();
+    const prev = byName.get(nm);
+    if (!prev || it.repo.stars > (byId.get(prev)?.repo.stars ?? 0)) byName.set(nm, it.repo.id);
+    for (const t of new Set([...it.card.tags, ...it.card.ecosystem].map((x) => x.toLowerCase()))) { df.set(t, (df.get(t) ?? 0) + 1); if (!NOISE_TAGS.has(t)) push(byTag, t, it.repo.id); }
+    for (const a of it.card.alternatives) push(namedBy, a.toLowerCase(), it.repo.id);
+  }
   const idf = new Map<string, number>();
   for (const [t, d] of df) idf.set(t, Math.log((n + 1) / (d + 1)));
-  idfCache = { at: Date.now(), idf };
-  return idf;
+  idxCache = { items: all, byId, idf, byTag, byOwner, byName, namedBy };
+  return idxCache;
 }
 
 /**
@@ -66,37 +82,46 @@ export async function neighbors(id: string, limit = 24): Promise<Neighbor[]> {
   const me = await getItem(id);
   if (!me?.card) return [];
   const r = redis();
-  const [all, altIds, links] = await Promise.all([allItems(), r.smembers(CK.alt(me.repo.id)), getEdges(me.repo.id, "links")]);
-  const idf = tagIdf(all);
-  const carded = all.filter((it) => it.card && it.repo.id !== me.repo.id);
+  const [all, altIds, links, inbound, m] = await Promise.all([
+    allItems(), r.smembers(CK.alt(me.repo.id)), getEdges(me.repo.id, "links"),
+    r.smembers(`edges:${me.repo.id}:linked-by`).catch(() => [] as string[]), getMatrix(),
+  ]);
+  const idx = corpusIndex(all);
+  const idf = idx.idf;
   // Alternatives by id, and by bare name when the card only names them ("aider", "cline").
-  const byName = new Map<string, string>();
-  for (const it of carded) { const nm = it.repo.name.toLowerCase(); if (!byName.has(nm) || it.repo.stars > (all.find((x) => x.repo.id === byName.get(nm))?.repo.stars ?? 0)) byName.set(nm, it.repo.id); }
   const alt = new Set(altIds.map((x) => x.toLowerCase()));
-  for (const a of me.card.alternatives) { const al = a.toLowerCase(); if (al.includes("/")) alt.add(al); else { const hit = byName.get(al) ?? byName.get(al.replace(/\s+/g, "-")); if (hit) alt.add(hit); } }
-  const out = new Set(links);
-  const inbound = new Set(await r.smembers(`edges:${me.repo.id}:linked-by`).catch(() => [] as string[]));
+  for (const a of me.card.alternatives) { const al = a.toLowerCase(); if (al.includes("/")) alt.add(al); else { const hit = idx.byName.get(al) ?? idx.byName.get(al.replace(/\s+/g, "-")); if (hit) alt.add(hit); } }
+  const out = new Set(links), inb = new Set(inbound);
   const myTags = new Set([...me.card.tags, ...me.card.ecosystem].map((t) => t.toLowerCase()).filter((t) => !NOISE_TAGS.has(t)));
-  const emb = await getEmbeddings([me.repo.id, ...carded.map((it) => it.repo.id)]);
-  const mine = emb.get(me.repo.id);
-  const meNamesMe = (it: Item) => it.card!.alternatives.some((a) => { const al = a.toLowerCase(); return al === me.repo.id || al === me.repo.name.toLowerCase(); });
+
+  // Candidate generation — not the whole corpus. Union of: hard edges, repos sharing a specific tag,
+  // same owner, the semantic top-64, and repos that name us. Typically 100–300 at any corpus size.
+  const cand = new Set<string>([...alt, ...out, ...inb, ...(idx.byOwner.get(me.repo.owner.toLowerCase()) ?? []), ...(idx.namedBy.get(me.repo.id) ?? []), ...(idx.namedBy.get(me.repo.name.toLowerCase()) ?? [])]);
+  for (const t of myTags) for (const x of idx.byTag.get(t) ?? []) cand.add(x);
+  const mine = rowOf(m, me.repo.id);
+  const cosOf = new Map<string, number>();
+  if (mine) for (const { id: cid, cos } of topK(m, mine, 64, new Set([me.repo.id]))) { cand.add(cid); cosOf.set(cid, cos); }
+  cand.delete(me.repo.id);
 
   const res: Neighbor[] = [];
-  for (const it of carded) {
-    const c = it.card!;
+  for (const cid of cand) {
+    const it = idx.byId.get(cid);
+    if (!it?.card) continue;
+    const c = it.card;
     const s: Neighbor["signals"] = { shared: [] };
     let score = 0;
-    const isAlt = alt.has(it.repo.id) || meNamesMe(it);
+    const isAlt = alt.has(cid) || c.alternatives.some((a) => { const al = a.toLowerCase(); return al === me.repo.id || al === me.repo.name.toLowerCase(); });
     if (isAlt) { s.alt = true; score += 8; }
-    if (out.has(it.repo.id)) { s.linksTo = true; score += 2.5; }
-    if (inbound.has(it.repo.id)) { s.linkedFrom = true; score += 2.5; }
+    if (out.has(cid)) { s.linksTo = true; score += 2.5; }
+    if (inb.has(cid)) { s.linkedFrom = true; score += 2.5; }
     if (it.repo.owner.toLowerCase() === me.repo.owner.toLowerCase()) { s.sameOwner = true; score += 1.5; }
     if (c.category === me.card.category) { s.sameCategory = true; score += 0.3; }
     const shared = Array.from(new Set([...c.tags, ...c.ecosystem].map((t) => t.toLowerCase()).filter((t) => myTags.has(t))));
     s.shared = shared;
     score += Math.min(4, shared.reduce((a, t) => a + (idf.get(t) ?? 1), 0) * 0.8);
-    const v = emb.get(it.repo.id);
-    const cos = mine && v ? dot(mine, v) : 0;
+    let cos = cosOf.get(cid);
+    if (cos === undefined && mine) { const v = rowOf(m, cid); cos = v ? dot(mine, v) : 0; }
+    cos ??= 0;
     if (cos) s.cos = cos;
     const hard = isAlt || !!s.linksTo || !!s.linkedFrom || !!s.sameOwner;
     if (cos > 0.50) score += (cos - 0.50) * 12;                          // .60 → +1.2, .70 → +2.4

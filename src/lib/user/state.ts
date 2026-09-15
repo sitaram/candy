@@ -146,6 +146,34 @@ export async function isSaved(uid: string, ids: string[]): Promise<Set<string>> 
   return new Set(ids.filter((_, i) => scores[i] != null));
 }
 
+/**
+ * Everything the feed needs about a user, one round trip. Remote Redis is ~75 ms per hop from Vercel,
+ * so five sequential/parallel-but-separate reads was ~180 ms before a single byte of ranking ran.
+ * touchVisit's read-then-write is folded in (HGET then HSET in the same pipeline is fine — we want
+ * the previous value, and the write orders after it).
+ */
+export async function loadUser(uid: string): Promise<{ profile: Profile; seen: Set<string>; saved: Set<string>; lastVisit: number; tasteBuf: Buffer | null; tasteW: number }> {
+  const r = redis();
+  const res = await r.pipeline()
+    .hgetall(UK.profile(uid))
+    .zrange(UK.seen(uid), "0", "-1")
+    .zrange(UK.saved(uid), "0", "-1")
+    .hget(UK.meta(uid), "lastVisit")
+    .hset(UK.meta(uid), "lastVisit", Date.now())
+    .getBuffer(`u:${uid}:taste`)
+    .get(`u:${uid}:tastew`)
+    .exec();
+  const v = (i: number) => res?.[i]?.[1];
+  return {
+    profile: new Map(Object.entries((v(0) as Record<string, string>) ?? {}).map(([k, x]) => [k, Number(x)])),
+    seen: new Set((v(1) as string[]) ?? []),
+    saved: new Set((v(2) as string[]) ?? []),
+    lastVisit: Number((v(3) as string | null) ?? 0),
+    tasteBuf: (v(5) as Buffer | null) ?? null,
+    tasteW: Number((v(6) as string | null) ?? 0),
+  };
+}
+
 export async function touchVisit(uid: string): Promise<{ lastVisit: number }> {
   const r = redis();
   const prev = Number((await r.hget(UK.meta(uid), "lastVisit")) ?? 0);

@@ -13,9 +13,9 @@
  * absent or the embedding call fails. No LLM on the path; one embeddings call (~60 ms).
  */
 import { allItems, type Item } from "../corpus/api";
-import { embedTexts, getEmbeddings, getEmbeddingsCached, getTaste, dot } from "../embed";
+import { embedTexts, getEmbeddingsCached, tasteFrom, dot } from "../embed";
 import { baseScore, fitScore, tasteFit } from "./rank";
-import { getProfile, isSaved } from "./state";
+import { loadUser } from "./state";
 import type { FeedItem } from "./feed";
 
 export interface SearchResult extends FeedItem {
@@ -54,7 +54,12 @@ export async function search(uid: string, qRaw: string, limit = 20): Promise<Sea
   const kws = keywords(q);
   const nameQuery = looksLikeName(q);
 
-  const [items, profile, taste] = await Promise.all([allItems(), getProfile(uid), getTaste(uid)]);
+  // Start the OpenAI query embedding now so it overlaps the Redis reads instead of following them.
+  const semanticWanted = !nameQuery || q.includes(" ");
+  const qvP = semanticWanted ? queryVector(q).catch((e: unknown) => { console.warn("[search] embed", (e as Error).message); return null; }) : Promise.resolve(null);
+  const [items, u] = await Promise.all([allItems(), loadUser(uid)]);
+  const { profile, saved: savedAll } = u;
+  const taste = tasteFrom(u.tasteBuf, u.tasteW);
   const carded = items.filter((it) => it.card && !it.card.flags.some((f) => f === "spam-suspect" || f === "no-substance" || f === "star-farm-suspect"));
 
   /* ---- lexical lane ---- */
@@ -89,9 +94,9 @@ export async function search(uid: string, qRaw: string, limit = 20): Promise<Sea
 
   /* ---- semantic lane ---- */
   let semantic = false;
-  if (!nameQuery || q.includes(" ")) {
+  const qv = await qvP;
+  if (qv) {
     try {
-      const [qv] = await embedTexts([q], "query");
       const vectors = await getEmbeddingsCached(carded.map((it) => it.repo.id));
       if (vectors.size > 0) {
         semantic = true;
@@ -118,7 +123,7 @@ export async function search(uid: string, qRaw: string, limit = 20): Promise<Sea
 
   /* ---- merge + personal ranking ---- */
   const ids = Array.from(hits.keys());
-  const tasteVectors = taste && taste.w > 0 ? await getEmbeddings(ids) : undefined;
+  const tasteVectors = taste && taste.w > 0 ? await getEmbeddingsCached(ids) : undefined;
   const bestSem = Math.max(...Array.from(hits.values()).map((h) => h.sem), 0.0001);
   const ranked = Array.from(hits.values()).map((h) => {
     // Relevance in [0,1]. Exact/name hits saturate. Otherwise semantic finds and lexical confirms:
@@ -148,7 +153,7 @@ export async function search(uid: string, qRaw: string, limit = 20): Promise<Sea
   });
   ranked.sort((a, b) => b.score - a.score);
   const top = ranked.slice(0, limit);
-  const saved = await isSaved(uid, top.map((r) => r.h.it.repo.id));
+  const saved = savedAll;
 
   return {
     q,
@@ -165,4 +170,20 @@ export async function search(uid: string, qRaw: string, limit = 20): Promise<Sea
       match: r.match,
     })),
   };
+}
+
+/**
+ * Query embeddings, cached. The same few hundred queries recur ("mcp server", "rust cli"), and voice
+ * search repeats its last query on every re-render of the sheet. OpenAI round trip is ~150 ms and
+ * $0.00002; the cache makes repeats 0 ms. Bounded LRU of 500 ≈ 1 MB.
+ */
+const qcache = new Map<string, Float32Array>();
+async function queryVector(q: string): Promise<Float32Array> {
+  const k = q.trim().toLowerCase();
+  const hit = qcache.get(k);
+  if (hit) { qcache.delete(k); qcache.set(k, hit); return hit; }
+  const [v] = await embedTexts([k], "query");
+  qcache.set(k, v);
+  if (qcache.size > 500) qcache.delete(qcache.keys().next().value!);
+  return v;
 }

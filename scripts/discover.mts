@@ -3,6 +3,7 @@
  * Usage: pnpm discover [github|hn|lobsters|rss|awesome ...]
  */
 import { discoverers } from "../src/lib/discover/index.ts";
+import { invalidate } from "../src/lib/corpus/api";
 import { discover, stats } from "../src/lib/store/corpus.ts";
 import { closeRedis } from "../src/lib/store/redis.ts";
 
@@ -26,4 +27,5 @@ for (const name of names) {
 }
 
 console.log("\n", await stats());
+await invalidate();   // rebuild the read snapshot every process serves from
 await closeRedis();

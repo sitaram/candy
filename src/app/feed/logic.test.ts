@@ -1,57 +1,74 @@
 import { describe, it, expect } from "vitest";
-import { HUE, hueOf, fmt, agoShort, splitWhy, lockAxis, resolveGesture, THRESH, VTHRESH, AXIS_LOCK } from "./logic";
+import { lockAxis, resolveGesture, classifyRelease, splitWhy, agoShort, fmt, HUE, hueOf, THRESH, VTHRESH, AXIS_LOCK } from "./logic";
 import { CATEGORIES } from "@/lib/enrich/card";
-import { feedItem, item, NOW } from "@/test/fixtures";
+import { feedItem, item } from "@/test/fixtures";
+
+const both = { prev: true, next: true };
+
+describe("lockAxis", () => {
+  it("stays unlocked inside the dead zone", () => { expect(lockAxis(AXIS_LOCK - 1, 0)).toBeNull(); expect(lockAxis(3, 3)).toBeNull(); });
+  it("picks the dominant axis; ties go to y", () => {
+    expect(lockAxis(20, 5)).toBe("x"); expect(lockAxis(5, 20)).toBe("y"); expect(lockAxis(12, 12)).toBe("y");
+  });
+});
+
+describe("resolveGesture", () => {
+  it("x: past THRESH decides, sign picks side", () => {
+    expect(resolveGesture("x", THRESH, 0, both)).toBe("like");
+    expect(resolveGesture("x", -THRESH, 0, both)).toBe("skip");
+    expect(resolveGesture("x", THRESH - 1, 0, both)).toBe("none");
+  });
+  it("y: up is next, down is prev, gated by can", () => {
+    expect(resolveGesture("y", 0, -VTHRESH, both)).toBe("next");
+    expect(resolveGesture("y", 0, VTHRESH, both)).toBe("prev");
+    expect(resolveGesture("y", 0, -VTHRESH, { prev: true, next: false })).toBe("none");
+    expect(resolveGesture("y", 0, VTHRESH, { prev: false, next: true })).toBe("none");
+  });
+  it("a big dx on the y axis does not decide", () => { expect(resolveGesture("y", 300, -10, both)).toBe("none"); });
+  it("unlocked never resolves", () => { expect(resolveGesture(null, 500, 500, both)).toBe("none"); });
+});
+
+describe("classifyRelease", () => {
+  it("tiny unlocked travel is a tap", () => { expect(classifyRelease(null, 3, 4, both)).toEqual({ kind: "tap" }); });
+  it("unlocked but travelled is nothing (finger wandered, no axis)", () => { expect(classifyRelease(null, 9, 0, both).kind).toBe("none"); });
+  it("carries the drag so the fly-out starts where the finger left", () => {
+    expect(classifyRelease("x", 140, -20, both)).toEqual({ kind: "decide", decision: "like", dx: 140, dy: -20 });
+  });
+  it("pages with the dy so the slide continues", () => {
+    expect(classifyRelease("y", 0, -200, both)).toEqual({ kind: "page", dir: 1, dy: -200 });
+    expect(classifyRelease("y", 0, 150, both)).toEqual({ kind: "page", dir: -1, dy: 150 });
+  });
+  it("short y is a release back to rest, not overscroll", () => {
+    expect(classifyRelease("y", 0, -40, both)).toEqual({ kind: "release", dy: -40, overscroll: false });
+  });
+  it("swiping up with no next is overscroll (splash before the feed lands)", () => {
+    expect(classifyRelease("y", 0, -200, { prev: false, next: false })).toEqual({ kind: "release", dy: -200, overscroll: true });
+  });
+  it("short x is nothing; the card springs back via CSS", () => { expect(classifyRelease("x", 40, 0, both).kind).toBe("none"); });
+});
+
+describe("card text helpers", () => {
+  it("splitWhy pulls the fit line out", () => {
+    expect(splitWhy(["on Hacker News", "matches your interest in rust", "released"])).toEqual({ fit: "rust", rest: ["on Hacker News", "released"] });
+    expect(splitWhy(["on HN", "outside your usual"])).toEqual({ fit: null, rest: ["on HN"] });   // explore marker is hidden
+  });
+  it("agoShort", () => {
+    const now = Date.parse("2026-09-14T12:00:00Z");
+    expect(agoShort("2026-09-14T10:00:00Z", now)).toBe("today");
+    expect(agoShort("2026-09-11T12:00:00Z", now)).toBe("3d");
+    expect(agoShort("2026-07-10T12:00:00Z", now)).toBe("2mo");   // 66 d / 30 → 2
+    expect(agoShort("2025-03-14T12:00:00Z", now)).toBe("1.5y");   // one decimal under two years
+    expect(agoShort("2024-01-01T12:00:00Z", now)).toBe("3y");
+    expect(agoShort("", now)).toBe(""); expect(agoShort("garbage", now)).toBe("");
+  });
+  it("fmt", () => { expect(fmt(950)).toBe("950"); expect(fmt(1500)).toBe("1.5k"); expect(fmt(124185)).toBe("124k"); });
+});
 
 describe("hue", () => {
-  it("every category has a hue, so no card falls back to the default by accident", () => {
+  it("every category has a hue, so no card falls back to the default by accident (the three copies had drifted before they were unified)", () => {
     for (const c of CATEGORIES) expect(HUE[c], c).toBeDefined();
     expect(hueOf(feedItem(item("a/b", { card: { category: "security" } })))).toBe(0);
     expect(hueOf(feedItem(item("a/b", { card: null })))).toBe(230);
     expect(hueOf(undefined)).toBe(230);
-  });
-});
-
-describe("fmt / agoShort", () => {
-  it.each([[0, "0"], [999, "999"], [1000, "1.0k"], [1500, "1.5k"], [9999, "10.0k"], [10_000, "10k"], [124_185, "124k"]])("fmt(%i) = %s", (n, s) => expect(fmt(n)).toBe(s));
-  it("agoShort buckets: today, 1d, Nd, Nmo, N.Ny / Ny", () => {
-    const d = (n: number) => new Date(NOW - n * 86_400_000).toISOString();
-    expect(agoShort(d(0.5), NOW)).toBe("today");
-    expect(agoShort(d(1.5), NOW)).toBe("1d");
-    expect(agoShort(d(12), NOW)).toBe("12d");
-    expect(agoShort(d(75), NOW)).toBe("3mo");   // Math.round(2.5)
-    expect(agoShort(d(500), NOW)).toBe("1.4y");
-    expect(agoShort(d(1000), NOW)).toBe("3y");
-    expect(agoShort("", NOW)).toBe("");
-    expect(agoShort("garbage", NOW)).toBe("");
-  });
-});
-
-describe("splitWhy", () => {
-  it("lifts the personal-fit line into a chip, hides the explore marker, keeps the rest in order", () => {
-    expect(splitWhy(["outside your usual — exploring", "released v2 today", "matches your interest in mcp, cli", "on Hacker News"]))
-      .toEqual({ fit: "mcp, cli", rest: ["released v2 today", "on Hacker News"] });
-    expect(splitWhy([])).toEqual({ fit: null, rest: [] });
-  });
-});
-
-describe("gestures", () => {
-  it("axis locks only after AXIS_LOCK px of travel, by dominant direction; ties go vertical", () => {
-    expect(lockAxis(3, 3)).toBeNull();
-    expect(lockAxis(AXIS_LOCK, 0)).toBeNull();          // hypot must exceed, not equal
-    expect(lockAxis(AXIS_LOCK + 1, 0)).toBe("x");
-    expect(lockAxis(0, AXIS_LOCK + 1)).toBe("y");
-    expect(lockAxis(8, 8)).toBe("y");
-    expect(lockAxis(30, -20)).toBe("x");
-  });
-  it("horizontal: right past THRESH likes, left skips; vertical: up nexts, down prevs; both gated by availability", () => {
-    expect(resolveGesture("x", THRESH, 0)).toBe("like");
-    expect(resolveGesture("x", -THRESH, 0)).toBe("skip");
-    expect(resolveGesture("x", THRESH - 1, 0)).toBe("none");
-    expect(resolveGesture("y", 0, -VTHRESH)).toBe("next");
-    expect(resolveGesture("y", 0, VTHRESH)).toBe("prev");
-    expect(resolveGesture("y", 0, -VTHRESH, { prev: true, next: false })).toBe("none");
-    expect(resolveGesture("y", 0, VTHRESH, { prev: false, next: true })).toBe("none");
-    expect(resolveGesture(null, 500, 500)).toBe("none");
   });
 });

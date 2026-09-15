@@ -4,13 +4,15 @@
  * nothing under store/, crawl/, or enrich/ directly.
  */
 import { safeJson } from "../util/json";
-import { CK, getCards, type StoredCard } from "../enrich";
+import { CK, getCards, parseCard, type StoredCard } from "../enrich";
 import type { Category, Flag, Hook } from "../enrich/card";
 import { collectionMembers } from "../store/collections";
-import { corpusIds, getEdges, getMentions, getRepos, getTags } from "../store/corpus";
+import { corpusIds, getRepos } from "../store/corpus";
+import { parseRepo } from "../store/types";
 import { K, normId } from "../store/keys";
 import { getRaw } from "../store/raw";
 import { redis } from "../store/redis";
+import { currentVersion, readSnapshot, writeSnapshot } from "./snapshot";
 import type { Mention, Repo } from "../store/types";
 
 /** A repo with its card. The unit every interface works with. */
@@ -63,12 +65,43 @@ export type Sort = "interest" | "velocity" | "released" | "priority" | "stars" |
 
 const DEFAULT_EXCLUDE: Flag[] = ["spam-suspect", "no-substance"];
 
-let cache: { at: number; items: Item[] } | null = null;
-const TTL = 30_000;
+/**
+ * In-process read model. Served from the gzip'd snapshot (see snapshot.ts); the slow assembly path
+ * runs only when no snapshot exists, and writes one. Version-checked every CHECK ms so a write
+ * anywhere (crawl, ensureItem, backfill) is visible to every process within that window.
+ */
+let cache: { items: Item[]; ver: number; checkedAt: number; byId: Map<string, Item> } | null = null;
+const CHECK = 30_000;
+let loading: Promise<Item[]> | null = null;
 
-/** All items, cached 30s in-process. Cheap enough to scan for now (< 10k). */
 export async function allItems(): Promise<Item[]> {
-  if (cache && Date.now() - cache.at < TTL) return cache.items;
+  if (cache && Date.now() - cache.checkedAt < CHECK) return cache.items;
+  if (loading) return loading;
+  loading = (async () => {
+    try {
+      if (cache) {
+        const ver = await currentVersion();
+        if (ver === cache.ver) { cache.checkedAt = Date.now(); return cache.items; }
+      }
+      const snap = await readSnapshot();
+      if (snap) { cache = { items: snap.items, ver: snap.ver, checkedAt: Date.now(), byId: new Map(snap.items.map((i) => [i.repo.id, i])) }; return snap.items; }
+      const items = await assembleItems();
+      const ver = await writeSnapshot(items);
+      cache = { items, ver, checkedAt: Date.now(), byId: new Map(items.map((i) => [i.repo.id, i])) };
+      return items;
+    } finally { loading = null; }
+  })();
+  return loading;
+}
+
+/** O(1) lookup for callers that have the id; avoids a linear find over the corpus. */
+export async function itemById(id: string): Promise<Item | null> {
+  await allItems();
+  return cache?.byId.get(id) ?? null;
+}
+
+/** Slow path: assemble from per-repo keys. Only for building the snapshot. */
+export async function assembleItems(): Promise<Item[]> {
   const ids = await corpusIds();
   const r = redis();
   const [repos, cards, prio, tagRes] = await Promise.all([
@@ -79,7 +112,7 @@ export async function allItems(): Promise<Item[]> {
   ]);
   const prioById = new Map(ids.map((id, i) => [id, Number(prio[i] ?? 0)]));
   const tagsById = new Map(ids.map((id, i) => [id, (tagRes?.[i]?.[1] as string[]) ?? []]));
-  const items: Item[] = repos.map((repo) => {
+  return repos.map((repo) => {
     const tags = tagsById.get(repo.id) ?? [];
     return {
       repo,
@@ -89,12 +122,46 @@ export async function allItems(): Promise<Item[]> {
       priority: prioById.get(repo.id) ?? 0,
     };
   });
-  cache = { at: Date.now(), items };
-  return items;
 }
 
-export function invalidate(): void {
-  cache = null;
+/**
+ * After a bulk write (crawl, enrich, embed scripts): rebuild the snapshot once so every process sees it.
+ */
+export async function invalidate(): Promise<void> {
+  const items = await assembleItems();
+  const ver = await writeSnapshot(items);
+  cache = { items, ver, checkedAt: Date.now(), byId: new Map(items.map((i) => [i.repo.id, i])) };
+}
+
+/**
+ * After a single-repo write (ensureItem, backfill): read that one repo back and patch it into the
+ * snapshot. ~2 round trips instead of ~5k. Falls back to a full rebuild if there is no snapshot yet.
+ */
+export async function upsertSnapshotItem(id: string): Promise<void> {
+  const nid = normId(id);
+  const fresh = await readItemFromRedis(nid);
+  const snap = cache ?? (await readSnapshot().then((s) => s && { items: s.items, ver: s.ver, checkedAt: 0, byId: new Map(s.items.map((i) => [i.repo.id, i])) }));
+  if (!snap) return invalidate();
+  const items = snap.items.filter((i) => i.repo.id !== nid);
+  if (fresh) items.push(fresh);
+  const ver = await writeSnapshot(items);
+  cache = { items, ver, checkedAt: Date.now(), byId: new Map(items.map((i) => [i.repo.id, i])) };
+}
+
+async function readItemFromRedis(nid: string): Promise<Item | null> {
+  const r = redis();
+  const res = await r.pipeline().hgetall(K.repo(nid)).hgetall(CK.card(nid)).zscore(K.frontier, nid).smembers(K.tags(nid)).exec();
+  const repo = parseRepo((res?.[0]?.[1] as Record<string, string>) ?? {});
+  if (!repo) return null;
+  const card = parseCard((res?.[1]?.[1] as Record<string, string>) ?? {});
+  const tags = (res?.[3]?.[1] as string[]) ?? [];
+  return {
+    repo,
+    card,
+    sources: tags.filter((t) => t.startsWith("src:")).map((t) => t.slice(4)),
+    awesome: tags.filter((t) => t.startsWith("awesome:")).map((t) => t.slice(8)),
+    priority: Number(res?.[2]?.[1] ?? 0),
+  };
 }
 
 function arr<T>(v: T | T[] | undefined): T[] | undefined {
@@ -158,10 +225,17 @@ export async function getItems(filter: Filter = {}, sort: Sort = "interest", lim
   return sortItems(all.filter((it) => matches(it, filter)), sort).slice(0, limit);
 }
 
+/**
+ * One item, one Redis round trip. Serves from the corpus cache when warm; otherwise fetches just this
+ * repo rather than loading all 1,200+ (which is ~1 s to a remote Redis, and was what every deep dive
+ * paid whenever a backfill had invalidated the cache).
+ */
 export async function getItem(id: string): Promise<Item | null> {
   const nid = normId(id);
-  const all = await allItems();
-  return all.find((it) => it.repo.id === nid) ?? null;
+  const hit = cache?.byId.get(nid);
+  if (hit) return hit;
+  // Not in the snapshot: either never in the corpus, or written since. Ask Redis for just this one.
+  return readItemFromRedis(nid);
 }
 
 export async function getItemDetail(id: string): Promise<ItemDetail | null> {
@@ -169,20 +243,21 @@ export async function getItemDetail(id: string): Promise<ItemDetail | null> {
   if (!item) return null;
   const r = redis();
   const nid = item.repo.id;
-  const [readme, relRaw, mentions, links, alt, buildsOn, awesomeTags] = await Promise.all([
+  // Everything in one pipeline: this Redis is ~250 ms away, so round trips, not bytes, are the cost.
+  const [readme, relRaw, mentionsRaw, links, alt, buildsOn] = await Promise.all([
     getRaw(nid, "readme"),
     getRaw(nid, "releases"),
-    getMentions(nid),
-    getEdges(nid, "links"),
+    r.lrange(K.mentions(nid), 0, -1),
+    r.smembers(K.edges(nid, "links")),
     r.smembers(CK.alt(nid)),
     r.smembers(CK.builds(nid)),
-    getTags(nid).then((t) => t.filter((x) => x.startsWith("awesome:")).map((x) => x.slice(8))),
   ]);
-  // Siblings: other corpus repos in the same awesome lists (capped).
+  const mentions = mentionsRaw.map((x) => safeJson<Mention | null>(x, null, "mention")).filter((m): m is Mention => !!m);
+  // Siblings: other corpus repos in the same awesome lists (capped). Tags already on the item.
   let awesomeSiblings: string[] = [];
-  if (awesomeTags.length) {
-    const sets = await Promise.all(awesomeTags.map((l) => r.sinter(K.awesome(l), K.corpus)));
-    awesomeSiblings = Array.from(new Set(sets.flat())).filter((x) => x !== nid).slice(0, 30);
+  if (item.awesome.length) {
+    const sets = (await r.pipeline(item.awesome.map((l) => ["sinter", K.awesome(l), K.corpus])).exec()) ?? [];
+    awesomeSiblings = Array.from(new Set(sets.flatMap((x) => (x[1] as string[]) ?? []))).filter((x) => x !== nid).slice(0, 30);
   }
   return {
     ...item,
@@ -197,34 +272,23 @@ export async function getItemDetail(id: string): Promise<ItemDetail | null> {
  * Similar items by card overlap: shared tags/ecosystem weighted, same category,
  * explicit alt edges. Good enough until embeddings; same signature after.
  */
+/**
+ * Flat "similar" list, used by voice context and the /r page. Same ranker as the labelled groups
+ * (related.ts), so the two never disagree; `why` is derived from the signals.
+ */
 export async function similar(id: string, limit = 10): Promise<{ item: Item; score: number; why: string[] }[]> {
-  const me = await getItem(id);
-  if (!me?.card) return [];
-  const all = await allItems();
-  const alt = new Set(await redis().smembers(CK.alt(me.repo.id)));
-  const myTags = new Set([...me.card.tags, ...me.card.ecosystem].map((t) => t.toLowerCase()));
-  const out: { item: Item; score: number; why: string[] }[] = [];
-  for (const it of all) {
-    if (it.repo.id === me.repo.id || !it.card) continue;
+  const { neighbors } = await import("./related");
+  const ns = await neighbors(id, limit);
+  return ns.map((n) => {
     const why: string[] = [];
-    let score = 0;
-    if (alt.has(it.repo.id)) {
-      score += 5;
-      why.push("named alternative");
-    }
-    if (it.card.category === me.card.category) {
-      score += 2;
-      why.push(`both ${it.card.category}`);
-    }
-    const shared = [...it.card.tags, ...it.card.ecosystem].map((t) => t.toLowerCase()).filter((t) => myTags.has(t));
-    if (shared.length) {
-      score += shared.length;
-      why.push(`shares ${Array.from(new Set(shared)).slice(0, 3).join(", ")}`);
-    }
-    if (it.repo.language && it.repo.language === me.repo.language) score += 0.5;
-    if (score >= 2) out.push({ item: it, score, why });
-  }
-  return out.sort((a, b) => b.score - a.score).slice(0, limit);
+    if (n.signals.alt) why.push("named alternative");
+    if (n.signals.linksTo || n.signals.linkedFrom) why.push("linked from README");
+    if (n.signals.sameOwner) why.push("same author");
+    if (n.signals.shared.length) why.push(`shares ${n.signals.shared.slice(0, 3).join(", ")}`);
+    if ((n.signals.cos ?? 0) > 0.6 && !why.length) why.push("close in meaning");
+    if (n.signals.sameCategory && !why.length) why.push("same category");
+    return { item: n.item, score: n.score, why };
+  });
 }
 
 export async function categories(): Promise<{ category: string; count: number }[]> {

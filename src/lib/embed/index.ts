@@ -91,20 +91,94 @@ export async function putEmbeddings(pairs: { id: string; v: Float32Array }[]): P
   await p.exec();
 }
 
-/** All corpus vectors in one round trip. Missing ids map to null. */
 /**
- * Whole-corpus vector cache for search: one Redis round-trip per 60 s per process instead of one per
- * query. ~10k × 512 × 4 B = 20 MB; fine for a Node process, and vectors only change when cards do.
+ * The whole corpus as one matrix, in one Redis key (emb:matrix = ids JSON + Float32 block, ~2 MB at 1k,
+ * ~20 MB at 10k), versioned with the corpus snapshot. One GET per process per version instead of one
+ * pipelined read per vector per request (862 reads = 165 ms at 1.2k; linear). Missing vectors are
+ * simply absent from `ids`.
  */
-let all: { at: number; m: Map<string, Float32Array>; ids: string } | null = null;
-export async function getEmbeddingsCached(ids: string[]): Promise<Map<string, Float32Array>> {
-  const sig = `${ids.length}:${ids[0]}:${ids[ids.length - 1]}`;
-  if (all && all.ids === sig && Date.now() - all.at < 60_000) return all.m;
-  const m = await getEmbeddings(ids);
-  all = { at: Date.now(), m, ids: sig };
-  return m;
+export const MK = { matrix: "emb:matrix", ver: "emb:ver" } as const;
+
+export interface Matrix { ids: string[]; row: Map<string, number>; data: Float32Array; ver: number }
+let matrix: { m: Matrix; checkedAt: number } | null = null;
+let matrixLoading: Promise<Matrix> | null = null;
+const MCHECK = 30_000;
+
+export async function writeMatrix(): Promise<number> {
+  const r = redis();
+  const keys: string[] = [];
+  let cursor = "0";
+  do { const [c, ks] = await r.scan(cursor, "MATCH", "emb:*", "COUNT", 1000); cursor = c; for (const k of ks) if (k !== MK.matrix && k !== MK.ver) keys.push(k); } while (cursor !== "0");
+  const ids = keys.map((k) => k.slice(4)).sort();
+  const vecs = await getEmbeddings(ids);
+  const have = ids.filter((id) => vecs.has(id));
+  const data = new Float32Array(have.length * DIM);
+  have.forEach((id, i) => data.set(vecs.get(id)!, i * DIM));
+  const head = Buffer.from(JSON.stringify(have), "utf8");
+  const len = Buffer.alloc(4); len.writeUInt32LE(head.length);
+  const buf = Buffer.concat([len, head, Buffer.from(data.buffer)]);
+  const [, ver] = await Promise.all([r.set(MK.matrix, buf), r.incr(MK.ver)]);
+  return ver;
 }
 
+function parseMatrix(buf: Buffer, ver: number): Matrix {
+  const hl = buf.readUInt32LE(0);
+  const ids = JSON.parse(buf.subarray(4, 4 + hl).toString("utf8")) as string[];
+  const body = buf.subarray(4 + hl);
+  const data = new Float32Array(body.buffer.slice(body.byteOffset, body.byteOffset + body.byteLength));
+  return { ids, row: new Map(ids.map((id, i) => [id, i])), data, ver };
+}
+
+export async function getMatrix(): Promise<Matrix> {
+  if (matrix && Date.now() - matrix.checkedAt < MCHECK) return matrix.m;
+  if (matrixLoading) return matrixLoading;
+  matrixLoading = (async () => {
+    try {
+      const r = redis();
+      if (matrix) { const ver = Number((await r.get(MK.ver)) ?? 0); if (ver === matrix.m.ver) { matrix.checkedAt = Date.now(); return matrix.m; } }
+      let [buf, ver] = await Promise.all([r.getBuffer(MK.matrix), r.get(MK.ver)]);
+      if (!buf) { await writeMatrix(); [buf, ver] = await Promise.all([r.getBuffer(MK.matrix), r.get(MK.ver)]); }
+      const m = parseMatrix(buf!, Number(ver ?? 0));
+      matrix = { m, checkedAt: Date.now() };
+      return m;
+    } finally { matrixLoading = null; }
+  })();
+  return matrixLoading;
+}
+
+/** Test hook: forget the in-process matrix so the next getMatrix() reads Redis. */
+export function _resetMatrixCache(): void { matrix = null; }
+
+export function rowOf(m: Matrix, id: string): Float32Array | null {
+  const i = m.row.get(id);
+  return i === undefined ? null : m.data.subarray(i * DIM, (i + 1) * DIM);
+}
+
+/** Cosine of `q` against every row; returns the top k (id, cos) excluding `skip`. One pass, no allocation per row. */
+export function topK(m: Matrix, q: Float32Array, k: number, skip?: Set<string>): { id: string; cos: number }[] {
+  const out: { id: string; cos: number }[] = [];
+  let min = -Infinity;
+  const n = m.ids.length, d = m.data;
+  for (let r = 0; r < n; r++) {
+    const id = m.ids[r];
+    if (skip?.has(id)) continue;
+    let s = 0; const o = r * DIM;
+    for (let i = 0; i < DIM; i++) s += q[i] * d[o + i];
+    if (out.length < k) { out.push({ id, cos: s }); if (out.length === k) min = Math.min(...out.map((x) => x.cos)); }
+    else if (s > min) { let j = 0; for (let i = 1; i < k; i++) if (out[i].cos < out[j].cos) j = i; out[j] = { id, cos: s }; min = Math.min(...out.map((x) => x.cos)); }
+  }
+  return out.sort((a, b) => b.cos - a.cos);
+}
+
+/** Map view over the matrix for callers that want `Map<id, vec>` (feed, search). Rows are views, not copies. */
+export async function getEmbeddingsCached(ids: string[]): Promise<Map<string, Float32Array>> {
+  const m = await getMatrix();
+  const out = new Map<string, Float32Array>();
+  for (const id of ids) { const v = rowOf(m, id); if (v) out.set(id, v); }
+  return out;
+}
+
+/** Per-id reads straight from Redis. For the matrix builder and for ids that may be newer than the matrix. */
 export async function getEmbeddings(ids: string[]): Promise<Map<string, Float32Array>> {
   const out = new Map<string, Float32Array>();
   if (!ids.length) return out;
@@ -130,9 +204,13 @@ export interface Taste { v: Float32Array; w: number }
 /** The user's taste as a unit vector plus the evidence weight behind it. null until the first embedded reaction. */
 export async function getTaste(uid: string): Promise<Taste | null> {
   const [b, w] = await Promise.all([redis().getBuffer(EK.taste(uid)), redis().get(EK.tastew(uid))]);
+  return tasteFrom(b, Number(w ?? 0));
+}
+
+/** Build a Taste from already-fetched bytes (see state.loadUser, which reads them in one pipeline). */
+export function tasteFrom(b: Buffer | null, weight: number): Taste | null {
   const sum = fromBuf(b);
   if (!sum) return null;
-  const weight = Number(w ?? 0);
   // All evidence cancelled (e.g. like then undo): no taste, rather than a random direction from float dust.
   if (weight <= 0 || !sum.some((x) => Math.abs(x) > 1e-6)) return null;
   return { v: normalize(sum), w: weight };

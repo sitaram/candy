@@ -17,6 +17,10 @@ export const dynamic = "force-dynamic";
  */
 export const GET = route({ params: ItemParams, limit: "read" }, async ({ uid, params, req }) => {
   const id = RepoId.parse(`${params.owner}/${params.name}`);
+  // Fast path first: if the card is already here, that is one round trip and we are done. Redis is
+  // ~250 ms away, so the old isKnown → ensureItem → getItemDetail chain was three of them before any data.
+  const fast = await getItemDetail(id);
+  if (fast?.card) return Response.json(fast);
   const known = await isKnown(id);
   if (known === "absent") throw new HttpError(404, "not found");
   if (known === "frontier") {

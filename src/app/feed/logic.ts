@@ -57,3 +57,23 @@ export function resolveGesture(axis: Axis, dx: number, dy: number, can: { prev: 
   }
   return "none";
 }
+
+export type Release =
+  | { kind: "tap" }
+  | { kind: "decide"; decision: "like" | "skip"; dx: number; dy: number }
+  | { kind: "page"; dir: 1 | -1; dy: number }
+  | { kind: "release"; dy: number; overscroll: boolean }   // y-axis, short of a threshold (or past it with nowhere to go)
+  | { kind: "none" };
+
+/** Everything a released pointer can mean, from its total travel. Pure; the hook just dispatches. */
+export function classifyRelease(axis: Axis, dx: number, dy: number, can: { prev: boolean; next: boolean }): Release {
+  if (!axis && Math.hypot(dx, dy) < 8) return { kind: "tap" };
+  const intent = resolveGesture(axis, dx, dy, can);
+  switch (intent) {
+    case "like": case "skip": return { kind: "decide", decision: intent, dx, dy };
+    case "next": return { kind: "page", dir: 1, dy };
+    case "prev": return { kind: "page", dir: -1, dy };
+  }
+  if (axis === "y") return { kind: "release", dy, overscroll: dy <= -VTHRESH && !can.next };
+  return { kind: "none" };
+}

@@ -4,6 +4,7 @@ import type { CSSProperties } from "react";
 import type { FeedItem } from "@/lib/user/feed";
 import { hueOf, fmt, agoShort, splitWhy } from "./logic";
 import { VoiceBoundary } from "./VoiceBoundary";
+import { Tip } from "./Tip";
 
 export type Decision = "like" | "skip";
 
@@ -108,13 +109,15 @@ export function Card({
       {debug && <div className="fcard-dbg">score {f.score} · fit {f.fit}</div>}
 
       <div className="fcard-actions" onPointerDown={stop}>
-        <button className="act dive" onClick={onOpen} aria-label="Deep dive" title="Deep dive (enter, or tap the card)">{I.open}</button>
+        <Tip label="Deep dive" tipKey="dive" side="top" intro={false}><button className="act dive" onClick={onOpen} aria-label="Deep dive" title="Deep dive (enter, or tap the card)">{I.open}</button></Tip>
         <VoiceBoundary where="card-actions" fallback={<button className="act voice" disabled aria-label="Voice unavailable" title="Voice unavailable">{I.voice}</button>}>
         <div className={`voice-cluster${voice && voice.state !== "idle" ? " on" : ""}`}>
-          <button className={`act voice${voice && voice.state !== "idle" ? ` on ${voice.state}` : ""}`}
-            onClick={(e) => { e.stopPropagation(); onVoice?.(); }} aria-label={voice && voice.state !== "idle" ? "End conversation" : "Talk about this"} title={voice && voice.state !== "idle" ? "End (v)" : "Talk about this (v)"}>
-            {voice && voice.state !== "idle" ? <span className="stop" aria-hidden /> : I.voice}
-          </button>
+          <Tip label={voice && voice.state !== "idle" ? "End the conversation" : "Talk about this project"} tipKey="card-voice" side="top" intro={!(voice && voice.state !== "idle")} delay={1800}>
+            <button className={`act voice${voice && voice.state !== "idle" ? ` on ${voice.state}` : ""}`}
+              onClick={(e) => { e.stopPropagation(); onVoice?.(); }} aria-label={voice && voice.state !== "idle" ? "End conversation" : "Talk about this"} title={voice && voice.state !== "idle" ? "End (v)" : "Talk about this (v)"}>
+              {voice && voice.state !== "idle" ? <span className="stop" aria-hidden /> : I.voice}
+            </button>
+          </Tip>
           {voice && voice.state !== "idle" && (
             <button className={`act sub mute${voice.muted ? " off" : ""}`} onClick={(e) => { e.stopPropagation(); voice.toggleMute?.(); }} aria-label={voice.muted ? "Unmute" : "Mute"} title={voice.muted ? "Unmute" : "Mute"}>
               {voice.muted ? I.micOff : I.mic}

@@ -547,13 +547,12 @@ export function FeedClient() {
       <header className="feed-head">
         <a href="/" className="brand">candy</a>
         <span className="feed-since">
-          {since && since.lastVisit > 0 ? (
+          {since && since.lastVisit > 0 && (since.newInYourAreas > 0 || since.releasesOnSaved.length > 0 || since.newInCorpus > 0) ? (
             <>
-              {since.newInCorpus} new
-              {since.newInYourAreas > 0 && <>, <b>{since.newInYourAreas} in your areas</b></>}
-              {since.releasesOnSaved.length > 0 && <>, {since.releasesOnSaved.length} saved released</>}
+              {since.newInYourAreas > 0 ? <b>{since.newInYourAreas} new in your areas</b> : <>{since.newInCorpus} new</>}
+              {since.releasesOnSaved.length > 0 && <>{since.newInYourAreas > 0 || since.newInCorpus > 0 ? " · " : ""}{since.releasesOnSaved.length} saved released</>}
             </>
-          ) : profileSize === 0 ? "swipe a few and it learns" : ""}
+          ) : "discover open source"}
         </span>
         <button className="icon-btn feed-search" onClick={openSearch} aria-label="Search" title="Search (/)">{I.search}</button>
         <button className="icon-btn feed-search" onClick={openVoiceSearch} aria-label="Ask by voice" title="Ask by voice">{I.voice}</button>

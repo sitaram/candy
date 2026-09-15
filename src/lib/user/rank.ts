@@ -5,6 +5,7 @@
  */
 import type { Item } from "../corpus/api";
 import { itemTerms, type Profile } from "./state";
+import { readable } from "./terms";
 import { dot, type Taste } from "../embed";
 
 export interface Ranked {
@@ -39,7 +40,8 @@ export function fitScore(it: Item, profile: Profile): { fit: number; matched: st
     } else neg += -p * w;
   }
   const fit = Math.max(-0.5, Math.min(1, pos / denom - neg / denom));
-  return { fit, matched: matched.sort((a, b) => b.w - a.w).map((m) => m.term.replace(/^(cat|lang):/, "")) };
+  // Readable, not the slug: "AI and LLM tools", "Rust" — this string is shown on the card and read aloud by voice.
+  return { fit, matched: matched.sort((a, b) => b.w - a.w).map((m) => readable(m.term)) };
 }
 
 export function baseScore(it: Item): { score: number; why: string[] } {

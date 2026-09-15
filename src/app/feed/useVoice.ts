@@ -134,7 +134,9 @@ export function useVoice(handlers: VoiceHandlers) {
       else if (name === "open_result") output = (await h.current.onOpenResult?.(String(args.which ?? "1"))) ?? "Could not open that.";
       else {
         const r = await fetch("/api/voice/tool", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name, args, current: h.current.currentId?.() ?? null }) });
-        output = ((await r.json()) as { output?: string }).output ?? "No result.";
+        // After a switch (card → search) the model may still call a tool from the earlier surface; the server
+        // 400s on the enum. Say so, rather than "No result." which reads as an empty answer.
+        output = r.status === 400 ? "That isn't available on this screen. Use the tools you have now." : ((await r.json()) as { output?: string }).output ?? "No result.";
       }
     } catch (e) {
       const err = e as Error;

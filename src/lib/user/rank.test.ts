@@ -28,7 +28,7 @@ describe("fitScore", () => {
     const { fit, matched } = fitScore(item("a/b", { card: { tags: ["cli", "rust"] } }), p);
     // pos = 2·1 + 1·1 = 3 ; denom = 7
     expect(fit).toBeCloseTo(3 / 7);
-    expect(matched).toEqual(["rust", "cli"]);
+    expect(matched).toEqual(["Rust", "CLI tools"]);   // readable, not the slug
   });
   it("negative profile terms subtract; result is clamped to [-0.5, 1]", () => {
     const p = new Map([["cli", -50], ["x", 1]]);
@@ -36,9 +36,9 @@ describe("fitScore", () => {
     const q = new Map([["cli", 100]]);
     expect(fitScore(item("a/b", { card: { tags: ["cli"] } }), q).fit).toBe(1);
   });
-  it("strips cat:/lang: prefixes from matched names so the UI reads 'rust', not 'lang:rust'", () => {
+  it("names matched terms readably — 'Rust', 'command-line tools' — not 'lang:rust' / 'cat:cli' (shown on the card and read aloud)", () => {
     const p = new Map([["lang:rust", 1], ["cat:cli", 1]]);
-    expect(fitScore(item("a/b", { card: { category: "cli" }, repo: { language: "Rust" } }), p).matched).toEqual(["cli", "rust"]);
+    expect(fitScore(item("a/b", { card: { category: "cli" }, repo: { language: "Rust" } }), p).matched).toEqual(["command-line tools", "Rust"]);
   });
 });
 
@@ -143,7 +143,7 @@ describe("rank", () => {
     const r = rank(items, p, { n: 10, exploreRatio: 0 });
     // 'mid' is interest 5 with full fit; 'hi' interest 8 with none. 5^1.2·2 = 13.8 > 8^1.2 = 12.1
     expect(r[0].item.repo.id).toBe("a/mid");
-    expect(r[0].why[0]).toBe("matches your interest in cli");
+    expect(r[0].why[0]).toBe("matches your interest in CLI tools");
   });
   it("applies a 0.7 penalty per repeated category so the deck varies", () => {
     const many = Array.from({ length: 6 }, (_, i) => item(`c/${i}`, { card: { interest: 7 - i * 0.1, category: "cli", tags: [`t${i}`] } }));

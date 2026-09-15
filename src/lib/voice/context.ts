@@ -160,7 +160,7 @@ A sharp, warm, opinionated engineer-friend — the colleague who has already tri
 English. Match the user if they switch.
 
 # Opening
-On connection, without waiting for the user to speak, give a spoken take on the current repo in at most 20 seconds (roughly 45-60 words): what it is, why it is in their feed, and the one most interesting thing (a hook, a release, a mention, an alternative). The user's microphone is closed while you give this take — they cannot interrupt — so end it by handing the floor over clearly. Close with one sentence that (a) tells them they can now talk and (b) names two or three concrete things they could ask, using this repo's own terms — an alternative by name, a release, a hook. For example: "I'm listening now — ask me how it compares to Whisper, what changed in 0.4, or say next." Then stop. After that first take the mic stays open and they can interrupt you at any time.
+On connection, without waiting for the user to speak, give a spoken take on the current repo in at most 20 seconds — roughly 60 words *including* the closing hand-off sentence: what it is, why it is in their feed, and the one most interesting thing (a hook, a release, a mention, an alternative). The user's microphone is closed while you give this take — they cannot interrupt — so end it by handing the floor over clearly. Close with one sentence that (a) tells them they can now talk and (b) names two or three concrete things they could ask, using this repo's own terms — an alternative by name, a release, a hook. For example: "I'm listening now — ask me how it compares to Whisper, what changed in 0.4, or say next." Then stop. After that first take the mic stays open and they can interrupt you at any time.
 
 # Verbosity
 - Direct answers: one or two natural sentences. Short is good; terse is not.
@@ -225,29 +225,8 @@ export const SEARCH_TOOLS = [
   },
 ] as const;
 
-/** Profile terms as a voice would say them: cat:ai-llm → "AI and LLMs", lang:rust → "Rust", mcp → "MCP servers". */
-const SPOKEN: Record<string, string> = {
-  "cat:ai-llm": "AI and LLM tools", "cat:ai-agents": "AI agents", "cat:ml-infra": "ML infrastructure", "cat:dev-tools": "dev tools", "cat:cli": "command-line tools",
-  "cat:web-framework": "web frameworks", "cat:frontend": "frontend", "cat:backend": "backend", "cat:database": "databases", "cat:data-eng": "data engineering",
-  "cat:devops-infra": "DevOps and infra", "cat:security": "security", "cat:networking": "networking", "cat:systems": "systems programming",
-  "cat:languages-compilers": "languages and compilers", "cat:mobile": "mobile", "cat:desktop": "desktop apps", "cat:games-graphics": "games and graphics",
-  "cat:science": "scientific computing", "cat:productivity": "productivity", "cat:learning-resource": "learning resources",
-  mcp: "MCP servers", llm: "LLM tooling", "local-inference": "local LLMs", rag: "RAG", agents: "agents", cli: "CLI tools", rust: "Rust", python: "Python",
-  typescript: "TypeScript", go: "Go", "vs code": "VS Code extensions", vscode: "VS Code extensions", neovim: "Neovim", terminal: "terminal tools",
-  "self-hosted": "self-hosted software", "local-first": "local-first apps", kubernetes: "Kubernetes", postgres: "Postgres", postgresql: "Postgres",
-  voice: "voice", tts: "text-to-speech", stt: "speech-to-text", testing: "testing", e2e: "end-to-end testing", observability: "observability",
-  claude: "Claude tooling", openai: "OpenAI tooling", anthropic: "Anthropic tooling", huggingface: "Hugging Face", "hugging-face": "Hugging Face",
-  pytorch: "PyTorch", cuda: "CUDA", react: "React", nextjs: "Next.js", "next.js": "Next.js", vue: "Vue", svelte: "Svelte", tailwind: "Tailwind",
-  docker: "Docker", wasm: "WebAssembly", webassembly: "WebAssembly", privacy: "privacy tools", "speaker-diarization": "speaker diarization",
-  whisper: "Whisper", langchain: "LangChain", "vector-database": "vector databases", embeddings: "embeddings", "fine-tuning": "fine-tuning",
-  "open-source": "open source", oss: "open source", github: "GitHub tooling", git: "Git tools", sqlite: "SQLite", redis: "Redis", graphql: "GraphQL",
-};
-export function spoken(term: string): string {
-  if (SPOKEN[term]) return SPOKEN[term];
-  if (term.startsWith("lang:")) { const l = term.slice(5); return l.length <= 3 ? l.toUpperCase() : l[0].toUpperCase() + l.slice(1); }
-  if (term.startsWith("cat:")) return term.slice(4).replace(/-/g, " ");
-  return term.replace(/-/g, " ");
-}
+import { spoken } from "@/lib/user/terms";
+export { spoken };
 
 /**
  * Two interests to name in the opener, drawn from the top five so it is not "mcp" every time.

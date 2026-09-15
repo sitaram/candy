@@ -88,12 +88,14 @@ describe("search()", () => {
     await corpus();
     vi.spyOn(embed, "embedTexts").mockResolvedValue([vec(0)]);
     const before = (await search(U, "voice agents")).results.map((x) => x.id);
-    for (let i = 0; i < 4; i++) await react(U, (await getItem("ts/voice"))!, "like");
+    // One like per card (a repeat is a no-op now, and a card has one reaction): like + save on ts/voice, save on livekit.
+    await react(U, (await getItem("ts/voice"))!, "like");
+    await react(U, (await getItem("ts/voice"))!, "save");
     await react(U, (await getItem("livekit/agents"))!, "save");
     const after = await search(U, "voice agents");
     expect(after.results.map((x) => x.id).indexOf("ts/voice")).toBeLessThanOrEqual(before.indexOf("ts/voice"));
-    // The learned terms, strongest first: voice-agents (4×1) then ai-agents (4×0.6×0.6); typescript (4×0.5×0.5) is third and cut.
-    expect(after.results.find((x) => x.id === "ts/voice")!.why).toContain("matches your interest in voice-agents, ai-agents");
+    // The learned terms, strongest first: voice-agents (3×1) then ai-agents (3×0.6×0.6); typescript (3×0.5×0.5) is third and cut.
+    expect(after.results.find((x) => x.id === "ts/voice")!.why).toContain("matches your interest in voice agents, AI agents");
     expect(after.results.find((x) => x.id === "livekit/agents")!.saved).toBe(true);
     expect(after.results.length).toBeLessThanOrEqual(20);
   });

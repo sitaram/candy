@@ -134,7 +134,18 @@
 .fcard-dbg { font-size: 11px; color: var(--ink-4); text-align: center; margin-bottom: 6px; }
 
 /* actions */
-.fcard-actions { display: flex; justify-content: center; align-items: center; gap: 64px; }
+/* dive · voice, with room between them for mute + stop to appear beside voice without moving anything */
+.fcard-actions { display: flex; justify-content: center; align-items: center; gap: 100px; }
+.voice-cluster { position: relative; width: 64px; height: 64px; }
+.voice-cluster .act.voice { position: absolute; left: 0; top: 0; }
+.voice-cluster .act.sub { position: absolute; top: 12px; width: 40px; height: 40px; }
+.voice-cluster .act.sub.mute { right: calc(100% + 10px); }
+.voice-cluster .act.sub.end { left: calc(100% + 10px); }
+.act.sub svg { width: 20px; height: 20px; }
+.act.sub.end svg { width: 18px; height: 18px; }
+.act.sub.mute.off { color: var(--skip); border-color: color-mix(in srgb, var(--skip) 45%, transparent); background: color-mix(in srgb, var(--skip) 12%, var(--fill)); }
+@media (hover: hover) { .act.sub.mute.off:hover { color: var(--skip); background: color-mix(in srgb, var(--skip) 18%, var(--fill)); } }
+@media (max-width: 360px) { .fcard-actions { gap: 84px; } .voice-cluster .act.sub.mute { right: calc(100% + 6px); } .voice-cluster .act.sub.end { left: calc(100% + 6px); } }
 .act {
   width: 64px; height: 64px; border-radius: 50%;
   border: 1.5px solid var(--line); background: var(--fill); color: var(--ink);
@@ -155,7 +166,6 @@
 .act.voice.on { color: var(--bg); background: var(--accent); border-color: transparent; }
 @media (hover: hover) { .act.voice.on:hover { background: var(--accent); color: var(--bg); } }
 .act.voice.on.connecting { opacity: .55; }
-.act.voice.on .stop { width: 20px; height: 20px; border-radius: 4px; background: currentColor; display: block; }
 .toast.err { background: var(--skip); color: #fff; }
 .toast.err button { color: #fff; }
 .act svg { width: 26px; height: 26px; }
@@ -404,13 +414,10 @@
 }
 .s-voice:hover { background: var(--fill-2); color: var(--ink); }
 .s-voice:active { transform: scale(.92); }
-.s-voice.on {
-  background: var(--accent); color: var(--bg); border-color: transparent;
-  box-shadow: 0 0 0 calc(2px + var(--lvl, 0) * 10px) color-mix(in srgb, var(--accent) 22%, transparent);
-  transition: box-shadow .06s linear;
-}
-.s-voice.on.connecting { animation: vpulse 1.2s ease-in-out infinite; }
-.s-voice.on .stop { width: 14px; height: 14px; border-radius: 3px; background: currentColor; display: block; }
+.s-voice.on { background: var(--accent); color: var(--bg); border-color: transparent; }
+.s-voice.on.connecting { opacity: .55; }
+.s-voice.sub { width: 34px; height: 34px; color: var(--ink-3); }
+.s-voice.sub.mute.off { color: var(--skip); border-color: color-mix(in srgb, var(--skip) 45%, transparent); background: color-mix(in srgb, var(--skip) 12%, var(--fill)); }
 .s-note { flex: 0 0 auto; padding: 4px 30px 8px; font-size: 13.5px; color: var(--ink-3); line-height: 1.4; max-height: 64px; overflow: hidden; }
 .s-note.err { color: var(--skip); }
 .s-note.heard { color: var(--ink-4); font-style: italic; }

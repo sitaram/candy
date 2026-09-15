@@ -40,6 +40,9 @@ const I = {
   // live-voice bars — the glyph Siri / ChatGPT Voice / Gemini Live use for a real-time conversation
   voice: <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M4 10v4" /><path d="M8 7v10" /><path d="M12 4v16" /><path d="M16 7v10" /><path d="M20 10v4" /></svg>,
   search: <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>,
+  mic: <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5 11a7 7 0 0 0 14 0" /><path d="M12 18v3" /></svg>,
+  micOff: <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 9v2a3 3 0 0 0 5.1 2.1" /><path d="M15 9.3V6a3 3 0 0 0-6 0" /><path d="M5 11a7 7 0 0 0 11.4 5.4M19 11a7 7 0 0 1-.6 2.8" /><path d="M12 18v3" /><path d="m3 3 18 18" /></svg>,
+  stop: <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2.5" /></svg>,
   // profile: person in a ring — the one glyph every phone user reads as "you", at the same stroke weight as search
   me: <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9.5" /><circle cx="12" cy="10" r="3.2" /><path d="M5.8 18.6c1.4-2.4 3.6-3.6 6.2-3.6s4.8 1.2 6.2 3.6" /></svg>,
   // "maximize": two diagonal corner arrows — reads as "open this up"
@@ -77,7 +80,7 @@ function Card({
   f, style, className, debug, saved, reaction, onSave, onOpen, onVoice, voice,
 }: {
   f: FeedItem; style?: CSSProperties; className?: string; debug?: boolean; saved?: boolean; reaction?: Decision;
-  onSave?: () => void; onOpen?: () => void; onVoice?: () => void; voice?: { state: string; level: number };
+  onSave?: () => void; onOpen?: () => void; onVoice?: () => void; voice?: { state: string; level: number; muted?: boolean; toggleMute?: () => void };
 }) {
   const c = f.item.card;
   const r = f.item.repo;
@@ -147,10 +150,22 @@ function Card({
 
       <div className="fcard-actions" onPointerDown={stop}>
         <button className="act dive" onClick={onOpen} aria-label="Deep dive" title="Deep dive (enter, or tap the card)">{I.open}</button>
-        <button className={`act voice${voice && voice.state !== "idle" ? ` on ${voice.state}` : ""}`}
-          onClick={(e) => { e.stopPropagation(); onVoice?.(); }} aria-label={voice && voice.state !== "idle" ? "End conversation" : "Talk about this"} title="Talk about this (v)">
-          {voice && voice.state !== "idle" ? <span className="stop" aria-hidden /> : I.voice}
-        </button>
+        <div className={`voice-cluster${voice && voice.state !== "idle" ? " on" : ""}`}>
+          <button className={`act voice${voice && voice.state !== "idle" ? ` on ${voice.state}` : ""}`}
+            onClick={(e) => { e.stopPropagation(); onVoice?.(); }} aria-label={voice && voice.state !== "idle" ? "Talking" : "Talk about this"} title="Talk about this (v)">
+            {I.voice}
+          </button>
+          {voice && voice.state !== "idle" && (
+            <>
+              <button className={`act sub mute${voice.muted ? " off" : ""}`} onClick={(e) => { e.stopPropagation(); voice.toggleMute?.(); }} aria-label={voice.muted ? "Unmute" : "Mute"} title={voice.muted ? "Unmute" : "Mute"}>
+                {voice.muted ? I.micOff : I.mic}
+              </button>
+              <button className="act sub end" onClick={(e) => { e.stopPropagation(); onVoice?.(); }} aria-label="End conversation" title="End">
+                {I.stop}
+              </button>
+            </>
+          )}
+        </div>
       </div>
       <div className="stamp like">YES</div>
       <div className="stamp skip">NOPE</div>
@@ -621,7 +636,7 @@ export function FeedClient() {
                 {cur ? (
                   <Card key={cur.id} f={cur} style={curStyle} debug={debug} saved={saved.has(cur.id)} reaction={reacted.current.get(cur.id)}
                     onSave={() => toggleSave(cur.id)} onOpen={() => openDetail(cur.id)}
-                    onVoice={toggleVoice} voice={{ state: voice.state, level: voice.level }} />
+                    onVoice={toggleVoice} voice={{ state: voice.state, level: voice.level, muted: voice.muted, toggleMute: voice.toggleMute }} />
                 ) : (
                   <Splash style={curStyle} onStart={() => { if (items.length) go(0); else wantStart.current = true; }} />
                 )}

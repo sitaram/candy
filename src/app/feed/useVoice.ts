@@ -40,6 +40,7 @@ export function useVoice(handlers: VoiceHandlers) {
   const [state, setState] = useState<VoiceState>("idle");
   const [level, setLevel] = useState(0);          // 0..1, whoever is louder (mic or model) — drives the button ring
   const [micLevel, setMicLevel] = useState(0);    // 0..1, you only — drives "hearing you"
+  const [muted, setMuted] = useState(false);       // mic track disabled; the model hears silence
   const [transcript, setTranscript] = useState(""); // last thing the model said (for the sheet)
   const [error, setError] = useState<string | null>(null);
 
@@ -68,7 +69,7 @@ export function useVoice(handlers: VoiceHandlers) {
     void ctx.current?.close();
     if (audioEl.current) { audioEl.current.srcObject = null; audioEl.current.remove(); }
     pc.current = null; dc.current = null; mic.current = null; ctx.current = null; audioEl.current = null;
-    setLevel(0); setMicLevel(0); speaking.current = false;
+    setLevel(0); setMicLevel(0); speaking.current = false; setMuted(false);
     setState("idle");
     if (reason && !opts?.quiet) setError(reason);
   }, []);
@@ -250,5 +251,12 @@ export function useVoice(handlers: VoiceHandlers) {
     return () => document.removeEventListener("visibilitychange", onVis);
   }, []);
 
-  return { state, level, micLevel, transcript, error, start, stop, inject, active: state !== "idle" && state !== "error" };
+  const toggleMute = useCallback(() => {
+    const t = mic.current?.getAudioTracks()[0];
+    if (!t) return;
+    t.enabled = !t.enabled;
+    setMuted(!t.enabled);
+  }, []);
+
+  return { state, level, micLevel, transcript, error, start, stop, inject, muted, toggleMute, active: state !== "idle" && state !== "error" };
 }

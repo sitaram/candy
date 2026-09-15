@@ -51,9 +51,22 @@ The corpus holds 1,225 carded repos. Thirty percent came from more than one sour
 
 ## Voice
 
-**The card is the context.** Tap the bars and you are talking to a guide that already knows the project. Before it hands the browser a short-lived key, the server bakes the full brief into the session: why the repo is in your feed, six similar repos, and a compact profile of you. The browser then speaks to the realtime model directly, and the real key never leaves the server. The guide opens with a take of twenty seconds or less, with the mic closed so a cough cannot cut it off, and it ends by handing over the floor in the repo's own terms: "ask how it compares to Whisper, what changed in 0.4, or say next." The mic opens as that audio finishes, and from then on you can interrupt at will. Swipes keep working underneath, and a page change hands the model the new brief.
+Voice is a live, two-way conversation with the corpus. You talk, it talks back, and you can interrupt it, the way you would a person. There is no dictation step and no transcript to read. It lives in two places:
 
-**The tools are the product's own read API.** No model sits on that path and each call returns in under 150 ms. Whatever a tool returns, the guide says, so tools return only what is true right now. **The screen follows the voice.** When the guide shifts to another repo, it slides that card onto the rail, so what you hear and what you see stay the same thing. **Nothing is transcribed to the screen.** The button breathes with whoever is louder, and the card stays the visual. **Two models do two jobs.** The realtime model holds a three-thousand-token brief and cannot read a sixty-thousand-character README. Hard questions such as "does it support X" or "what broke last release" go to a text model that has the full README, releases and graph as a cached prompt. It answers in three to six seconds; the guide says "let me read" and relays. The same path powers the typed *Ask this repo* box. Sessions end after three minutes of mutual silence. Idle time is nearly free because the meter runs on audio tokens, not wall clock, and a three-minute conversation costs about $0.20.
+- **On a card.** Tap the bars and a guide that already knows the project gives you a short take, then lets you ask, discuss and go deep, or move on to the next card by voice.
+- **In the header.** The same bars open search already listening. Describe what you need in your own words and the results appear on the rail.
+
+**The card is the context.** Before the browser is handed a short-lived key, the server bakes the whole brief into the session: the card, why it is in your feed, six similar repos, and a compact profile of you. The browser then speaks to the realtime model directly, and the real key never leaves the server.
+
+**It opens, then hands over.** The guide gives a take of twenty seconds or less, with the mic closed so a cough cannot cut it off. It ends by offering the floor in the repo's own terms: "ask how it compares to Whisper, what changed in 0.4, or say next." The mic opens as that audio finishes, and from then on you can interrupt at will.
+
+**The screen follows the voice.** Swipes keep working under a conversation, and a page change hands the guide the new brief. When the guide shifts to another repo, it slides that card onto the rail, so what you hear and what you see stay the same thing. Nothing is transcribed to the screen. The button breathes with whoever is louder, and the card stays the visual.
+
+**The tools are the product's own read API.** No model sits on that path and each call returns in under 150 ms. Whatever a tool returns, the guide says, so tools return only what is true right now.
+
+**Two models do two jobs.** The realtime model holds a three-thousand-token brief and cannot read a sixty-thousand-character README. Hard questions such as "does it support X" or "what broke last release" go to a text model that has the full README, releases and graph as a cached prompt. It answers in three to six seconds; the guide says "let me read" and relays. The same path powers the typed *Ask this repo* box.
+
+**Cost is bounded.** Sessions end after three minutes of mutual silence. Idle time is nearly free because the meter runs on audio tokens, not wall clock, and a three-minute conversation costs about $0.20.
 
 ## Search
 

@@ -183,15 +183,16 @@
 
 /* splash — page −1: three zones, space does the structuring */
 .fcard.splash { justify-content: space-between; align-items: center; text-align: center; padding-bottom: calc(18px + env(safe-area-inset-bottom)); --hue: 268; --hue2: 205; }
-.sp-top { display: flex; flex-direction: column; align-items: center; gap: 8px; padding-top: 7vh; }
+.sp-top { display: flex; flex-direction: column; align-items: center; gap: 8px; padding-top: 5vh; }
 .sp-brand { font-family: var(--font-display); font-weight: 900; font-size: clamp(56px, 18vw, 84px); letter-spacing: -.05em; line-height: 1; color: var(--ink); }
 .sp-line { font-family: var(--font-display); font-size: clamp(19px, 5.4vw, 24px); font-weight: 700; letter-spacing: -.02em; color: var(--ink); }
 
-.sp-claims { list-style: none; margin: 4vh 0; padding: 0 6px; display: flex; flex-direction: column; gap: 12px; max-width: 340px; text-align: left; }
+.sp-claims { list-style: none; margin: 3vh 0 5vh; padding: 0 6px; display: flex; flex-direction: column; gap: 12px; max-width: 340px; text-align: left; }
 .sp-claims li { font-size: clamp(14.5px, 3.9vw, 16px); line-height: 1.42; color: var(--ink-2); text-wrap: pretty; padding-left: 12px; border-left: 2px solid var(--line); }
 .sp-claims b { font-family: var(--font-display); font-weight: 800; letter-spacing: -.01em; color: var(--ink); margin-right: 4px; }
 
 .sp-bottom { display: flex; flex-direction: column; align-items: center; gap: 12px; width: 100%; max-width: 380px; }
+.sp-bottom .sp-start { margin-top: 14px; }
 .sp-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; width: 100%; }
 .sp-grid > div { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 12px 4px 10px; border-radius: 12px; background: var(--fill); }
 .sp-grid b { font-family: var(--font-display); font-size: 18px; font-weight: 800; color: var(--ink); line-height: 1; letter-spacing: .02em; }
@@ -207,7 +208,7 @@
 .fcard.splash.rail .sp-start { visibility: hidden; }
 
 @media (max-width: 360px) { .sp-grid span { font-size: 10.5px; } .sp-grid > div { padding: 10px 2px 8px; } }
-@media (min-height: 800px) { .sp-top { padding-top: 10vh; } .sp-claims { gap: 16px; } }
+@media (min-height: 800px) { .sp-top { padding-top: 8vh; } .sp-claims { gap: 16px; } }
 
 /* gesture reminder: lean right (green), lean left (red), lift (peek), settle. ~3 s, once a minute. */
 .drag-layer.breathing { animation: breathe 3s cubic-bezier(.45,.05,.35,1) both; }   /* on the layer: the card's inline transform is the drag, this composes with it */

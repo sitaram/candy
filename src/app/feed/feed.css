@@ -213,17 +213,18 @@
 @media (max-width: 360px) { .sp-grid span { font-size: 10.5px; } .sp-grid > div { padding: 10px 2px 8px; } }
 /* short phones (SE-class, ≤ 700px tall): smaller brand, tighter rhythm, grid loses its captions */
 @media (max-height: 700px) {
-  .sp-top { padding-top: 3vh; gap: 4px; }
-  .sp-brand { font-size: clamp(44px, 14vw, 60px); }
+  .sp-top { padding-top: 2vh; gap: 3px; }
+  .sp-brand { font-size: clamp(42px, 13vw, 54px); }
   .sp-line { font-size: 18px; }
-  .sp-claims { margin: 2vh 0 3vh; gap: 9px; }
-  .sp-claims li { font-size: 14px; line-height: 1.38; }
+  .sp-claims { margin: 2vh 0 2.5vh; gap: 8px; }
+  .sp-claims li { font-size: 13.5px; line-height: 1.36; }
   .sp-grid > div { padding: 9px 2px 8px; gap: 2px; }
   .sp-grid b { font-size: 16px; }
   .sp-grid span { font-size: 10.5px; }
   .sp-bottom { gap: 8px; }
   .sp-bottom .sp-start { margin-top: 4px; padding-top: 2px; }
   .sp-arrow { font-size: 18px; }
+  .fcard.splash { padding-bottom: calc(10px + env(safe-area-inset-bottom)); }
 }
 @media (min-height: 800px) { .sp-top { padding-top: 8vh; } .sp-claims { gap: 16px; } }
 

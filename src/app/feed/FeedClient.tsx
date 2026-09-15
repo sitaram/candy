@@ -169,9 +169,9 @@ function Splash({ style, onStart }: { style?: CSSProperties; onStart: () => void
       </div>
 
       <ul className="sp-claims">
-        <li><b>Discover.</b> New and rising projects from GitHub, Hacker News, newsletters, and the awesome lists. Building something? Search or just say it.</li>
-        <li><b>Understand.</b> Go all the way down on any repo. It reads the whole README and release notes to answer hard questions.</li>
-        <li><b>Decide.</b> Swipe like Tinder, browse like TikTok. It learns what you like.</li>
+        <li><b>Discover.</b> New and rising projects from GitHub, Hacker News, newsletters, and the awesome lists. Scroll like TikTok, swipe like Tinder — it learns what you like.</li>
+        <li><b>Understand.</b> Every card says why it’s here. Open one for what it does, what it competes with, and what just shipped.</li>
+        <li><b>Ask.</b> Building something? Type it or say it. Or ask any repo a hard question — it has read the README so you don’t have to.</li>
       </ul>
 
       <div className="sp-bottom">

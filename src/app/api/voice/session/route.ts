@@ -16,6 +16,7 @@ const VOICE = process.env.REALTIME_VOICE ?? "marin";
  * with OpenAI; the standard key never leaves this server.
  */
 export async function POST(req: Request) {
+  const t0 = Date.now();
   const key = process.env.OPENAI_API_KEY;
   if (!key) return Response.json({ error: "voice not configured" }, { status: 503 });
   const uid = await getUid();
@@ -78,5 +79,6 @@ export async function POST(req: Request) {
     return Response.json({ error: "could not start voice session" }, { status: 502 });
   }
   const data = (await r.json()) as { value: string; expires_at: number };
+  console.info(`[voice/session] ${uid.slice(0, 8)} ${body.mode} ${body.id ?? body.query ?? ""} · ${instructions.length} chars, ${tools.length} tools · ${Date.now() - t0}ms`);
   return Response.json({ secret: data.value, expiresAt: data.expires_at, model: MODEL });
 }

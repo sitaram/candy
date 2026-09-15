@@ -143,7 +143,7 @@ export function Search({ open, onClose, onPick, autoVoice }: { open: boolean; on
           )}
           <button className={`s-voice${listening ? ` on ${voice.state}` : ""}`}
             onClick={toggleVoice} aria-label={listening ? "Stop listening" : "Search by voice"} title={listening ? "Stop" : "Search by voice"}>
-            {I.voice}
+            {listening ? <span className="stop" aria-hidden /> : I.voice}
           </button>
           </VoiceBoundary>
         </div>

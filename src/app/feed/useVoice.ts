@@ -253,7 +253,7 @@ export function useVoice(handlers: VoiceHandlers) {
       const tick = () => { const l = rms(al), r = rms(ar); setLevel(Math.min(1, Math.max(r, l) * 4)); setMicLevel(Math.min(1, l * 4)); raf.current = requestAnimationFrame(tick); };
       tick();
     }
-  }, [bumpSilence, onEvent, send, stop]);
+  }, [bumpSilence, onEvent, send, setMic, stop]);
 
   const stopRef = useRef(stop); stopRef.current = stop;
   useEffect(() => () => stopRef.current("unmount", { quiet: true }), []);

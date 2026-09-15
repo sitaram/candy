@@ -156,7 +156,7 @@ function Card({
         <div className={`voice-cluster${voice && voice.state !== "idle" ? " on" : ""}`}>
           <button className={`act voice${voice && voice.state !== "idle" ? ` on ${voice.state}` : ""}`}
             onClick={(e) => { e.stopPropagation(); onVoice?.(); }} aria-label={voice && voice.state !== "idle" ? "End conversation" : "Talk about this"} title={voice && voice.state !== "idle" ? "End (v)" : "Talk about this (v)"}>
-            {I.voice}
+            {voice && voice.state !== "idle" ? <span className="stop" aria-hidden /> : I.voice}
           </button>
           {voice && voice.state !== "idle" && (
             <button className={`act sub mute${voice.muted ? " off" : ""}`} onClick={(e) => { e.stopPropagation(); voice.toggleMute?.(); }} aria-label={voice.muted ? "Unmute" : "Mute"} title={voice.muted ? "Unmute" : "Mute"}>

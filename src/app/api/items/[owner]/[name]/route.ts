@@ -1,4 +1,5 @@
 import { getItemDetail, similar } from "@/lib/corpus/api";
+import { getRelated } from "@/lib/corpus/related";
 import { ensureItem } from "@/lib/corpus/ensure";
 
 export const dynamic = "force-dynamic";
@@ -9,7 +10,17 @@ export async function GET(_req: Request, ctx: { params: Promise<{ owner: string;
   const ens = await ensureItem(`${owner}/${name}`);
   if (!ens.exists) return Response.json({ error: "not found" }, { status: 404 });
   const id = ens.id;
-  const [detail, sim] = await Promise.all([getItemDetail(id), similar(id, 10)]);
+  const [detail, sim, rel] = await Promise.all([getItemDetail(id), similar(id, 10), getRelated(id)]);
   if (!detail) return Response.json({ error: "not found" }, { status: 404 });
-  return Response.json({ ...detail, similar: sim.map((s) => ({ id: s.item.repo.id, score: s.score, why: s.why, pitch: s.item.card?.pitch })) });
+  return Response.json({
+    ...detail,
+    similar: sim.map((s) => ({ id: s.item.repo.id, score: s.score, why: s.why, pitch: s.item.card?.pitch })),
+    related: {
+      labelled: rel.labelled,
+      groups: rel.groups.map((g) => ({
+        label: g.label,
+        items: g.items.map((it) => ({ id: it.repo.id, name: it.repo.name, owner: it.repo.owner, pitch: it.card?.pitch ?? it.repo.description ?? "", stars: it.repo.stars, lang: it.repo.language, category: it.card?.category ?? "" })),
+      })),
+    },
+  });
 }

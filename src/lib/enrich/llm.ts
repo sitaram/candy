@@ -5,7 +5,7 @@ import { CATEGORIES, type Card } from "./card";
 export const MODEL = process.env.CANDY_MODEL ?? "claude-haiku-4-5-20251001";
 
 let client: Anthropic | undefined;
-function ai(): Anthropic {
+export function ai(): Anthropic {
   if (!client) client = new Anthropic();
   return client;
 }

@@ -1,3 +1,4 @@
+import { redis } from "../store/redis";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { z } from "zod";
 
@@ -73,6 +74,10 @@ describe("route()", () => {
     expect(r.status).toBe(500); expect(r.json.error).toBe("internal error"); expect(r.json.rid).toBe(r.rid);
     expect(JSON.stringify(r.json)).not.toContain("hunter2");
     expect(err).toHaveBeenCalled(); err.mockRestore();
+    // …but the ring buffer has the real message, under the same rid the client was shown.
+    await new Promise((res) => setTimeout(res, 30));
+    const rec = JSON.parse((await redis().lindex("err:log", 0))!);
+    expect(rec).toMatchObject({ side: "server", where: "api:/x", rid: r.rid, status: 500, msg: "redis password is hunter2" });
   });
   it("rate limit bucket → 429 with Retry-After", async () => {
     const h = route({ limit: "voice" }, async () => Response.json({}));

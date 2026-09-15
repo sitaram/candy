@@ -183,9 +183,9 @@ function Splash({ style, onStart }: { style?: CSSProperties; onStart: () => void
       </div>
 
       <ul className="sp-claims">
-        <li><b>Discover.</b> New and rising, from GitHub, Hacker News, newsletters, and the awesome lists. Swipe right to like, left to pass — it learns your taste.</li>
-        <li><b>Search.</b> Building something? Say what you need, typed or spoken, and find the repos that fit.</li>
-        <li><b>Ask.</b> Any repo, all the way down. It reads the full README and release notes to answer hard questions — on screen or out loud.</li>
+        <li><b>Discover.</b> See what’s new and rising across GitHub, Hacker News, newsletters, and the awesome lists — and swipe to shape what you see next.</li>
+        <li><b>Search.</b> Building something? Say what you need and find the repos that fit.</li>
+        <li><b>Ask.</b> Pick any repo and get real answers — how it works, what changed, its limits, whether it’s ready — on screen or out loud.</li>
       </ul>
 
       <div className="sp-bottom">

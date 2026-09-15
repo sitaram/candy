@@ -1,6 +1,7 @@
 import { env } from "@/lib/env";
 import { createHash } from "node:crypto";
 import { HttpError, route } from "@/lib/api/guard";
+import { recordServer } from "@/lib/errors";
 import { VoiceSessionBody } from "@/lib/api/schemas";
 import { getItem } from "@/lib/corpus/api";
 import { feed } from "@/lib/user/feed";
@@ -75,6 +76,7 @@ export const POST = route({ body: VoiceSessionBody, limit: "voice", maxBody: 8_1
   if (!r.ok) {
     const txt = await r.text();
     console.error("[voice] client_secrets", r.status, txt.slice(0, 300));
+    recordServer("voice/session:client_secrets", new Error(`${r.status} ${txt.slice(0, 200)}`), { status: r.status });
     throw new HttpError(502, "could not start voice session");
   }
   const data = (await r.json()) as { value: string; expires_at: number };

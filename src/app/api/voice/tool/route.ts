@@ -3,6 +3,7 @@ import { RepoId, Text, VoiceToolBody } from "@/lib/api/schemas";
 import { getItemDetail, search, similar } from "@/lib/corpus/api";
 import { briefOf } from "@/lib/voice/context";
 import { askRepo } from "@/lib/ask";
+import { recordServer } from "@/lib/errors";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
@@ -53,7 +54,10 @@ export const POST = route({ body: VoiceToolBody, limit: "llm", maxBody: 8_192 },
       }
     }
   } catch (e) {
+    // Swallowed on purpose — the model must keep talking — but not silently: this is the one server
+    // failure the user never sees as an error, so the sink is the only place it will show up.
     console.error(`[voice/tool] ${name} threw after ${Date.now() - t0}ms`, e);
+    recordServer(`voice/tool:${name}`, e);
     return say("Tool failed; tell the user briefly and continue.");
   }
 });

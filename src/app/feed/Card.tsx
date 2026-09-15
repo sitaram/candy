@@ -152,7 +152,7 @@ export function Splash({ style, onStart }: { style?: CSSProperties; onStart: () 
           <div><b>tap</b><span>deep dive</span></div>
           <div><b>talk</b><span>ask</span></div>
         </div>
-        <a className="sp-more" href="/about" onPointerDown={stop}>How it works →</a>
+        <a className="sp-more" href="/about" onPointerDown={stop}>How it works <span aria-hidden>→</span></a>
         <button className="sp-start" onClick={onStart}><span className="sp-arrow">↑</span>swipe up to start</button>
       </div>
     </section>

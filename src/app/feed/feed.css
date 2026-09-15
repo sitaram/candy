@@ -522,6 +522,7 @@
 .tip-wrap[data-align="center"] .tip { left: 50%; translate: -50% 0; }
 .tip-wrap[data-align="end"] .tip { right: 0; }
 .tip-wrap[data-align="start"] .tip { left: 0; }
-.tip-wrap.shown .tip, .tip-wrap:focus-within .tip { opacity: 1; transform: translateY(0) scale(1); }
+.tip-wrap.shown .tip { opacity: 1; transform: translateY(0) scale(1); }
+/* Not on focus: a clicked/tapped button keeps focus, and the tip stayed up through — and after — the voice session. */
 @media (hover: hover) { .tip-wrap:hover .tip { opacity: 1; transform: translateY(0) scale(1); transition-delay: .35s; } }
 @media (prefers-reduced-motion: reduce) { .tip { transition: opacity .1s; transform: none; } }

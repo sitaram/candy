@@ -9,6 +9,10 @@
    ~16px in, level with the feed's wordmark. Tighter gap to the wordmark so the label keeps its centre. */
 .about-head { padding-left: 10px; gap: 8px; }   /* the chevron's own 8px pad supplies the rest of the edge margin */
 .about-back { width: 44px; height: 44px; min-width: 0; padding: 0; margin: 0; text-decoration: none; }
+/* Same as the feed: no grey tap box on iOS, no focus ring left behind by a click — only the keyboard's. */
+.about, .about * { -webkit-tap-highlight-color: transparent; }
+.about-head :focus { outline: none; }
+.about-head :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 6px; }
 /* The label is centred on the header, not on the leftover space — left cluster (chevron + wordmark) and right (voice)
    differ in width, so a flex:1 label would drift right. Absolute, with the row's own padding as the bound. */
 .about-head { position: sticky; }

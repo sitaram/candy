@@ -32,7 +32,12 @@ export function Detail({ id, onClose, onOpen }: { id: string; onClose: () => voi
     const ac = new AbortController();
     fetch(`/api/items/${id}`, { signal: ac.signal })
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`${r.status}`))))
-      .then((j: Data) => setD(j))
+      .then((j: Data) => {
+        setD(j);
+        // Tail on demand: the server queued this repo's missing alternatives; kick the worker from here so
+        // the slow part (GitHub + Claude) never sits on the detail request. keepalive survives navigation.
+        if (j.related?.pending) fetch("/api/backfill", { method: "POST", keepalive: true }).catch(() => {});
+      })
       .catch((e: Error) => {
         if (e.name !== "AbortError") setErr(e.message);
       });

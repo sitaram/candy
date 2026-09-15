@@ -153,9 +153,12 @@
   display: flex; align-items: center; justify-content: center;
   cursor: pointer; transition: transform .12s, background .12s;
 }
-.act:active { transform: scale(.9); }
+.act:active { transform: scale(.92); transition-duration: .06s; }
 /* no focus square after a tap; keyboard focus still shows a ring */
-.act, .splash, .drag-layer { -webkit-tap-highlight-color: transparent; }
+/* Touch: no grey tap flash, no long-press callout, no accidental text selection anywhere in the feed. */
+.feed, .feed * { -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none; }
+.feed { user-select: none; -webkit-user-select: none; }
+.feed input, .feed textarea, .detail-body, .detail-body * { user-select: text; -webkit-user-select: text; }
 .act:focus { outline: none; }
 .act:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .act.dive, .act.voice { width: 64px; height: 64px; color: var(--ink-2); }
@@ -165,9 +168,9 @@
   box-shadow: 0 0 0 calc(2px + var(--lvl, 0) * 14px) color-mix(in srgb, var(--accent) 22%, transparent);
   transition: transform .12s, box-shadow .09s linear;
 }
-.act.voice.on:hover { background: var(--accent); color: var(--bg); }
+@media (hover: hover) { .act.voice.on:hover { background: var(--accent); color: var(--bg); } }
 .act.voice.on.listening { background: var(--like); box-shadow: 0 0 0 calc(2px + var(--lvl, 0) * 18px) color-mix(in srgb, var(--like) 26%, transparent); }
-.act.voice.on.listening:hover { background: var(--like); }
+@media (hover: hover) { .act.voice.on.listening:hover { background: var(--like); } }
 .act.voice.on.thinking { animation: vpulse 1.2s ease-in-out infinite; }
 .act.voice.on.connecting { animation: vpulse 1.2s ease-in-out infinite; }
 @keyframes vpulse { 0%, 100% { box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 22%, transparent); } 50% { box-shadow: 0 0 0 10px color-mix(in srgb, var(--accent) 10%, transparent); } }
@@ -175,10 +178,10 @@
 .toast.err { background: var(--skip); color: #fff; }
 .toast.err button { color: #fff; }
 .act svg { width: 26px; height: 26px; }
-.act:hover { background: var(--fill-2); color: var(--ink); }
+@media (hover: hover) { .act:hover { background: var(--fill-2); color: var(--ink); } }
 
 .icon-btn { background: none; border: none; color: var(--ink-3); padding: 6px; cursor: pointer; border-radius: 10px; display: inline-flex; text-decoration: none; font-size: 18px; line-height: 1; }
-.icon-btn:hover { color: var(--ink); background: var(--fill); }
+@media (hover: hover) { .icon-btn:hover { color: var(--ink); background: var(--fill); } }
 .icon-btn.bm.on { color: #e6b422; }
 
 /* splash — page −1: three zones, space does the structuring */
@@ -254,7 +257,6 @@
   cursor: pointer; overflow: hidden;
   touch-action: none; user-select: none; -webkit-user-select: none;
 }
-.peek-strip:active { filter: brightness(1.08); }
 .peek-label { font-size: 10.5px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-4); }
 .peek-title { font-family: var(--font-display); font-weight: 800; font-size: 19px; letter-spacing: -.02em; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--ink); }
 .peek-pitch { color: var(--ink-3); font-size: 13.5px; line-height: 1.35; margin-top: 3px; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
@@ -420,7 +422,8 @@
   width: 100%; display: flex; gap: 12px; align-items: flex-start; text-align: left; font: inherit; color: inherit; cursor: pointer;
   background: none; border: none; border-radius: 14px; padding: 12px 10px 12px 8px; min-width: 0;
 }
-.s-row:hover, .s-row:active { background: var(--fill); }
+@media (hover: hover) { .s-row:hover { background: var(--fill); } }
+.s-row:active { background: var(--fill); }
 .s-n { flex: 0 0 22px; font-family: var(--font-display); font-weight: 700; font-size: 13px; color: var(--ink-4); padding-top: 3px; text-align: right; font-variant-numeric: tabular-nums; }
 .s-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
 .s-head { display: flex; align-items: baseline; gap: 8px; min-width: 0; }

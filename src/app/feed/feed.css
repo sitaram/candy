@@ -190,14 +190,15 @@
 .sp-brand { font-family: var(--font-display); font-weight: 900; font-size: clamp(56px, 18vw, 84px); letter-spacing: -.05em; line-height: 1; color: var(--ink); }
 .sp-line { font-family: var(--font-display); font-size: clamp(19px, 5.4vw, 24px); font-weight: 700; letter-spacing: -.02em; color: var(--ink); }
 
-.sp-claims { list-style: none; margin: 3vh 0 5vh; padding: 0 6px; display: flex; flex-direction: column; gap: 13px; max-width: 344px; text-align: left; }
+.sp-mid { display: flex; flex-direction: column; align-items: center; gap: 30px; width: 100%; max-width: 380px; margin: 2vh 0; }
+.sp-claims { list-style: none; margin: 0; padding: 0 6px; display: flex; flex-direction: column; gap: 13px; max-width: 344px; text-align: left; }
 .sp-claims li { font-size: clamp(14.5px, 3.9vw, 16px); line-height: 1.42; color: var(--ink-2); text-wrap: pretty; padding-left: 12px; border-left: 2px solid var(--line); }
 .sp-claims b { font-family: var(--font-display); font-weight: 800; letter-spacing: -.01em; color: var(--ink); margin-right: 4px; }
 
 /* Bottom stack: grid, then the How-it-works pill, then the swipe hint. The grid sits higher (bigger gap
    below it) so the pill has room; the hint is pinned last with its own space so the bottom never crowds. */
-.sp-bottom { display: flex; flex-direction: column; align-items: center; gap: 18px; width: 100%; max-width: 380px; padding-bottom: 2vh; }
-.sp-bottom .sp-start { margin-top: 8px; }
+.sp-bottom { display: flex; flex-direction: column; align-items: center; gap: 22px; width: 100%; max-width: 380px; padding-bottom: 1vh; }
+.sp-bottom .sp-start { margin-top: 0; }
 .sp-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; width: 100%; }
 .sp-grid > div { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 12px 4px 10px; border-radius: 12px; background: var(--fill); }
 .sp-grid b { font-family: var(--font-display); font-size: 18px; font-weight: 800; color: var(--ink); line-height: 1; letter-spacing: .02em; }
@@ -220,18 +221,19 @@
   .sp-top { padding-top: 2vh; gap: 3px; }
   .sp-brand { font-size: clamp(42px, 13vw, 54px); }
   .sp-line { font-size: 18px; }
-  .sp-claims { margin: 2vh 0 2.5vh; gap: 8px; }
+  .sp-mid { gap: 16px; margin: 1vh 0; }
+  .sp-claims { gap: 8px; }
   .sp-claims li { font-size: 13.5px; line-height: 1.36; }
   .sp-grid > div { padding: 9px 2px 8px; gap: 2px; }
   .sp-grid b { font-size: 16px; }
   .sp-grid span { font-size: 10.5px; }
-  .sp-bottom { gap: 10px; padding-bottom: 1vh; }
-  .sp-bottom .sp-start { margin-top: 2px; padding-top: 2px; }
+  .sp-bottom { gap: 12px; padding-bottom: 0; }
+  .sp-bottom .sp-start { margin-top: 0; padding-top: 2px; }
   .sp-more { padding: 7px 14px; font-size: 13px; }
   .sp-arrow { font-size: 18px; }
   .fcard.splash { padding-bottom: calc(10px + env(safe-area-inset-bottom)); }
 }
-@media (min-height: 800px) { .sp-top { padding-top: 8vh; } .sp-claims { gap: 16px; } }
+@media (min-height: 800px) { .sp-top { padding-top: 7vh; } .sp-claims { gap: 16px; } .sp-mid { gap: 34px; } }
 
 /* gesture reminder: lean right (green), lean left (red), lift (peek), settle. ~3 s, once a minute. */
 .drag-layer.breathing { animation: breathe 3s cubic-bezier(.45,.05,.35,1) both; }   /* on the layer: the card's inline transform is the drag, this composes with it */

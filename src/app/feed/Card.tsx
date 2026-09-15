@@ -139,19 +139,23 @@ export function Splash({ style, onStart }: { style?: CSSProperties; onStart: () 
         <div className="sp-line">Open source worth your time.</div>
       </div>
 
-      <ul className="sp-claims">
-        <li><b>Discover.</b> See what’s new and rising across GitHub, Hacker News, newsletters, and the awesome lists — and swipe to shape what you see next.</li>
-        <li><b>Search.</b> Describe what you’re building, in your own words, and find the repos that fit.</li>
-        <li><b>Ask.</b> Pick any repo and get real answers — how it works, what changed, its limits, whether it’s ready — on screen or out loud.</li>
-      </ul>
-
-      <div className="sp-bottom">
+      {/* Middle block: what it does, then how you drive it. The grid is explanation, so it lives with the
+          claims — not down with the calls to action, where it made the bottom third dense and the middle hollow. */}
+      <div className="sp-mid">
+        <ul className="sp-claims">
+          <li><b>Discover.</b> See what’s new and rising across GitHub, Hacker News, newsletters, and the awesome lists — and swipe to shape what you see next.</li>
+          <li><b>Search.</b> Describe what you’re building, in your own words, and find the repos that fit.</li>
+          <li><b>Ask.</b> Pick any repo and get real answers — how it works, what changed, its limits, whether it’s ready — on screen or out loud.</li>
+        </ul>
         <div className="sp-grid">
           <div><b>↑ ↓</b><span>browse</span></div>
           <div><b><i className="lk">→</i> <i className="pk">←</i></b><span>like · pass</span></div>
           <div><b>tap</b><span>deep dive</span></div>
           <div><b>talk</b><span>ask</span></div>
         </div>
+      </div>
+
+      <div className="sp-bottom">
         <a className="sp-more" href="/about" onPointerDown={stop}>How it works <span aria-hidden>→</span></a>
         <button className="sp-start" onClick={onStart}><span className="sp-arrow">↑</span>swipe up to start</button>
       </div>

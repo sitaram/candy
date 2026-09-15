@@ -177,8 +177,8 @@ export function useVoice(handlers: VoiceHandlers) {
       d.onopen = () => {
         setState("listening");
         bumpSilence();
-        // Card mode opens with a spoken take; search mode waits for the user to speak.
-        if (opts.mode === "card") send({ type: "response.create" });
+        // Both modes open with a line: card mode a 20 s take on the repo, search mode a one-sentence invitation.
+        send({ type: "response.create" });
       };
       d.onclose = () => { if (dc.current === d) stop("ended by server"); };
       d.onerror = (e) => console.warn("[voice] datachannel error", e);

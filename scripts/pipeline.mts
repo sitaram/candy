@@ -2,6 +2,7 @@
  * Background pipeline loop. Run once and forget; product work never waits on it.
  *   pnpm pipeline            # loop forever
  *   pnpm pipeline --once     # one cycle
+ *   pnpm pipeline --weekly   # the scheduled job: discover, refresh every corpus repo, enrich what is new, embed. ~10 min.
  *
  * Each cycle: discover (if > DISCOVER_EVERY_MIN since last) -> crawl CRAWL_PER_CYCLE -> enrich ENRICH_PER_CYCLE.
  * Budgets via env: CRAWL_PER_CYCLE=100 ENRICH_PER_CYCLE=50 CYCLE_MIN=10 DISCOVER_EVERY_MIN=60 LLM_USD_PER_DAY=5
@@ -19,7 +20,8 @@ const ENRICH_PER_CYCLE = env("ENRICH_PER_CYCLE", 50);
 const CYCLE_MIN = env("CYCLE_MIN", 10);
 const DISCOVER_EVERY_MIN = env("DISCOVER_EVERY_MIN", 60);
 const LLM_USD_PER_DAY = env("LLM_USD_PER_DAY", 5);
-const once = process.argv.includes("--once");
+const weekly = process.argv.includes("--weekly");
+const once = process.argv.includes("--once") || weekly;
 
 await mkdir("logs", { recursive: true });
 const log = async (s: string) => {
@@ -33,7 +35,7 @@ const todayKey = () => `budget:llm:${new Date().toISOString().slice(0, 10)}`;
 
 async function cycle(): Promise<void> {
   const last = Number((await r.get("pipeline:lastDiscover")) ?? 0);
-  if (Date.now() - last > DISCOVER_EVERY_MIN * 60_000) {
+  if (weekly || Date.now() - last > DISCOVER_EVERY_MIN * 60_000) {
     for (const [name, fn] of Object.entries(discoverers)) {
       try {
         const hits = await fn();
@@ -46,7 +48,10 @@ async function cycle(): Promise<void> {
     await r.set("pipeline:lastDiscover", Date.now());
   }
 
-  const c = await crawl(CRAWL_PER_CYCLE, 6, () => {});
+  // Weekly: everything older than a day is stale, and the budget covers the whole corpus plus new arrivals.
+  const c = weekly
+    ? await crawl(Number((await stats()).fetched) + 300, 6, () => {}, 86_400_000)
+    : await crawl(CRAWL_PER_CYCLE, 6, () => {});
   await log(`crawl: fetched ${c.fetched} missing ${c.missing} failed ${c.failed} +frontier ${c.newlyDiscovered}${c.rateLimitedUntil ? ` RATE-LIMITED until ${new Date(c.rateLimitedUntil).toLocaleTimeString()}` : ""}`);
 
   const spent = Number((await r.get(todayKey())) ?? 0);
@@ -60,6 +65,12 @@ async function cycle(): Promise<void> {
     await log(`enrich: skipped, daily budget $${LLM_USD_PER_DAY} reached`);
   }
 
+  if (weekly) {
+    // New cards need vectors; idempotent, skips what is already embedded.
+    const { embedMissing } = await import("./embed-lib.ts");
+    await log(`embed: ${await embedMissing()} new vectors`);
+    await r.set("pipeline:lastWeekly", Date.now());
+  }
   await log(`stats ${JSON.stringify(await stats())}`);
 }
 

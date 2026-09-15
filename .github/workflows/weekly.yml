@@ -1,0 +1,28 @@
+# Weekly refresh: discover new repos, re-fetch every corpus repo (stars, releases, README),
+# enrich what is new, embed. Product reads Redis, so nothing here touches the deploy.
+name: weekly refresh
+on:
+  schedule:
+    - cron: "0 9 * * 1"        # Mondays 09:00 UTC
+  workflow_dispatch: {}
+concurrency: { group: pipeline, cancel-in-progress: false }
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 10 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm pipeline --weekly
+        env:
+          REDIS_URL: ${{ secrets.REDIS_URL }}
+          GITHUB_TOKEN: ${{ secrets.GH_CRAWL_TOKEN }}   # a PAT; the default GITHUB_TOKEN is scoped to this repo
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          LLM_USD_PER_DAY: "10"
+      - if: always()
+        run: tail -n 40 logs/pipeline.log || true

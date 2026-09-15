@@ -14,8 +14,8 @@ export interface CrawlResult {
  * Pull N repos off the frontier, fetch, extract, store, and feed linked repos
  * back into the frontier (the crawl loop). Concurrency is modest to stay polite.
  */
-export async function crawl(n: number, concurrency = 4, log = console.log): Promise<CrawlResult> {
-  const ids = await nextToCrawl(n);
+export async function crawl(n: number, concurrency = 4, log = console.log, staleMs?: number): Promise<CrawlResult> {
+  const ids = await nextToCrawl(n, staleMs);
   const res: CrawlResult = { fetched: 0, missing: 0, failed: 0, newlyDiscovered: 0 };
   if (!ids.length) return res;
 

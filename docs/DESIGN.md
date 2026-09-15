@@ -20,6 +20,8 @@ GitHub knows *what* a repo is. Nobody has built the layer that knows **why it ma
   | The crawl itself | 3,524 README→repo links between corpus repos | Related-project graph; the tail finds itself |
 
   Result: 842 carded repos, 30 % of them multi-source, 13 % with a live human endorsement. Machine sources outnumber human ones 6:1, so widening means more *humans* (more newsletters, Reddit via RSS), not more GitHub.
+
+  **Freshness.** A GitHub Actions job runs every Monday (`pnpm pipeline --weekly`): re-pull all six sources, re-fetch every corpus repo so stars, velocity, releases, and READMEs are at most a week old, card what is new, embed it. Weekly is the honest cadence for a ten-minutes-a-day habit — the ranker's "released this week" and "+N★/day" signals are true at that resolution, and a week of new arrivals is about what one person can swipe through. The feed itself never waits on this; it reads Redis. Going daily is a one-line cron change if the corpus earns it.
 - **Interestingness as typed metadata.** Not a summary — a schema of *reasons*: momentum, event (release, license change, first HN thread), provenance (big org, known author), novelty, maturity, audience, spam flags. Extracted once per repo; every surface ranks and explains from the same fields. The signals a human uses to judge "worth my time" become columns.
 - **A graph, not a list.** README links are materialized (3,524 edges); named alternatives live on the card. In the deep dive the neighbours are not a ranked list but *labelled groups* — "Does the same job, in Rust", "Runs on top of it", "The bigger, older incumbent" — written per repo by the card model from the signals that connected them (alternatives, links, shared tags, embedding cosine). A flat list makes the reader do the clustering; a label tells them in four words what a group is *relative to this repo*. Deterministic fallback when unlabelled. Dependency edges, awesome-list co-membership and HN co-mention are next.
 - **Coverage by tier.** Head exhaustively, niches on expansion, tail on demand. A niche like *voice* is seeded from topics and awesome lists and grown through the graph. Anything anyone asks about is carded in ~5 s and stays forever. Depth follows attention.
@@ -57,7 +59,7 @@ GitHub knows *what* a repo is. Nobody has built the layer that knows **why it ma
 
 | Decision | Why | Cost |
 |---|---|---|
-| Offline pipeline, read-only product | Sub-100 ms feed; iterate on UI without waiting on crawls | Freshness is hourly, not live |
+| Offline pipeline, read-only product | Sub-100 ms feed; iterate on UI without waiting on crawls | Freshness is weekly, not live |
 | Redis as the only store | One system for frontier, corpus, graph, user state; trivially snapshot-able | Memory-bound; raw docs gzip'd and bounded, disk/S3 next |
 | Haiku for cards, tool-use schema | $0.007/repo, schema-enforced output | Over-scores famous repos; fixed with an explicit scale in the prompt |
 | GitHub + HN + Lobsters + RSS + awesome lists as sources | All free, no scraping, complementary signals | GitHub-only universe; Hugging Face and registries are gaps |

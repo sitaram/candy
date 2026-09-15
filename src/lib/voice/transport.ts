@@ -82,29 +82,41 @@ export async function connect(opts: VoiceStart, cb: TransportCallbacks): Promise
   };
 
   try {
-    // 2. Mic + ephemeral secret in parallel.
-    const [stream, secret] = await Promise.all([
+    // 2. Mic + ephemeral secret in parallel. allSettled, not all: if the secret fails while the permission
+    // prompt is still up, the stream that resolves later must be stopped, or the mic indicator stays lit.
+    const [msR, secR] = await Promise.allSettled([
       navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } }),
       fetchSecret(opts),
     ]);
-    ms = stream;
-    const track = ms.getAudioTracks()[0];
+    if (msR.status === "fulfilled") ms = msR.value;
+    if (msR.status === "rejected") throw msR.reason;
+    if (secR.status === "rejected") throw secR.reason;   // teardown() below stops the stream we just got
+    const secret = secR.value;
+    const stream: MediaStream = msR.value;
+    const track = stream.getAudioTracks()[0];
     // Not the device label: "Sitaram's AirPods Pro" is a name, and this trace leaves the device.
-    tlog("mic+secret ok", { tracks: ms.getAudioTracks().map((t) => ({ enabled: t.enabled, muted: t.muted, settings: t.getSettings?.() })) });
-    track?.addEventListener("ended", () => tlog("mic.track.ended"));
+    tlog("mic+secret ok", { tracks: stream.getAudioTracks().map((t) => ({ enabled: t.enabled, muted: t.muted, settings: t.getSettings?.() })) });
     track?.addEventListener("mute", () => tlog("mic.track.mute"));
     track?.addEventListener("unmute", () => tlog("mic.track.unmute"));
+
+    let closed = false;
+    let recover: ReturnType<typeof setTimeout> | null = null;
+    const lost = (why: string) => { if (closed) return; closed = true; cb.onLost(why); };
 
     // 3. Peer connection + data channel.
     const p = new RTCPeerConnection();
     pc = p;
-    const local = ms;
-    p.ontrack = (e) => { tlog("pc.track", { kind: e.track.kind }); el.srcObject = e.streams[0]; cb.onTrack(e.streams[0], local); };
-    p.addTrack(ms.getTracks()[0]);
+    const local = stream;
+    // iOS ends the track on backgrounding / an incoming call; the session would otherwise continue deaf.
+    track?.addEventListener("ended", () => { tlog("mic.track.ended"); lost("microphone ended"); });
+    p.ontrack = (e) => {
+      tlog("pc.track", { kind: e.track.kind });
+      const remote = e.streams[0] ?? new MediaStream([e.track]);   // a track without a stream would throw in createMediaStreamSource
+      el.srcObject = remote; cb.onTrack(remote, local);
+    };
+    p.addTrack(stream.getTracks()[0]);
     const d = p.createDataChannel("oai-events");
-    let closed = false;
-    let recover: ReturnType<typeof setTimeout> | null = null;
-    const lost = (why: string) => { if (closed) return; closed = true; cb.onLost(why); };
+
     const t: Transport = {
       pc: p, dc: d,
       send: (ev) => {

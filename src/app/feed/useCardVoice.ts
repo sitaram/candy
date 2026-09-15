@@ -97,14 +97,20 @@ export function useCardVoice(rail: Rail, detailOpen: boolean) {
   }, [voice]);
 
   // Swiping while talking: tell the model what's on screen now (but not for tool-driven changes, which return the brief themselves).
+  // Deps are the card *id* and `active` only. `voice` is a new object every render, and the meter re-renders
+  // ~60×/s while talking — with it in the deps the 300 ms timer was cleared and re-armed on every frame and
+  // the brief never went out. inject/briefOf are read through refs at fire time.
+  const injectRef = useRef(voice.inject); injectRef.current = voice.inject;
+  const curRef = useRef(cur); curRef.current = cur;
+  const curId = cur?.id ?? null;
   useEffect(() => {
-    if (!voice.active || !cur) { voiceCardId.current = cur?.id ?? null; return; }
-    if (voiceCardId.current === null) { voiceCardId.current = cur.id; return; }   // session just started on this card
-    if (voiceCardId.current === cur.id) return;
-    voiceCardId.current = cur.id;
-    const t = setTimeout(async () => { const b = await briefOf(cur); if (b) voice.inject(b, false); }, 300);
+    if (!voice.active || !curId) { voiceCardId.current = curId; return; }
+    if (voiceCardId.current === null) { voiceCardId.current = curId; return; }   // session just started on this card
+    if (voiceCardId.current === curId) return;
+    voiceCardId.current = curId;
+    const t = setTimeout(async () => { const c = curRef.current; if (c?.id !== curId) return; const b = await briefOf(c); if (b) injectRef.current(b, false); }, 300);
     return () => clearTimeout(t);
-  }, [cur, voice.active, voice, briefOf]);
+  }, [curId, voice.active, briefOf]);
   useEffect(() => { if (!voice.active) voiceCardId.current = null; }, [voice.active]);
 
   return { voice, toggle, showRepo, jumpTo, startOn };

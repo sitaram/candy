@@ -97,7 +97,9 @@ async function ship(t: Trace): Promise<void> {
 }
 
 function safe(d: unknown): unknown {
-  try { const s = JSON.stringify(d); return s.length > 600 ? JSON.parse(s.slice(0, 600) + (s.startsWith("{") ? '"…":1}' : "")) ?? s.slice(0, 600) : d; }
+  // Over 600 chars: keep the head as a string. (An earlier version tried to re-close the sliced JSON and
+  // almost always produced invalid JSON → "[object Object]" — every large payload was logged useless.)
+  try { const s = JSON.stringify(d); return s.length > 600 ? s.slice(0, 600) + "…" : d; }
   catch { return String(d).slice(0, 300); }
 }
 

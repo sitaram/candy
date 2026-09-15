@@ -190,7 +190,7 @@ export function FeedClient() {
                 {cur ? (
                   <Card key={cur.id} f={cur} style={curStyle} debug={debug} saved={saved.has(cur.id)} reaction={reacted.current.get(cur.id)}
                     onSave={() => toggleSave(cur.id)} onOpen={() => openDetail(cur.id)}
-                    onVoice={toggleVoice} voice={{ state: voice.state, level: voice.level, muted: voice.muted, toggleMute: voice.toggleMute }} />
+                    onVoice={toggleVoice} voice={{ state: voice.state, active: voice.active, level: voice.level, muted: voice.muted, toggleMute: voice.toggleMute }} />
                 ) : (
                   <Splash style={curStyle} onStart={startFeed} />
                 )}

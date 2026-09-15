@@ -103,20 +103,25 @@ export function useRail() {
   /* ---- motion primitives ---- */
 
   /** Animate the vertical pager from a starting px offset to 0. */
+  const settleT = useRef<ReturnType<typeof setTimeout> | null>(null);   // the 620 ms "animation over" timer; tracked so interrupt() can cancel it
   const settleFrom = useCallback((fromPx: number) => {
     busy.current = true;
+    if (settleT.current) clearTimeout(settleT.current);
     // Commit the start position synchronously, force a style flush so the browser has it as the
     // transition's "from", then commit the end position — all in this task. No rAF hop: a rAF can
     // be a frame or more away on a busy main thread, and that gap reads as a stall before the slide.
     flushSync(() => { setAnimating(false); setSettle(fromPx); });
     void stackRef.current?.getBoundingClientRect();
     flushSync(() => { setAnimating(true); setSettle(0); });
-    setTimeout(() => { setAnimating(false); busy.current = false; }, 620);
+    settleT.current = setTimeout(() => { settleT.current = null; setAnimating(false); busy.current = false; }, 620);
   }, []);
 
   /** A touch during a settle animation snaps it to rest instead of being dropped; the finger takes over. */
   const interrupt = useCallback(() => {
-    if (busy.current) { busy.current = false; setAnimating(false); setSettle(0); }
+    // Cancel the pending timer too: otherwise the old one fires mid-way through the *next* gesture's animation
+    // and clears busy/animating under it.
+    if (settleT.current) { clearTimeout(settleT.current); settleT.current = null; }
+    if (busy.current) { busy.current = false; setAnimating(false); setSettle(0); setGhost(null); }
   }, []);
 
   /** Move to another page; the new current card slides in from the side it was on. */
@@ -132,6 +137,9 @@ export function useRail() {
   /** Horizontal decision: fly the current card out, next rises in. */
   const decide = useCallback((kind: Decision, fromDrag?: { dx: number; dy: number }) => {
     if (!cur || busy.current) return;
+    // The last card stays on screen after a decision (nothing rises to replace it); a second swipe on it
+    // must not count and post again.
+    if (reacted.current.has(cur.id)) return;
     lastTouch.current = Date.now();
     seenRef.current.add(cur.id);
     reacted.current.set(cur.id, kind);
@@ -142,6 +150,7 @@ export function useRail() {
     // Ghost = the card flying out. Next rises via the same settle; if there is no next, the ghost alone carries the gesture.
     const hasNext = idx + 1 < items.length;
     busy.current = true;
+    if (settleT.current) clearTimeout(settleT.current);
     flushSync(() => {
       setGhost({ item: cur, kind, style: { transform: startT, transition: "none" } });
       if (hasNext) { setAnimating(false); setIdx(idx + 1); setSettle(vh); }
@@ -151,7 +160,7 @@ export function useRail() {
       setGhost((g) => g && { ...g, style: { transform: endT, opacity: 0, transition: "transform .32s cubic-bezier(.2,.7,.3,1), opacity .32s" } });
       if (hasNext) { setAnimating(true); setSettle(0); }
     });
-    setTimeout(() => { setGhost(null); setAnimating(false); busy.current = false; }, 620);
+    settleT.current = setTimeout(() => { settleT.current = null; setGhost(null); setAnimating(false); busy.current = false; }, 620);
     if (undoTimer.current) clearTimeout(undoTimer.current);
     setUndo({ item: cur, kind, at: idx });
     undoTimer.current = setTimeout(() => setUndo(null), 6000);

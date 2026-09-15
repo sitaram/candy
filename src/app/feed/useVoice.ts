@@ -72,6 +72,7 @@ export function useVoice(handlers: VoiceHandlers) {
   const speaking = useRef(false);    // model audio is playing on the device right now
   const autoMuted = useRef(false);   // muted by us for the opening take; released when that audio finishes playing
   const connecting = useRef(false);
+  const gen = useRef(0);             // per-start generation: a stale connect() must not adopt, meter, or stop() a newer session
   const base = useRef(handlers);
   base.current = handlers;
   // A surface that is temporarily on top (the search sheet) layers its tools over the owner's. Merged per call
@@ -83,6 +84,7 @@ export function useVoice(handlers: VoiceHandlers) {
   const modeRef = useRef<VoiceStart["mode"] | null>(null);
 
   const stop = useCallback((reason?: string, opts?: { quiet?: boolean }) => {
+    gen.current++;
     const t = tr.current;
     if (t || connecting.current) traceEnd(`${reason ?? "user"} · lastActivity ${Math.round((Date.now() - lastActivity.current) / 1000)}s ago · pc ${t?.pc.connectionState} · dc ${t?.dc.readyState}`);
     if (silenceT.current) clearTimeout(silenceT.current);
@@ -92,7 +94,9 @@ export function useVoice(handlers: VoiceHandlers) {
     setLevel(0); setMicLevel(0); speaking.current = false; setMuted(false); autoMuted.current = false;
     modeRef.current = null; setMode(null);
     setState("idle");
-    if (reason && !opts?.quiet) setError(reason);
+    // A reason is a new error to show; a plain stop (user tapped end / "ok" on the toast) clears the old one.
+    // Previously only start() cleared it, so "ended by server" stayed on screen until the next session.
+    if (reason && !opts?.quiet) setError(reason); else if (!reason) setError(null);
   }, [setState]);
 
   const bumpSilence = useCallback(() => {
@@ -109,9 +113,10 @@ export function useVoice(handlers: VoiceHandlers) {
   const send = useCallback((ev: RTEvent) => { tr.current?.send(ev); }, []);
 
   /** Tell the model the on-screen card changed (used by swipes while talking). */
+  const spokeDuringTool = useRef(false);   // set when something created a response while a tool call was running
   const inject = useCallback((text: string, speak = false) => {
     send({ type: "conversation.item.create", item: { type: "message", role: "system", content: [{ type: "input_text", text }] } });
-    if (speak) send({ type: "response.create" });
+    if (speak) { send({ type: "response.create" }); spokeDuringTool.current = true; }
   }, [send]);
 
   const setMic = useCallback((on: boolean) => { if (tr.current) { tr.current.setMic(on); setMuted(!on); } }, []);
@@ -119,6 +124,7 @@ export function useVoice(handlers: VoiceHandlers) {
   const runTool = useCallback(async (name: string, args: Record<string, unknown>, callId: string) => {
     let output: string;
     const t0 = Date.now();
+    spokeDuringTool.current = false;
     tlog(`tool.call ${name}`, redactArgs(args));
     try {
       if (name === "next_card") output = (await h.current.onNextCard?.()) ?? "No more cards in the feed right now.";
@@ -137,6 +143,9 @@ export function useVoice(handlers: VoiceHandlers) {
     }
     tlog(`tool.done ${name}`, { ms: Date.now() - t0, out: output.slice(0, 160) });
     send({ type: "conversation.item.create", item: { type: "function_call_output", call_id: callId, output } });
+    // open_result hands the session to a card via switchTo(…, speak:true), which already created a response;
+    // a second response.create here is "conversation_already_has_active_response" → error toast.
+    if (spokeDuringTool.current) { spokeDuringTool.current = false; return; }
     send({ type: "response.create" });
   }, [send]);
 
@@ -171,6 +180,11 @@ export function useVoice(handlers: VoiceHandlers) {
         case "response.done": {
           if (!speaking.current) setState("listening");
           bumpSilence();
+          // The opening take was supposed to release the mic when its audio finished. If it produced no audio at all
+          // (error, empty, cancelled), that never fires and the user sits muted with a button that says "Mute".
+          if (autoMuted.current && !speaking.current) { autoMuted.current = false; setMic(true); }
+          const rs = (ev.response as { status?: string; status_details?: { reason?: string } } | undefined);
+          if (rs?.status === "incomplete") tlog("response.incomplete", rs.status_details);
           const resp = ev.response as { output?: { type: string; name?: string; arguments?: string; call_id?: string }[] } | undefined;
           for (const item of resp?.output ?? []) {
             if (item.type === "function_call" && item.name && item.call_id) {
@@ -192,6 +206,8 @@ export function useVoice(handlers: VoiceHandlers) {
   const start = useCallback(async (opts: VoiceStart) => {
     if (tr.current || connecting.current) return;
     connecting.current = true;
+    const my = ++gen.current;
+    const stale = () => gen.current !== my;
     setError(null); setTranscript("");
     setState("connecting");
     traceStart(opts.mode);
@@ -203,8 +219,9 @@ export function useVoice(handlers: VoiceHandlers) {
     const adopt = (t: Transport) => {
       if (mine) return;
       mine = t;
-      // stop() may have run while we were connecting (user tapped again, unmount): a call nobody wants.
-      if (!connecting.current) { t.close(); return; }
+      // stop() may have run while we were connecting (user tapped again, unmount), or a newer start() may have
+      // taken over: a call nobody wants.
+      if (!connecting.current || stale()) { t.close(); return; }
       tr.current = t;
       connecting.current = false;
     };
@@ -212,6 +229,7 @@ export function useVoice(handlers: VoiceHandlers) {
       const t = await connect(opts, {
         onEvent,
         onTrack: (remote, local) => {
+          if (stale()) return;   // a stale transport's meter (AudioContext + rAF) would otherwise run until the next stop()
           stopMeter.current?.();
           stopMeter.current = startMeter(remote, local, (l) => { setLevel(l.mixed); setMicLevel(l.local); });
         },
@@ -225,11 +243,12 @@ export function useVoice(handlers: VoiceHandlers) {
           if (opts.mode === "card" || opts.mode === "doc") { autoMuted.current = true; setMic(false); }
           send({ type: "response.create" });
         },
-        onLost: (why) => { if (mine && tr.current === mine) stop(why); },
+        onLost: (why) => { if (!stale() && mine && tr.current === mine) stop(why); },
       });
       adopt(t);
     } catch (e) {
       tlog("start.throw", { msg: (e as Error).message, name: (e as Error).name, stack: ((e as Error).stack ?? "").split("\n").slice(0, 4).join(" | ") });
+      if (stale()) return;   // an orphaned attempt failing must not tear down the session that replaced it
       stop(friendlyError(e));
       setState("error");
     }
@@ -243,7 +262,13 @@ export function useVoice(handlers: VoiceHandlers) {
    */
   const switchSeq = useRef(0);
   const switchTo = useCallback(async (opts: VoiceStart, say?: { note: string; speak: boolean }) => {
-    if (!tr.current) { await start(opts); return; }
+    if (!tr.current) {
+      if (!connecting.current) { await start(opts); return; }
+      // Still connecting: wait for the channel rather than dropping the switch (and its note) on the floor.
+      const t0 = Date.now();
+      while (!tr.current && connecting.current && Date.now() - t0 < 8_000) await new Promise((r) => setTimeout(r, 100));
+      if (!tr.current) { tlog("switch.dropped", { to: opts.mode, reason: "never connected" }); return; }
+    }
     const my = ++switchSeq.current;
     const from = modeRef.current;
     tlog("switch", { from, to: opts });
@@ -258,7 +283,8 @@ export function useVoice(handlers: VoiceHandlers) {
       tlog("switch.ok", { to: opts.mode });
     } catch (e) {
       tlog("switch.throw", { msg: (e as Error).message });
-      // The old instructions still apply; the conversation carries on rather than dying.
+      // The old instructions still apply; say so, so the UI doesn't claim a mode the session isn't in.
+      if (my === switchSeq.current) { modeRef.current = from; setMode(from); }
     }
   }, [inject, send, start]);
 

@@ -50,13 +50,13 @@ export function FeedClient() {
   const { voice, toggle: toggleVoice, jumpTo, startOn } = useCardVoice(rail, !!open);
   /** A result picked while talking keeps the conversation: the card's voice session starts on the new card. */
   const pickResult = useCallback((r: SearchResult, opts?: { voice: boolean }) => {
+    if (opts?.voice) startOn(r);   // first: flips the session to card mode before the sheet's unmount asks "is this still mine?"
     setSearchOpen(false);
     insertAndGo(r);
-    if (opts?.voice) startOn(r);
   }, [insertAndGo, startOn]);
-  const openSearch = useCallback(() => { if (voice.active) voice.stop(); setSearchVoice(false); setSearchOpen(true); }, [voice]);
+  const openSearch = useCallback(() => { setSearchVoice(false); setSearchOpen(true); }, []);
   /** Header voice: straight into a listening search — one tap, no keyboard. */
-  const openVoiceSearch = useCallback(() => { if (voice.active) voice.stop(); setSearchVoice(true); setSearchOpen(true); }, [voice]);
+  const openVoiceSearch = useCallback(() => { setSearchVoice(true); setSearchOpen(true); }, []);
 
   /* ---- splash: renders immediately; the feed loads behind it. A start gesture before it lands is honored on arrival. ---- */
   const wantStart = useRef(false);
@@ -145,7 +145,7 @@ export function FeedClient() {
           ) : "discover open source"}
         </span>
         <button className="icon-btn feed-search" onClick={openSearch} aria-label="Search" title="Search (/)">{I.search}</button>
-        <button className="icon-btn feed-search" onClick={openVoiceSearch} aria-label="Ask by voice" title="Ask by voice">{I.voice}</button>
+        <button className="hv" onClick={openVoiceSearch} aria-label="Ask by voice" title="Ask by voice">{I.voice}</button>
         <a href="/me" className="icon-btn feed-me" aria-label="Your profile" title="You">
           {count.like + count.skip > 0 && <span className="feed-tally"><b className="lk">{count.like}</b><b className="pk">{count.skip}</b></span>}
           {I.me}
@@ -207,7 +207,7 @@ export function FeedClient() {
           <div className="keyhints">← pass · → like · ↑ ↓ browse · enter deep dive · v voice · / search · b bookmark · z undo</div>
         </div>
 
-        <Search open={searchOpen} autoVoice={searchVoice} onClose={() => setSearchOpen(false)} onPick={pickResult} />
+        <Search open={searchOpen} autoVoice={searchVoice} voice={voice} onClose={() => setSearchOpen(false)} onPick={pickResult} />
         {open && (
           <div className="detail-host">
             {/* pointerdown, not click: a tap on the card opens the sheet on pointerup, and the browser's

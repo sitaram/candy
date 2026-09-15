@@ -15,7 +15,7 @@ function Inner() {
   return (
     <span className="doc-voice">
       <button
-        className={`doc-voice-btn${on ? ` on ${voice.state}` : ""}`}
+        className={`hv${on ? ` on ${voice.state}` : ""}`}
         style={{ "--lvl": voice.level } as React.CSSProperties}
         onClick={() => (on ? voice.stop() : void voice.start({ mode: "doc" }))}
         aria-label={on ? "End conversation" : "Hear a summary and talk about this page"}
@@ -24,7 +24,7 @@ function Inner() {
         {on ? <span className="stop" aria-hidden /> : I.voice}
       </button>
       {on && (
-        <button className={`doc-mute${voice.muted ? " off" : ""}`} onClick={voice.toggleMute} aria-label="Mute microphone" aria-pressed={voice.muted} title={voice.muted ? "Unmute" : "Mute"}>
+        <button className={`hv sub${voice.muted ? " off" : ""}`} onClick={voice.toggleMute} aria-label="Mute microphone" aria-pressed={voice.muted} title={voice.muted ? "Unmute" : "Mute"}>
           {voice.muted ? I.micOff : I.mic}
         </button>
       )}

@@ -223,7 +223,7 @@
 .sp-grid b .lk { color: var(--like); }
 .sp-grid b .pk { color: var(--skip); }
 .sp-grid span { font-size: 11.5px; color: var(--ink-3); white-space: nowrap; }
-.sp-more { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 650; color: var(--ink); text-decoration: none; white-space: nowrap;
+.sp-more { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 650; color: var(--ink); text-decoration: none; white-space: nowrap; margin: -8px 0 8px;   /* a touch higher: closer to the grid than to the hint */
   padding: 10px 18px; border-radius: 999px; background: var(--fill); border: 1px solid var(--line); }
 .sp-more:active { transform: scale(.97); }
 

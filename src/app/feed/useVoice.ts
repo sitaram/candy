@@ -164,6 +164,7 @@ export function useVoice(handlers: VoiceHandlers) {
       case "response.output_audio_transcript.delta":
         setTranscript((t) => (t.length > 600 ? "" : t) + String(ev.delta ?? "")); break;
       case "response.output_audio_transcript.done":
+        tlog("transcript", String(ev.transcript ?? "").slice(-200));   // tail: shows whether a take was cut off mid-sentence
         setTranscript(String(ev.transcript ?? "")); break;
       case "conversation.item.input_audio_transcription.completed":
         h.current.onUserTranscript?.(String(ev.transcript ?? "").trim()); break;

@@ -10,9 +10,11 @@ import type { NextConfig } from "next";
  * Router means a middleware rewrite of every HTML response — not worth it for a site with no user-authored
  * HTML. `style-src 'unsafe-inline'` because gestures drive CSS variables through `style=`.
  */
+// Dev only: React Fast Refresh evaluates strings. Never in production, where the same policy would hide an XSS.
+const dev = process.env.NODE_ENV !== "production";
 const csp = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline'",
+  `script-src 'self' 'unsafe-inline'${dev ? " 'unsafe-eval'" : ""}`,
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data:",
   "font-src 'self'",

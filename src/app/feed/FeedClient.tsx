@@ -148,6 +148,11 @@ export function FeedClient() {
         </a>
       </header>
 
+      {/* Screen readers: the deck is a gesture surface, so announce each card as it lands and say how to drive it. */}
+      <p className="sr-only" aria-live="polite" aria-atomic="true">
+        {cur ? `${cur.id.split("/")[1]}. ${cur.item.card?.pitch ?? cur.item.repo.description ?? ""}${cur.why[0] ? ` ${cur.why[0]}.` : ""}` : ""}
+      </p>
+      <p className="sr-only">Keyboard: arrow right likes, left passes, up next, down previous. Enter opens details. B saves. V talks about it. Z undoes. Slash searches.</p>
       <div className="deck-wrap">
         <div className="deck">
           {loading && !intro && <div className="feed-empty" role="status">loading…</div>}

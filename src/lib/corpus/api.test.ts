@@ -1,10 +1,13 @@
 import { describe, it, expect, vi, beforeAll, afterAll, beforeEach } from "vitest";
-import { allItems, getItem, getItemDetail, getItems, matches, sortItems, similar, categories, search, invalidate } from "./api";
+import { allItems, getItem, getItemDetail, getItems, matches, sortItems, similar, categories, search, invalidate, upsertSnapshotItem, assembleItems } from "./api";
+import { readSnapshot, writeSnapshot } from "./snapshot";
+import { saveRepo } from "@/lib/store/corpus";
+import { saveCard } from "@/lib/enrich";
 import { parseCard, getCard, getCards, CK } from "@/lib/enrich";
 import { addEdges } from "@/lib/store/corpus";
 import { addAwesome } from "@/lib/store/corpus";
 import { K } from "@/lib/store/keys";
-import { item, seed, daysAgoIso, NOW } from "@/test/fixtures";
+import { item, card, seed, daysAgoIso, NOW } from "@/test/fixtures";
 import { mockRedis } from "@/test/setup";
 
 beforeAll(() => vi.useFakeTimers({ now: NOW }));
@@ -164,5 +167,27 @@ describe("similar (legacy, still used as the voice's 'six similar')", () => {
     expect(s[0].why).toEqual(["named alternative"]);
     expect(s[1].why).toEqual(["both cli", "shares a"]);
     expect(await similar("no/card")).toEqual([]);
+  });
+});
+
+describe("upsertSnapshotItem", () => {
+  it("patches one repo into the stored snapshot without losing another process's concurrent patch (regression: cache-based read-modify-write)", async () => {
+    await seed([{ id: "a/one" }]);
+    await allItems();                                                   // warm the in-process cache with [a/one]
+    // "Another process" writes b/two straight to Redis and rebuilds the snapshot; our cache does not know.
+    await saveRepo({ id: "b/two", stars: 1 }, {});
+    const { readmeHash, model, enrichedAt, inputTokens, outputTokens, ...pure } = card();
+    await saveCard("b/two", pure, { readmeHash, model, enrichedAt, inputTokens, outputTokens });
+    await writeSnapshot(await assembleItems());
+    // Now we upsert c/three. A cache-based patch would write [a/one, c/three] and lose b/two.
+    await saveRepo({ id: "c/three", stars: 1 }, {});
+    await upsertSnapshotItem("c/three");
+    expect((await readSnapshot())!.items.map((i) => i.repo.id).sort()).toEqual(["a/one", "b/two", "c/three"]);
+  });
+  it("removes a repo from the snapshot when its keys are gone", async () => {
+    await seed([{ id: "a/one" }, { id: "b/two" }]);
+    await mockRedis.del(K.repo("b/two"));
+    await upsertSnapshotItem("b/two");
+    expect((await readSnapshot())!.items.map((i) => i.repo.id)).toEqual(["a/one"]);
   });
 });

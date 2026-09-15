@@ -139,13 +139,21 @@ export async function invalidate(): Promise<void> {
  */
 export async function upsertSnapshotItem(id: string): Promise<void> {
   const nid = normId(id);
-  const fresh = await readItemFromRedis(nid);
-  const snap = cache ?? (await readSnapshot().then((s) => s && { items: s.items, ver: s.ver, checkedAt: 0, byId: new Map(s.items.map((i) => [i.repo.id, i])) }));
-  if (!snap) return invalidate();
-  const items = snap.items.filter((i) => i.repo.id !== nid);
-  if (fresh) items.push(fresh);
-  const ver = await writeSnapshot(items);
-  cache = { items, ver, checkedAt: Date.now(), byId: new Map(items.map((i) => [i.repo.id, i])) };
+  // Always patch the *stored* snapshot, not the in-process cache: two processes (or two backfill
+  // requests on one) each patching their own stale copy would have the second overwrite the first's
+  // repo. Reading it back first narrows the window to the single write below; a full rebuild by any
+  // crawl script closes it entirely. If the version moved while we worked, redo rather than clobber.
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const [fresh, snap] = await Promise.all([readItemFromRedis(nid), readSnapshot()]);
+    if (!snap) return invalidate();
+    const items = snap.items.filter((i) => i.repo.id !== nid);
+    if (fresh) items.push(fresh);
+    if ((await currentVersion()) !== snap.ver) continue;         // someone wrote meanwhile; re-read
+    const ver = await writeSnapshot(items);
+    cache = { items, ver, checkedAt: Date.now(), byId: new Map(items.map((i) => [i.repo.id, i])) };
+    return;
+  }
+  await invalidate();                                              // contended three times: rebuild from keys
 }
 
 async function readItemFromRedis(nid: string): Promise<Item | null> {

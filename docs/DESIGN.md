@@ -35,7 +35,7 @@ GitHub knows *what* a repo is. Nobody has built the layer that knows **why it ma
 | Lobsters | 2 | Tiny; kept for the tail |
 | The crawl itself | 3,524 README→repo links | The graph; the tail finds itself |
 
-The corpus holds 1,225 carded repos. Thirty percent came from more than one source and thirteen percent carry a live human endorsement. Machine sources outnumber human ones six to one, so widening the corpus means adding humans, not more of GitHub. A weekly job re-pulls everything in eleven minutes for $0.43, and the feed never waits on it. Weekly is also the honest cadence for a ten-minutes-a-day habit: "released this week" is true at that resolution, and a week of arrivals is about what one person can swipe through.
+The corpus holds 1,225 carded repos. Thirty percent came from more than one source and thirteen percent carry a live human endorsement. Machine sources outnumber human ones six to one, so widening the corpus means adding humans, not more of GitHub. A GitHub Actions job re-pulls everything weekly, in eleven minutes for $0.43, and the feed never waits on it. Weekly is also the honest cadence for a ten-minutes-a-day habit: "released this week" is true at that resolution, and a week of arrivals is about what one person can swipe through.
 
 **Two swipe grammars on one deck.** Up and down browse, the way TikTok does. You can go back, and nothing is judged. Left and right decide, the way Tinder does: like or pass. Nobody has combined the two. TikTok has no "no" and Tinder has no "back". Together they make browsing free and deciding cheap. The card teaches the gestures itself. On first arrival, and again after a minute idle, it breathes: a small lift, then a lean to each side with the colour of that decision showing at the edge.
 

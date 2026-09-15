@@ -73,17 +73,14 @@ GitHub knows *what* a repo is. Nobody has built the layer that knows **why it ma
 - Show the reason, not the score. "Matches your interest in mcp, vs code" is what the user needs, and it checks that the model is learning the right thing.
 - A frame's pause before a transition reads as a stall; commit start and end in one step. Two easing tempos on one deck make it read as a stack, not a sheet.
 
-## Code quality
+## Robustness
 
-Hardening pass, after the prototype worked.
+Done after the prototype worked, in the order that made the next step safe: tests before refactoring, validation before sharing the URL, the read model before growing the corpus. Two facts drove most of it. **Redis is 75 ms away** — a `PING` costs what a feed should — so cost is round trips, not bytes, and every path was rebuilt to one hop. And **the corpus is about to grow without a ceiling** — backfill adds repos behind every novel deep dive — so anything linear in corpus size was a cliff in waiting.
 
-- **Tests** — 146 cases against a real scratch Redis: ranking, search fusion, user state, embeddings, request guard, rate limit, schemas, error sink.
-- **Validated front door** — one guard on every route: user or 401, a schema per query, body and path with the offending field named, 413 on oversize, 400 on bad JSON, 500 never leaks the message, a request id on everything.
-- **Rate limits** — per caller per bucket in Redis, `Retry-After` on 429, fails open when Redis is down.
-- **Environment** — every setting read in one typed place; boot names the missing keys in one message.
-- **Bounded Redis** — five retries, five-second connect, error log at one a second; a corrupt row costs one item, not the corpus cache every user shares.
-- **One client fetch** — non-2xx becomes an error with a human message and the request id; reads retry once; twelve-second timeout; every failure has a visible state and a retry. No spinner forever.
-- **Error sink** — server 500s and client throws ship to a Redis ring buffer with per-day fingerprint counts.
-- **Round trips, not bytes** — Redis is 75 ms away, so cost is hops. The read model is one gzip'd key and the vectors one float block; a cold process loads both in 300 ms, flat in corpus size, where assembling from five thousand keys took over a second and grew. Neighbours score a generated candidate set — hard edges, specific-tag matches, semantic top 64 over inverted indexes — not the corpus. Warm: feed, neighbours and search each under 100 ms in one hop.
-- **Accessibility** — AA contrast on tertiary text; one focus ring; global reduced motion; the deck is a named live region announcing each card; off-screen copies hidden from assistive tech; toggles report state; the deep dive is a focus-managed dialog; toasts announce.
-- **Splitting the feed component** — card extracted; rail, gestures and keyboard next.
+**Fails safely.** One guard on every route: user or 401, a schema per query, body and path naming the offending field, 413 on oversize, 400 on bad JSON, 500 never leaks. Per-caller rate limits in Redis that fail open when Redis is down. Every setting read in one typed place; boot names the missing keys. Redis bounded (five retries, five-second connect); a corrupt row costs one item, not the cache every user shares. One client fetch: non-2xx becomes a human message with a request id, reads retry once, every failure has a visible state and a retry — no spinner forever. Server 500s and client throws ship to a ring buffer with per-day fingerprints.
+
+**Stays fast as it grows.** The read model is one gzip'd key and the vectors one float block; a cold process loads both in 300 ms, flat in corpus size, where assembling from five thousand keys took over a second and grew. User state is one pipeline. Neighbours score a generated candidate set — hard edges, specific-tag matches, semantic top 64 over inverted indexes — not the corpus. Query embeddings are cached and start before the Redis reads. Warm: feed, neighbours and search each under 100 ms, each one hop.
+
+**Can be changed.** 146 tests against a real scratch Redis, not a mock — ranking, search fusion, user state, embeddings, guard, rate limit, schemas, error sink, the gesture grammar. The feed component split five ways (card, rail, gestures, hint, voice wiring) so an edit to one cannot silently break another, which is how the breath animation and a flushSync bug were lost before. Accessibility as a pass, not a sprinkle: AA contrast, one focus ring, global reduced motion, the deck a live region announcing each card, the deep dive a focus-managed dialog.
+
+**Not yet.** No device tests. Observability is a ring buffer, not a dashboard or an alert. The corpus still lacks many named peers (codex's, for one) until `alts` runs. The 40/60 term-vector blend and every threshold in `related` are calibrated by eye on one corpus.

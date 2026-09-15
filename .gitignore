@@ -46,3 +46,8 @@ next-env.d.ts
 # candy
 /data/
 /logs
+qa-shots/
+
+# scratch notes
+/xxx
+/.xxx.swp

@@ -24,7 +24,8 @@
     "test": "scripts/test-redis.sh && vitest run",
     "test:watch": "scripts/test-redis.sh && vitest",
     "test:cov": "scripts/test-redis.sh && vitest run --coverage",
-    "errors": "node --env-file-if-exists=.env.local --import tsx scripts/errors.mts"
+    "errors": "node --env-file-if-exists=.env.local --import tsx scripts/errors.mts",
+    "qa": "node --import tsx scripts/qa/walk.mts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.124.0",

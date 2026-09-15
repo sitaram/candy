@@ -1,7 +1,13 @@
 import { getItemDetail, getItems } from "@/lib/corpus/api";
 import { similar } from "@/lib/corpus/related";
 import { ensureItem } from "@/lib/corpus/ensure";
+import { isKnown } from "@/lib/corpus/known";
+import { RepoId } from "@/lib/api/schemas";
+import { rateLimit } from "@/lib/api/ratelimit";
+import { charge } from "@/lib/api/spend";
+import { getUid } from "@/lib/user/uid";
 import { collectionsOf } from "@/lib/store/collections";
+import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 
 export const dynamic = "force-dynamic";
@@ -15,8 +21,21 @@ function ago(iso: string): string {
 /** Deep-dive page: everything we know about one repo. The `ask` box comes later. */
 export default async function RepoPage({ params }: { params: Promise<{ owner: string; name: string }> }) {
   const { owner, name } = await params;
-  const id = `${owner}/${name}`;
-  // Tier 3: fetch + enrich on demand if we have never seen this repo.
+  const parsed = RepoId.safeParse(`${owner}/${name}`);
+  if (!parsed.success) notFound();
+  const id = parsed.data;
+  // Same gate as /api/items/:id, which this page used to skip: a repo the corpus has never heard of is a
+  // 404 before it is a GitHub call and a Claude card, and one it has only heard of goes through the tight
+  // `fetch` bucket and the daily budget. Server components have no guard(), so it is spelled out here.
+  const known = await isKnown(id);
+  if (known === "absent") notFound();
+  if (known === "frontier") {
+    const h = await headers();
+    const ip = (h.get("x-forwarded-for") ?? "").split(",")[0].trim() || "ip:unknown";
+    const rl = await rateLimit("fetch", await getUid(), ip);
+    if (!rl.ok) notFound();
+    await charge("card").catch(() => notFound());
+  }
   const ens = await ensureItem(id);
   if (!ens.exists) notFound();
   const [d, sim, cols] = await Promise.all([getItemDetail(ens.id), similar(ens.id, 8), collectionsOf(ens.id)]);

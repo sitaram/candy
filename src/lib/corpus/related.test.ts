@@ -56,7 +56,7 @@ describe("neighbors", () => {
       { id: "samecat/d", repo: { stars: 2000 }, card: { category: "cli", tags: [] }, vec: at(0.45) },
     ]);
     await addEdges("me/x", "links", ["linked/c"]);
-    invalidate();
+    await invalidate();
     const ns = await neighbors("me/x");
     const by = new Map(ns.map((n) => [n.item.repo.id, n]));
     expect(by.get("close/a")?.signals.cos).toBeCloseTo(0.7);

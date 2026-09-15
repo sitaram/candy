@@ -18,7 +18,12 @@ client.on("error", () => { /* surfaced by the first command */ });
 vi.mock("@/lib/store/redis", () => ({ redis: () => client, closeRedis: async () => {} }));
 vi.mock("../lib/store/redis", () => ({ redis: () => client, closeRedis: async () => {} }));
 
-beforeEach(async () => { await client.flushdb(); });
+beforeEach(async () => {
+  await client.flushdb();
+  // In-process caches must not outlive the data they cache.
+  const { _resetMatrixCache } = await import("@/lib/embed");
+  _resetMatrixCache();
+});
 afterAll(async () => { await client.quit(); });
 
 export { client as mockRedis };

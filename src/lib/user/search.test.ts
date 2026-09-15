@@ -37,8 +37,8 @@ describe("search()", () => {
   // so every test here must seed the *same* ids with the *same* vectors — which this one fixture guarantees.
   const corpus = async () => seed([
     { id: "pipecat-ai/pipecat", card: { pitch: "Python framework for real-time voice agents", tags: ["voice-agents"], category: "ai-agents" }, repo: { language: "Python", stars: 5000 }, vec: vec(0) },
-    { id: "livekit/agents", card: { pitch: "Realtime agent framework", tags: ["voice-agents", "webrtc"], category: "ai-agents" }, repo: { language: "Python", stars: 9000 }, vec: at(0.9) },
-    { id: "ts/voice", card: { pitch: "Voice agents in TypeScript", tags: ["voice-agents"], category: "ai-agents" }, repo: { language: "TypeScript", stars: 900 }, vec: at(0.85) },
+    { id: "livekit/agents", card: { pitch: "Realtime agent framework", tags: ["voice-agents", "webrtc"], category: "ai-agents" }, repo: { language: "Python", stars: 9000 }, vec: at(0.95) },
+    { id: "ts/voice", card: { pitch: "Voice agents in TypeScript", tags: ["voice-agents"], category: "ai-agents" }, repo: { language: "TypeScript", stars: 900 }, vec: at(0.9) },
     { id: "webpack/webpack", card: { pitch: "Module bundler", tags: ["bundler"], category: "frontend" }, repo: { language: "JavaScript", stars: 65_000 }, vec: at(0.2) },
     { id: "spam/my", card: { pitch: "voice agents!!!", tags: ["voice-agents"], flags: ["spam-suspect"] }, vec: at(0.99) },
   ]);
@@ -63,22 +63,26 @@ describe("search()", () => {
     const ids = r.results.map((x) => x.id);
     expect(ids).not.toContain("spam/my");
     expect(ids).not.toContain("webpack/webpack");                    // cos .2 is outside the top band's .12 gap
-    // Raw cosine order is pipecat (1.0) > livekit (.90) > ts/voice (.85). Lexical confirmation lifts ts/voice
-    // over livekit — its `Language: TypeScript` matched a keyword — but not over pipecat, whose cosine lead is
-    // larger than the keyword boost. That is the fusion working: cosine finds the neighbourhood, keywords
-    // reorder inside it, neither alone decides. (rel: pipecat .820, ts/voice .815, livekit .750)
-    expect(ids.slice(0, 3)).toEqual(["pipecat-ai/pipecat", "ts/voice", "livekit/agents"]);
+    // Raw cosine order: pipecat 1.0 > livekit .95 > ts/voice .90 — all inside the .12 band the semantic lane keeps
+    // (webpack at .2 is not). rel = .7·cos/best + .3·min(1, lex/3); lex is 1.2 for the two Python repos (tag substring
+    // hits on "voice", "agent") and 2.2 for ts/voice (+2 for `Language: TypeScript` = the third keyword).
+    //   pipecat  .7·1.00 + .3·.40 = .820
+    //   ts/voice .7·.90  + .3·.73 = .850   ← the keyword lifted it past both higher-cosine peers
+    //   livekit  .7·.95  + .3·.40 = .785
+    // Same interest, same age, no stars term → quality is equal; rel² decides. Cosine found the neighbourhood,
+    // the keyword decided inside it. Neither alone would have put the TypeScript one first for a TypeScript query.
+    expect(ids.slice(0, 3)).toEqual(["ts/voice", "pipecat-ai/pipecat", "livekit/agents"]);
     expect(r.results[0].why[0]).toMatch(/^matches "|^close to what you described$/);
   });
   it("degrades to lexical when the embedding call fails, and says so", async () => {
     await corpus();
     vi.spyOn(embed, "embedTexts").mockRejectedValue(new Error("429"));
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const r = await search(U, "voice agents");
+    const r = await search(U, "voice agents please");        // a query no earlier test embedded: the LRU must miss
     expect(r.semantic).toBe(false);
     expect(r.results.map((x) => x.id)).toEqual(expect.arrayContaining(["pipecat-ai/pipecat", "livekit/agents", "ts/voice"]));
     expect(r.results.every((x) => x.match === "keyword")).toBe(true);
-    expect(warn).toHaveBeenCalledWith(expect.stringMatching(/semantic lane skipped/), "429");
+    expect(warn).toHaveBeenCalledWith("[search] embed", "429");
   });
   it("is personal: the same query ranks differently after the user likes TypeScript things; results carry `saved`", async () => {
     await corpus();

@@ -40,7 +40,7 @@ describe("feed", () => {
     // releases on saved: s/aved's release must be *after* the last visit; move it.
     const { saveRepo } = await import("@/lib/store/corpus");
     await saveRepo({ id: "s/aved", latestRelease: "v10", latestReleaseAt: new Date(NOW + 2 * 86_400_000).toISOString() }, {});
-    invalidate();
+    await invalidate();
     f = await feed(U);
     expect(f.since.lastVisit).toBe(NOW);
     expect(f.since.newInCorpus).toBe(2);

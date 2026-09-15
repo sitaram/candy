@@ -104,7 +104,7 @@ describe("buildContext / cardChangeBrief (against the corpus)", () => {
     expect(anon.instructions).toContain("New user; no learned interests yet.");
   });
   it("cardChangeBrief is the short form: no README, up to four related", async () => {
-    await seed([{ id: "me/x", card: { tags: ["a"] }, readme: "# R" }, { id: "o/y", card: { tags: ["a"], pitch: "Y pitch" } }]);
+    await seed([{ id: "me/x", card: { tags: ["a"], alternatives: ["o/y"] }, readme: "# R" }, { id: "o/y", card: { tags: ["a"], pitch: "Y pitch" } }]);
     const b = await cardChangeBrief(feedItem((await getItem("me/x"))!));
     expect(b.startsWith("The card on screen is now:\nREPO me/x")).toBe(true);
     expect(b).not.toContain("README");

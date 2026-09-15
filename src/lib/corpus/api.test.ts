@@ -12,7 +12,7 @@ import { mockRedis } from "@/test/setup";
 
 beforeAll(() => vi.useFakeTimers({ now: NOW }));
 afterAll(() => vi.useRealTimers());
-beforeEach(() => invalidate());
+beforeEach(async () => { await mockRedis.flushdb(); await invalidate(); });
 
 describe("parseCard", () => {
   it("null without a pitch; defaults and corrupt-JSON tolerance for everything else", () => {
@@ -41,7 +41,7 @@ describe("allItems", () => {
   it("joins repo, card, sources (src:*), awesome lists and frontier priority; caches for 30s; invalidate() busts", async () => {
     await seed([{ id: "a/b", sources: ["hn", "rss:x"] }, { id: "c/d", card: null }]);
     await addAwesome("list/one", ["a/b"]);
-    invalidate();
+    await invalidate();
     const items = await allItems();
     const ab = items.find((i) => i.repo.id === "a/b")!;
     expect(ab.card).not.toBeNull();
@@ -49,14 +49,15 @@ describe("allItems", () => {
     expect(ab.awesome).toEqual(["list/one"]);
     expect(ab.priority).toBeGreaterThan(0);
     expect(items.find((i) => i.repo.id === "c/d")!.card).toBeNull();
-    // cache
+    // The read model is a versioned snapshot: in-process copy is served until the stored version moves.
     await seed([{ id: "e/f" }]);
-    invalidate();                       // seed() invalidates; make explicit
     expect((await allItems()).length).toBe(3);
-    await mockRedis.flushdb();
-    expect((await allItems()).length).toBe(3);   // still cached
-    invalidate();
-    expect((await allItems()).length).toBe(0);
+    const { bumpVersion } = await import("./snapshot");
+    await mockRedis.del(K.repo("e/f"));       // change a key without touching the snapshot…
+    expect((await allItems()).length).toBe(3);   // …and the snapshot still says 3 (by design: writers must invalidate/upsert)
+    await bumpVersion();                          // a writer signals; next read past CHECK re-fetches the snapshot (still 3 items)
+    await invalidate();                           // a full rebuild reads keys again
+    expect((await allItems()).length).toBe(2);
   });
   it("getItem normalises the id", async () => {
     await seed([{ id: "a/b" }]);
@@ -137,7 +138,7 @@ describe("getItemDetail", () => {
     ]);
     await addEdges("a/b", "links", ["e/f"]);
     await addAwesome("l/one", ["a/b", "c/d", "e/f", "not/in-corpus"]);
-    invalidate();
+    await invalidate();
     const d = (await getItemDetail("a/b"))!;
     expect(d.readme).toBe("# A");
     expect(d.releases).toEqual([{ tag_name: "v1", body: "notes" }]);
@@ -153,20 +154,20 @@ describe("getItemDetail", () => {
   });
 });
 
-describe("similar (legacy, still used as the voice's 'six similar')", () => {
-  it("scores alternatives 5, same category 2, shared tags 1 each, same language 0.5; needs ≥2", async () => {
+describe("similar (the voice's 'related repos', now a view over neighbors())", () => {
+  it("maps each neighbour's signals to one human reason, in priority order", async () => {
     await seed([
-      { id: "me/x", card: { category: "cli", tags: ["a", "b"], alternatives: ["alt/y"] }, repo: { language: "Go" } },
+      { id: "me/x", card: { category: "cli", tags: ["specific-tag"], alternatives: ["alt/y"] }, repo: { language: "Go" } },
       { id: "alt/y", card: { category: "database", tags: [] } },
-      { id: "cat/z", card: { category: "cli", tags: ["a"] }, repo: { language: "Go" } },
-      { id: "far/w", card: { category: "database", tags: ["b"] } },
-      { id: "no/card", card: null },
+      { id: "me/sib", card: { category: "database", tags: [] } },
+      { id: "tag/z", card: { category: "cli", tags: ["specific-tag"] }, vec: undefined },
     ]);
     const s = await similar("me/x");
-    expect(s.map((x) => [x.item.repo.id, x.score])).toEqual([["alt/y", 5], ["cat/z", 3.5]]);
-    expect(s[0].why).toEqual(["named alternative"]);
-    expect(s[1].why).toEqual(["both cli", "shares a"]);
-    expect(await similar("no/card")).toEqual([]);
+    const by = new Map(s.map((x) => [x.item.repo.id, x]));
+    expect(by.get("alt/y")!.why).toEqual(["named alternative"]);
+    expect(by.get("me/sib")!.why).toEqual(["same author"]);
+    expect(by.has("tag/z")).toBe(false);              // a shared tag alone, with no vectors, is not enough to be related
+    expect(await similar("nope/x")).toEqual([]);
   });
 });
 

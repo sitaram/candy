@@ -54,7 +54,7 @@ export function vec(axis: number, spread = 0): Float32Array {
 import { saveRepo, discover } from "@/lib/store/corpus";
 import { saveCard } from "@/lib/enrich";
 import { invalidate } from "@/lib/corpus/api";
-import { putEmbeddings } from "@/lib/embed";
+import { putEmbeddings, writeMatrix } from "@/lib/embed";
 
 export interface Seed { id: string; repo?: Partial<Repo>; card?: Partial<StoredCard> | null; sources?: string[]; readme?: string; releases?: object[]; vec?: Float32Array }
 
@@ -71,5 +71,7 @@ export async function seed(seeds: Seed[]): Promise<void> {
     }
     if (s.vec) await putEmbeddings([{ id: s.id, v: s.vec }]);
   }
-  invalidate();
+  // Readers serve from two one-key caches (corpus snapshot, embedding matrix); rebuild both, as the scripts do.
+  if (seeds.some((s) => s.vec)) await writeMatrix();
+  await invalidate();
 }

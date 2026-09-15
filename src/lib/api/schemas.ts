@@ -13,7 +13,7 @@ export const RepoId = z
   .pipe(z.string().regex(/^[a-z0-9](?:[a-z0-9._-]{0,38})\/[a-z0-9._-]{1,100}$/, "expected owner/name"));
 
 /** One path segment of a repo id, as it arrives from the router (not yet joined). */
-export const RepoSeg = z.string().trim().min(1).max(100).regex(/^[A-Za-z0-9._-]+$/, "bad path segment");
+export const RepoSeg = z.string().trim().min(1).max(100).regex(/^(?=.*[A-Za-z0-9])[A-Za-z0-9._-]+$/, "bad path segment");
 
 /** Query-string integer with bounds; tolerates the string form URLSearchParams hands us. */
 export const Int = (min: number, max: number, dflt: number) =>

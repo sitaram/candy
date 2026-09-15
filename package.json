@@ -20,7 +20,10 @@
     "embed": "node --env-file-if-exists=.env.local --import tsx scripts/embed.mts",
     "relate": "node --env-file-if-exists=.env.local --import tsx scripts/relate.mts",
     "alts": "node --env-file-if-exists=.env.local --import tsx scripts/alts.mts",
-    "voice:trace": "node --env-file-if-exists=.env.local --import tsx scripts/voice-trace.mts"
+    "voice:trace": "node --env-file-if-exists=.env.local --import tsx scripts/voice-trace.mts",
+    "test": "scripts/test-redis.sh && vitest run",
+    "test:watch": "scripts/test-redis.sh && vitest",
+    "test:cov": "scripts/test-redis.sh && vitest run --coverage"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.124.0",
@@ -30,14 +33,17 @@
     "react-dom": "^19.2.4",
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1",
-    "rss-parser": "^3.13.0"
+    "rss-parser": "^3.13.0",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@types/node": "^22",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@vitest/coverage-v8": "^5.0.0",
     "tsx": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^5.0.0"
   },
   "engines": {
     "node": "22.x"

@@ -31,11 +31,10 @@
 
 @media (min-width: 900px) { .about-nav { padding: 10px 24px 8px; } .prose { padding-top: 32px; } }
 
-/* Header voice: same button as the card, at header scale, right-aligned. Mute appears beside it while live. */
-.doc-voice { justify-self: end; display: inline-flex; align-items: center; gap: 8px; position: relative; }
-.doc-voice .act.voice.doc { width: 32px; height: 32px; }
-.doc-voice .act.voice.doc svg { width: 16px; height: 16px; }
-.doc-voice .act.voice.on .stop { width: 12px; height: 12px; border-radius: 3px; }
-.doc-voice .act.sub.mute.doc { width: 28px; height: 28px; position: static; }
-.doc-voice .act.sub.mute.doc svg { width: 14px; height: 14px; }
+/* Header voice: the feed header's bare voice glyph, right-aligned. Fills with the accent while live; mute appears beside it. */
+.doc-voice { justify-self: end; display: inline-flex; align-items: center; gap: 2px; position: relative; margin-right: -6px; }
+.doc-voice .doc-voice-btn.on { color: var(--accent); }
+.doc-voice .doc-voice-btn.on.connecting { opacity: .55; }
+.doc-voice .doc-voice-btn .stop { width: 14px; height: 14px; margin: 3px; border-radius: 3px; background: currentColor; display: block; }
+.doc-voice .doc-mute.off { color: var(--skip); }
 .doc-voice-err { position: absolute; right: 0; top: calc(100% + 8px); white-space: nowrap; font-size: 12px; color: var(--skip); background: var(--bg-2); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; }

@@ -12,11 +12,11 @@ export default async function About() {
   const md = await readFile(path.join(process.cwd(), "docs", "DESIGN.md"), "utf8");
   return (
     <main className="about">
-      <nav className="about-nav">
-        <a href="/">← feed</a>
-        <span className="about-label">how it works</span>
+      <header className="feed-head about-head" role="banner">
+        <a href="/" className="brand" aria-label="Back to the feed">candy</a>
+        <span className="head-label">how it works</span>
         <DocVoice />
-      </nav>
+      </header>
       <article className="prose">
         <ReactMarkdown remarkPlugins={[remarkGfm]}>{md}</ReactMarkdown>
       </article>

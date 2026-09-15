@@ -75,18 +75,18 @@
 .feed-search { color: var(--ink-3); }
 .feed-search + .feed-search { margin-left: 2px; }
 .feed-search svg { width: 20px; height: 20px; }
-/* Header voice: a ringed button, same family as the card's 64px voice button at header scale. Shared by every page header. */
-.hv { flex: none; width: 36px; height: 36px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; border: 1.5px solid var(--line); background: var(--fill); color: var(--ink-2); cursor: pointer; transition: transform .12s, background .12s, color .12s; }
+/* Header voice: a bare glyph like the other header icons. Accent while live; stop square in place of the bars. */
+.hv { background: none; border: none; padding: 6px; cursor: pointer; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; color: var(--ink-3); line-height: 1; transition: color .12s; }
 .hv svg { width: 20px; height: 20px; }
-.hv:active { transform: scale(.92); }
-@media (hover: hover) { .hv:hover { background: var(--fill-2); color: var(--ink); } }
-.hv.on { color: var(--bg); background: var(--accent); border-color: transparent; }
+@media (hover: hover) { .hv:hover { color: var(--ink); } }
+.hv.on { color: var(--accent); }
 .hv.on.connecting { opacity: .55; }
-.hv .stop { width: 12px; height: 12px; border-radius: 3px; background: currentColor; display: block; }
-.hv.sub { width: 30px; height: 30px; }
-.hv.sub svg { width: 15px; height: 15px; }
-.hv.sub.off { color: var(--skip); border-color: var(--skip); background: color-mix(in srgb, var(--skip) 14%, var(--bg)); }
+.hv .stop { width: 14px; height: 14px; margin: 3px; border-radius: 3px; background: currentColor; display: block; }
+.hv.sub svg { width: 17px; height: 17px; }
+.hv.sub.off { color: var(--skip); }
 .feed-head .hv { margin-left: 2px; }
+/* The about page reuses .feed-head; its label sits where the "since" text does on the feed. */
+.feed-head .head-label { flex: 1; text-align: center; font-size: 11px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-4); }
 
 /* deck */
 .deck-wrap { flex: 1; min-height: 0; min-width: 0; width: 100%; display: flex; }

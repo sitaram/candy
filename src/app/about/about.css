@@ -4,9 +4,10 @@
 /* The safe-area inset lives on the page, not the sticky header: Safari changes the inset as its chrome
    collapses on scroll, and a header that pads by it resizes under your finger. */
 .about { min-height: 100dvh; padding-top: env(safe-area-inset-top); background: var(--bg); color: var(--ink); font-family: var(--font); -webkit-font-smoothing: antialiased; }
-.about-nav { position: sticky; top: env(safe-area-inset-top); z-index: 2; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; padding: 10px 22px; background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border-bottom: 1px solid var(--line); font-size: 14px; }
-.about-nav a { display: inline-flex; align-items: center; min-height: 44px; padding: 0 8px; margin: 0 -8px; color: var(--accent); text-decoration: none; font-weight: 600; }
-.about-nav > span.about-label { text-align: center; font-size: 11px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-4); }
+/* The header is the feed's header, made sticky. Same height, brand, icon colour and spacing, so the two pages read as one app. */
+.about-head { position: sticky; top: env(safe-area-inset-top); z-index: 2; background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border-bottom: 1px solid var(--line); }
+.doc-voice { display: inline-flex; align-items: center; gap: 2px; position: relative; margin-right: -6px; }
+.doc-voice-err { position: absolute; right: 0; top: calc(100% + 8px); white-space: nowrap; font-size: 12px; color: var(--skip); background: var(--bg-2); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; }
 
 .prose { max-width: 680px; margin: 0 auto; padding: 22px 22px calc(60px + env(safe-area-inset-bottom)); font-size: 16.5px; line-height: 1.6; color: var(--ink-2); }
 .prose h1 { font-family: var(--font-display); font-size: clamp(30px, 8vw, 40px); font-weight: 800; letter-spacing: -.035em; line-height: 1.05; color: var(--ink); margin: 8px 0 18px; }
@@ -31,10 +32,8 @@
 .prose th { font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-4); }
 .prose td:first-child { color: var(--ink); font-weight: 600; }
 
-@media (min-width: 900px) { .about-nav { padding: 10px 24px 8px; } .prose { padding-top: 32px; } }
+@media (min-width: 900px) { .prose { padding-top: 32px; } }
 
-/* Header voice uses the shared .hv ring from feed.css. The wrapper is text-height so the button overflows the row
-   symmetrically instead of growing the header. */
 .doc-voice { justify-self: end; display: inline-flex; align-items: center; gap: 6px; height: 16px; position: relative; margin-right: -6px; }
 .doc-voice-err { position: absolute; right: 0; top: calc(100% + 14px); white-space: nowrap; font-size: 12px; color: var(--skip); background: var(--bg-2); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; }
 

@@ -40,6 +40,8 @@ const I = {
   // live-voice bars — the glyph Siri / ChatGPT Voice / Gemini Live use for a real-time conversation
   voice: <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M4 10v4" /><path d="M8 7v10" /><path d="M12 4v16" /><path d="M16 7v10" /><path d="M20 10v4" /></svg>,
   search: <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>,
+  // profile: person in a ring — the one glyph every phone user reads as "you", at the same stroke weight as search
+  me: <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9.5" /><circle cx="12" cy="10" r="3.2" /><path d="M5.8 18.6c1.4-2.4 3.6-3.6 6.2-3.6s4.8 1.2 6.2 3.6" /></svg>,
   // "maximize": two diagonal corner arrows — reads as "open this up"
   open: <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 3h6v6" /><path d="m21 3-7 7" /><path d="M9 21H3v-6" /><path d="m3 21 7-7" /></svg>,
 };
@@ -72,10 +74,10 @@ function splitWhy(why: string[]): { fit: string | null; rest: string[] } {
 }
 
 function Card({
-  f, style, className, debug, saved, reaction, onSave, onOpen, onVoice, onSearch, voice,
+  f, style, className, debug, saved, reaction, onSave, onOpen, onVoice, voice,
 }: {
   f: FeedItem; style?: CSSProperties; className?: string; debug?: boolean; saved?: boolean; reaction?: Decision;
-  onSave?: () => void; onOpen?: () => void; onVoice?: () => void; onSearch?: () => void; voice?: { state: string; level: number };
+  onSave?: () => void; onOpen?: () => void; onVoice?: () => void; voice?: { state: string; level: number };
 }) {
   const c = f.item.card;
   const r = f.item.repo;
@@ -114,9 +116,6 @@ function Card({
         <span className="c-cat">{c ? CAT_LABEL[c.category] ?? c.category : ""}{r.language && <span className="c-lang"> · {r.language}</span>}</span>
         <span className="c-spacer" />
         {reaction && <span className={`c-reacted ${reaction}`}>{reaction === "like" ? "👍" : "👎"}</span>}
-        {onSearch && (
-          <button className="icon-btn" onPointerDown={stop} onClick={(e) => { stop(e); onSearch(); }} aria-label="Search" title="Search (/)">{I.search}</button>
-        )}
         <button className={`icon-btn bm${saved ? " on" : ""}`} onPointerDown={stop} onClick={(e) => { stop(e); onSave?.(); }} aria-label={saved ? "Remove bookmark" : "Bookmark"} title="Bookmark (b)">
           {I.bookmark(!!saved)}
         </button>
@@ -504,7 +503,7 @@ export function FeedClient() {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       if (searchOpen) return;
       if (open) { if (e.key === "Escape") closeDetail(); return; }
-      if (e.key === "/" && cur) { openSearch(); e.preventDefault(); return; }
+      if (e.key === "/") { openSearch(); e.preventDefault(); return; }
       if (e.key === "ArrowLeft") decide("skip");
       else if (e.key === "ArrowRight") decide("like");
       else if (e.key === "ArrowUp" || e.key === "j") go(idx + 1);
@@ -555,7 +554,11 @@ export function FeedClient() {
             </>
           ) : profileSize === 0 ? "swipe a few and it learns" : ""}
         </span>
-        <a href="/me" className="feed-me">{count.like + count.skip > 0 ? `${count.like} 👍 · ${count.skip} 👎` : "me"}</a>
+        <button className="icon-btn feed-search" onClick={openSearch} aria-label="Search" title="Search (/)">{I.search}</button>
+        <a href="/me" className="icon-btn feed-me" aria-label="Your profile" title="You">
+          {count.like + count.skip > 0 && <span className="feed-tally"><b className="lk">{count.like}</b><b className="pk">{count.skip}</b></span>}
+          {I.me}
+        </a>
       </header>
 
       <div className="deck-wrap">
@@ -592,7 +595,7 @@ export function FeedClient() {
                 {cur ? (
                   <Card key={cur.id} f={cur} style={curStyle} debug={debug} saved={saved.has(cur.id)} reaction={reacted.current.get(cur.id)}
                     onSave={() => toggleSave(cur.id)} onOpen={() => openDetail(cur.id)}
-                    onVoice={toggleVoice} onSearch={openSearch} voice={{ state: voice.state, level: voice.level }} />
+                    onVoice={toggleVoice} voice={{ state: voice.state, level: voice.level }} />
                 ) : (
                   <Splash style={curStyle} onStart={() => { if (items.length) go(0); else wantStart.current = true; }} />
                 )}
@@ -602,6 +605,17 @@ export function FeedClient() {
                   <Card f={ghost.item} style={ghost.style} saved={saved.has(ghost.item.id)} />
                 </div>
               )}
+            </div>
+          )}
+          {voice.active && (
+            <div className={`v-status ${voice.state}`} style={{ "--lvl": voice.state === "listening" ? voice.micLevel : voice.level } as CSSProperties} aria-live="polite">
+              <span className="v-dot" />
+              {voice.state === "connecting" ? "connecting…"
+                : voice.state === "listening" ? (voice.micLevel > 0.08 ? "hearing you" : "listening")
+                : voice.state === "thinking" ? "thinking…"
+                : voice.state === "speaking" ? "speaking"
+                : voice.state}
+              <button className="v-end" onClick={() => voice.stop()} aria-label="End conversation">end</button>
             </div>
           )}
           {voice.error && <div className="toast err">{voice.error}<button onClick={() => voice.stop()}>ok</button></div>}

@@ -36,7 +36,8 @@ interface RTEvent { type: string; [k: string]: unknown }
 
 export function useVoice(handlers: VoiceHandlers) {
   const [state, setState] = useState<VoiceState>("idle");
-  const [level, setLevel] = useState(0);          // 0..1, whoever is louder (mic or model)
+  const [level, setLevel] = useState(0);          // 0..1, whoever is louder (mic or model) — drives the button ring
+  const [micLevel, setMicLevel] = useState(0);    // 0..1, you only — drives "hearing you"
   const [transcript, setTranscript] = useState(""); // last thing the model said (for the sheet)
   const [error, setError] = useState<string | null>(null);
 
@@ -64,7 +65,7 @@ export function useVoice(handlers: VoiceHandlers) {
     void ctx.current?.close();
     if (audioEl.current) { audioEl.current.srcObject = null; audioEl.current.remove(); }
     pc.current = null; dc.current = null; mic.current = null; ctx.current = null; audioEl.current = null;
-    setLevel(0);
+    setLevel(0); setMicLevel(0);
     setState("idle");
     if (reason && !opts?.quiet) setError(reason);
   }, []);
@@ -219,7 +220,7 @@ export function useVoice(handlers: VoiceHandlers) {
       const ar = mk(remote), al = mk(local);
       const buf = new Uint8Array(128);
       const rms = (a: AnalyserNode) => { a.getByteTimeDomainData(buf); let s = 0; for (const v of buf) { const x = (v - 128) / 128; s += x * x; } return Math.sqrt(s / buf.length); };
-      const tick = () => { setLevel(Math.min(1, Math.max(rms(ar), rms(al)) * 4)); raf.current = requestAnimationFrame(tick); };
+      const tick = () => { const l = rms(al), r = rms(ar); setLevel(Math.min(1, Math.max(r, l) * 4)); setMicLevel(Math.min(1, l * 4)); raf.current = requestAnimationFrame(tick); };
       tick();
     }
   }, [bumpSilence, onEvent, send, stop]);
@@ -233,5 +234,5 @@ export function useVoice(handlers: VoiceHandlers) {
     return () => document.removeEventListener("visibilitychange", onVis);
   }, []);
 
-  return { state, level, transcript, error, start, stop, inject, active: state !== "idle" && state !== "error" };
+  return { state, level, micLevel, transcript, error, start, stop, inject, active: state !== "idle" && state !== "error" };
 }

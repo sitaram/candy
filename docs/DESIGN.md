@@ -1,8 +1,8 @@
 # Candy: Open source worth your time · [live](https://candy-sitaram1-s-teams.vercel.app)
 
-**Problem.** Engineers learn about useful open source by accident. Newsletters and trending pages are one more thing to read, the same for everyone, and stop at the headline. The time most of us have free is walking or driving. And the tools for finding software are built by engineers for engineers, so they look like engineering — lists, tables, stars, a README — while the interfaces people actually enjoy were invented somewhere else and never crossed over.
+**Problem.** Engineers learn about useful open source by accident. The tools for finding it — trending pages, newsletters, awesome lists — are the same for everyone, stop at the headline, and ask for time at a desk, when the time most of us have free is walking or driving. Meanwhile the last fifteen years of consumer software solved exactly these problems for other things: TikTok learned that a feed can teach itself what you like from nothing but swipes, Tinder that a decision can be a flick of the thumb, TripAdvisor that what other people said matters more than the listing. None of it has been brought to software itself.
 
-**Idea.** Treat the developer as a consumer. Borrow the patterns people already love — a deck you swipe, a guide you talk to, a reason under every recommendation — and put them on a corpus that knows why a project matters. Ten minutes a day, personalized, navigable, deep.
+**Idea.** Bring it. A deck you swipe, a guide you talk to, a reason under every recommendation, neighbours in labelled groups — on a corpus that knows why a project matters. Ten minutes a day, personalized, navigable, deep.
 
 Three verbs on one corpus — **discover** (a feed fused from GitHub, Hacker News, newsletters and awesome lists, ranked for you, learning from every swipe), **understand** (every card says why it is here; open one for what it does, what it competes with, what shipped), **ask** (find projects for what you are building, or put a hard question to one — it has read the README). Two modalities carry all three: a swipeable feed when you have a screen, voice when you don't.
 

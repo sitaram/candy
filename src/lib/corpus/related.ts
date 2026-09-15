@@ -98,14 +98,16 @@ export async function neighbors(id: string, limit = 24): Promise<Neighbor[]> {
     const v = emb.get(it.repo.id);
     const cos = mine && v ? dot(mine, v) : 0;
     if (cos) s.cos = cos;
+    const hard = isAlt || !!s.linksTo || !!s.linkedFrom || !!s.sameOwner;
     if (cos > 0.50) score += (cos - 0.50) * 12;                          // .60 → +1.2, .70 → +2.4
-    else if (cos && cos < 0.42) score -= (0.42 - cos) * 15;              // .30 → −1.8: text says "unrelated"; tags alone can't rescue it
+    // Low cosine says "the text is about something else". That should veto a *tag-only* candidate, but not
+    // an explicit relationship: a README link or a sibling repo is related whatever the embedding thinks.
+    else if (cos && cos < 0.42 && !hard) score -= (0.42 - cos) * 15;    // .30 → −1.8
     // Popularity: log10 stars, centred so 1k★ is neutral. 30k★ → +1.5, 30★ → −1.5.
     score += (Math.log10(Math.max(1, it.repo.stars)) - 3) * 1.0;
-    // Admission: a hard edge, OR meaning + a specific shared tag, OR very close meaning alone.
-    const hard = isAlt || s.linksTo || s.linkedFrom || s.sameOwner;
+    // Admission: a hard edge (always, in case a low score would hide it), OR meaning + a specific shared tag, OR very close meaning alone.
     const hasReason = hard || (cos > 0.50 && shared.length >= 1) || cos > 0.58;
-    if (hasReason && score >= 1.0) res.push({ item: it, score, signals: s });
+    if (hasReason && (hard || score >= 1.0)) res.push({ item: it, score, signals: s });
   }
   return res.sort((a, b) => b.score - a.score).slice(0, limit);
 }

@@ -1,4 +1,5 @@
-const REPO_RE = /https?:\/\/(?:www\.)?github\.com\/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)(?:[/#?)\]"'\s]|$)/g;
+// The name may be followed by a path, fragment, query, closing bracket/quote, whitespace, sentence punctuation, or end.
+const REPO_RE = /https?:\/\/(?:www\.)?github\.com\/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)*)(?=[/#?)\]"'\s.,;:!]|$)/g;
 const NOT_OWNERS = new Set([
   "topics", "orgs", "features", "marketplace", "sponsors", "about", "pricing", "login", "join",
   "settings", "notifications", "explore", "trending", "collections", "events", "site", "security",
@@ -10,7 +11,9 @@ export function reposInText(text: string): string[] {
   const out = new Set<string>();
   for (const m of text.matchAll(REPO_RE)) {
     const owner = m[1];
-    const repo = m[2].replace(/\.git$/, "");
+    // Sentence punctuation glued to the name ("…see github.com/a/b." / "a/b,") is not part of it.
+    const repo = m[2].replace(/[.,;:!?]+$/, "").replace(/\.git$/, "");
+    if (!repo) continue;
     if (NOT_OWNERS.has(owner.toLowerCase())) continue;
     if (repo.toLowerCase() === "github.io") continue;
     out.add(`${owner}/${repo}`);

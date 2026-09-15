@@ -83,7 +83,9 @@ function applyDelta(profile: Profile, item: Item, delta: number): void {
 function writeProfile(p: ReturnType<Redis["pipeline"]>, uid: string, profile: Profile, now: number): void {
   p.del(UK.profile(uid));
   if (profile.size) p.hset(UK.profile(uid), Object.fromEntries(Array.from(profile, ([k, v]) => [k, v.toFixed(4)])));
-  p.hset(UK.meta(uid), { profileUpdatedAt: now, lastVisit: now });
+  // Only the feed load (touchVisit) advances lastVisit: a reaction is not a visit, and if it counted
+  // as one, reacting from the deep dive right before a reload would wipe the "since you were here" summary.
+  p.hset(UK.meta(uid), { profileUpdatedAt: now });
 }
 
 /** Record a reaction and update the profile. Fast: one pipeline. */

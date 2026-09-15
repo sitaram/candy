@@ -49,3 +49,27 @@ export function vec(axis: number, spread = 0): Float32Array {
   if (spread) for (let i = 1; i <= 8; i++) v[(axis + i) % DIM] = spread;
   return normalize(v);
 }
+
+/* ---- seeding a mini corpus into the test Redis, through the real write paths ---- */
+import { saveRepo, discover } from "@/lib/store/corpus";
+import { saveCard } from "@/lib/enrich";
+import { invalidate } from "@/lib/corpus/api";
+import { putEmbeddings } from "@/lib/embed";
+
+export interface Seed { id: string; repo?: Partial<Repo>; card?: Partial<StoredCard> | null; sources?: string[]; readme?: string; releases?: object[]; vec?: Float32Array }
+
+/** Write repos + cards (+ optional readme/releases/embedding) and clear the in-process item cache. */
+export async function seed(seeds: Seed[]): Promise<void> {
+  for (const s of seeds) {
+    const r = repo({ id: s.id, ...s.repo });
+    await saveRepo(r, { readme: s.readme ?? "", releases: s.releases ? JSON.stringify(s.releases) : undefined });
+    if (s.sources) await discover(s.sources.map((src) => ({ repo: s.id, source: src, weight: 1 })));
+    if (s.card !== null) {
+      const c = card(s.card);
+      const { readmeHash, model, enrichedAt, inputTokens, outputTokens, ...pure } = c;
+      await saveCard(s.id, pure, { readmeHash, model, enrichedAt, inputTokens, outputTokens });
+    }
+    if (s.vec) await putEmbeddings([{ id: s.id, v: s.vec }]);
+  }
+  invalidate();
+}

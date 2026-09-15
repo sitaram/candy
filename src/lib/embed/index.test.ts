@@ -25,28 +25,31 @@ describe("vector math", () => {
   });
 });
 
+/** `env` is a snapshot taken at import, so the provider tests load a fresh module with a mocked env. */
+async function withEnv(over: Record<string, string | undefined>) {
+  vi.resetModules();
+  vi.doMock("@/lib/env", () => ({ env: { OPENAI_API_KEY: undefined, VOYAGE_API_KEY: undefined, ...over }, need: (k: string) => over[k], assertEnv: () => {} }));
+  return import("./index");
+}
+
 describe("provider", () => {
-  const env = { ...process.env };
-  afterEach(() => { process.env = { ...env }; });
-  it("prefers OpenAI, falls back to Voyage, throws with neither", () => {
-    process.env = { ...env, OPENAI_API_KEY: "x", VOYAGE_API_KEY: "y" };
-    expect(provider()).toBe("openai");
-    delete process.env.OPENAI_API_KEY;
-    expect(provider()).toBe("voyage");
-    delete process.env.VOYAGE_API_KEY;
-    expect(() => provider()).toThrow(/OPENAI_API_KEY or VOYAGE_API_KEY/);
+  afterEach(() => { vi.doUnmock("@/lib/env"); vi.resetModules(); });
+  it("prefers OpenAI, falls back to Voyage, throws with neither", async () => {
+    expect((await withEnv({ OPENAI_API_KEY: "x", VOYAGE_API_KEY: "y" })).provider()).toBe("openai");
+    expect((await withEnv({ VOYAGE_API_KEY: "y" })).provider()).toBe("voyage");
+    const none = await withEnv({});
+    expect(() => none.provider()).toThrow(/OPENAI_API_KEY or VOYAGE_API_KEY/);
   });
 });
 
 describe("embedTexts", () => {
-  const env = { ...process.env };
-  afterEach(() => { process.env = { ...env }; vi.restoreAllMocks(); });
+  afterEach(() => { vi.doUnmock("@/lib/env"); vi.resetModules(); vi.restoreAllMocks(); });
   it("posts to OpenAI with dimensions=512, restores response order by index, and normalizes", async () => {
-    process.env = { ...env, OPENAI_API_KEY: "k" };
+    const m = await withEnv({ OPENAI_API_KEY: "k" });
     const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({
       data: [{ index: 1, embedding: [0, 2, ...new Array(DIM - 2).fill(0)] }, { index: 0, embedding: [3, 0, ...new Array(DIM - 2).fill(0)] }],
     })));
-    const [a, b] = await embedTexts(["first", "second"]);
+    const [a, b] = await m.embedTexts(["first", "second"]);
     const req = fetchMock.mock.calls[0];
     expect(req[0]).toBe("https://api.openai.com/v1/embeddings");
     const body = JSON.parse((req[1] as RequestInit).body as string);
@@ -55,15 +58,15 @@ describe("embedTexts", () => {
     expect(a[0]).toBe(1); expect(b[1]).toBe(1);        // reordered by index and unit-normalized
   });
   it("sends input_type to Voyage", async () => {
-    process.env = { ...env, VOYAGE_API_KEY: "v" }; delete process.env.OPENAI_API_KEY;
+    const m = await withEnv({ VOYAGE_API_KEY: "v" });
     const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ data: [{ index: 0, embedding: new Array(DIM).fill(1) }] })));
-    await embedTexts(["q"], "query");
+    await m.embedTexts(["q"], "query");
     expect(JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string)).toMatchObject({ model: "voyage-3-lite", input_type: "query" });
   });
   it("surfaces HTTP errors with provider, status and a body excerpt", async () => {
-    process.env = { ...env, OPENAI_API_KEY: "k" };
+    const m = await withEnv({ OPENAI_API_KEY: "k" });
     vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("rate limited", { status: 429 }));
-    await expect(embedTexts(["x"])).rejects.toThrow(/embeddings\(openai\) 429: rate limited/);
+    await expect(m.embedTexts(["x"])).rejects.toThrow(/embeddings\(openai\) 429: rate limited/);
   });
 });
 

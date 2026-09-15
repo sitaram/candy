@@ -312,12 +312,13 @@ export function FeedClient() {
   /** Animate the vertical pager from a starting px offset to 0. */
   const settleFrom = useCallback((fromPx: number) => {
     busy.current = true;
+    // Commit the start position synchronously, force a style flush so the browser has it as the
+    // transition's "from", then commit the end position — all in this task. No rAF hop: a rAF can
+    // be a frame or more away on a busy main thread, and that gap reads as a stall before the slide.
     flushSync(() => { setAnimating(false); setSettle(fromPx); });
-    requestAnimationFrame(() => requestAnimationFrame(() => {
-      setAnimating(true);
-      setSettle(0);
-      setTimeout(() => { setAnimating(false); busy.current = false; }, 500);
-    }));
+    void stackRef.current?.getBoundingClientRect();
+    flushSync(() => { setAnimating(true); setSettle(0); });
+    setTimeout(() => { setAnimating(false); busy.current = false; }, 620);
   }, []);
 
   /** Move to another page; the new current card slides in from the side it was on. */
@@ -349,11 +350,12 @@ export function FeedClient() {
       setDrag({ dx: 0, dy: 0, axis: null, active: false });
       if (hasNext) { setAnimating(false); setIdx(idx + 1); setSettle(vh); }
     });
-    requestAnimationFrame(() => requestAnimationFrame(() => {
+    void stackRef.current?.getBoundingClientRect();
+    flushSync(() => {
       setGhost((g) => g && { ...g, style: { transform: endT, opacity: 0, transition: "transform .32s cubic-bezier(.2,.7,.3,1), opacity .32s" } });
       if (hasNext) { setAnimating(true); setSettle(0); }
-      setTimeout(() => { setGhost(null); setAnimating(false); busy.current = false; }, 380);
-    }));
+    });
+    setTimeout(() => { setGhost(null); setAnimating(false); busy.current = false; }, 620);
     if (undoTimer.current) clearTimeout(undoTimer.current);
     setUndo({ item: cur, kind, at: idx });
     undoTimer.current = setTimeout(() => setUndo(null), 6000);
@@ -523,7 +525,11 @@ export function FeedClient() {
   const dY = drag.active && drag.axis === "y" ? drag.dy : 0;
   // Vertical rail position of the current card (px). settle animates toward 0 after a page.
   const railY = dY + settle;
+  // Two tempos during a page: the card that just became current travels on a springy .5 s curve; the
+  // cards on the rail (the one that just left, the one now peeking) follow on a slower, flatter curve.
+  // Both start together, but the rail lags, so the deck reads as a stack, not one sheet.
   const ease = animating ? "transform .5s cubic-bezier(.3,1.25,.45,1)" : "none";
+  const railEase = animating ? "transform .62s cubic-bezier(.25,.8,.3,1)" : "none";
   const pr = Math.min(1, Math.abs(dX) / THRESH);
   const pendingDir: Decision | null = drag.axis === "x" && Math.abs(dX) > 12 ? (dX > 0 ? "like" : "skip") : null;
   const peekFade = Math.max(0, 1 - Math.max(0, -railY) / 120);   // strip fades as the next card rises
@@ -532,8 +538,8 @@ export function FeedClient() {
     transform: `translate(${dX}px, ${railY}px) rotate(${dX / 20}deg)`,
     transition: drag.active ? "none" : animating ? ease : "transform .25s cubic-bezier(.22,.9,.3,1)",
   };
-  const nextStyle: CSSProperties = { transform: `translateY(${vh + railY}px)`, transition: ease };
-  const prevStyle: CSSProperties = { transform: `translateY(${-vh + railY}px)`, transition: ease };
+  const nextStyle: CSSProperties = { transform: `translateY(${vh + railY}px)`, transition: railEase };
+  const prevStyle: CSSProperties = { transform: `translateY(${-vh + railY}px)`, transition: railEase };
   const hue = hueOf(cur);
 
   return (

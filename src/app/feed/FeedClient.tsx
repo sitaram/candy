@@ -167,7 +167,7 @@ function Splash({ style, onStart }: { style?: CSSProperties; onStart: () => void
         <div className="sp-brand">candy</div>
         <div className="sp-line">Open source worth your time.</div>
         <p className="sp-how">
-          What’s new and rising in open source, one card at a time. <b>TikTok-style cards, Tinder-style swipes</b> — and every card says why it’s here.
+          Candy watches GitHub, Hacker News, newsletters, and the awesome lists, and hands you the projects worth knowing — one card at a time. <b>TikTok-style cards, Tinder-style swipes</b>, and every card says why it’s here.
         </p>
         <div className="sp-grid">
           <div><b>↑ ↓</b><span>browse</span></div>

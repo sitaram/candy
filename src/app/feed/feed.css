@@ -187,7 +187,7 @@
 .sp-brand { font-family: var(--font-display); font-weight: 900; font-size: clamp(56px, 18vw, 84px); letter-spacing: -.05em; line-height: 1; color: var(--ink); }
 .sp-line { font-family: var(--font-display); font-size: clamp(20px, 5.6vw, 25px); font-weight: 700; letter-spacing: -.02em; color: var(--ink); margin-top: -4px; }
 .sp-how b { color: var(--ink); font-weight: 650; }
-.sp-how { margin: 6px 0 16px; font-size: clamp(15px, 4.1vw, 17px); color: var(--ink-2); max-width: 32ch; line-height: 1.5; text-wrap: pretty; }
+.sp-how { margin: 6px 0 16px; font-size: clamp(15px, 4.1vw, 17px); color: var(--ink-2); max-width: 34ch; line-height: 1.5; text-wrap: pretty; }
 
 .sp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; width: 100%; }
 .sp-grid > div { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 14px 10px 12px; border-radius: 14px; background: var(--fill); }

@@ -134,13 +134,13 @@
 .fcard-dbg { font-size: 11px; color: var(--ink-4); text-align: center; margin-bottom: 6px; }
 
 /* actions */
-/* dive · voice. While talking, mute attaches to the voice disc's right shoulder: a 36px satellite with the
-   same accent border, overlapping the disc's edge so the pair reads as one control. Row stays put. */
+/* dive · voice. While talking, a 48px mute disc sits beside the voice button — separate, its own target,
+   but visibly paired (accent border). The row keeps 64px between dive and voice; the extra width goes right. */
 .fcard-actions { display: flex; justify-content: center; align-items: center; gap: 64px; }
 .voice-cluster { position: relative; width: 64px; height: 64px; }
 .voice-cluster .act.voice { position: absolute; left: 0; top: 0; }
-.voice-cluster .act.sub.mute { position: absolute; left: 52px; top: 30px; width: 36px; height: 36px; z-index: 1; border-color: var(--accent); background: var(--bg); color: var(--ink-2); }
-.act.sub svg { width: 18px; height: 18px; }
+.voice-cluster .act.sub.mute { position: absolute; left: calc(100% + 14px); top: 8px; width: 48px; height: 48px; border-color: color-mix(in srgb, var(--accent) 55%, transparent); background: var(--fill); color: var(--ink-2); }
+.act.sub svg { width: 22px; height: 22px; }
 .act.sub.mute.off { color: var(--skip); border-color: var(--skip); background: color-mix(in srgb, var(--skip) 14%, var(--bg)); }
 @media (hover: hover) { .act.sub.mute:hover { background: var(--fill-2); color: var(--ink); } .act.sub.mute.off:hover { color: var(--skip); background: color-mix(in srgb, var(--skip) 20%, var(--bg)); } }
 .act {
@@ -414,7 +414,7 @@
 .s-voice:active { transform: scale(.92); }
 .s-voice.on { background: var(--accent); color: var(--bg); border-color: transparent; }
 .s-voice.on.connecting { opacity: .55; }
-.s-voice.sub { width: 34px; height: 34px; color: var(--ink-3); }
+.s-voice.sub { width: 40px; height: 40px; color: var(--ink-2); border-color: color-mix(in srgb, var(--accent) 55%, transparent); }
 .s-voice.sub.mute.off { color: var(--skip); border-color: color-mix(in srgb, var(--skip) 45%, transparent); background: color-mix(in srgb, var(--skip) 12%, var(--fill)); }
 .s-note { flex: 0 0 auto; padding: 4px 30px 8px; font-size: 13.5px; color: var(--ink-3); line-height: 1.4; max-height: 64px; overflow: hidden; }
 .s-note.err { color: var(--skip); }

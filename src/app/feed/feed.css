@@ -385,9 +385,17 @@
   animation: search-in .22s cubic-bezier(.2,.8,.2,1);
 }
 @keyframes search-in { from { transform: translateY(-14px); opacity: 0; } to { transform: none; opacity: 1; } }
-.s-bar { flex: 0 0 auto; display: flex; align-items: center; gap: 8px; padding: 12px 14px 10px 16px; border-bottom: 1px solid var(--line); }
+/* header row: back · title · count — same 48 px rhythm as the feed header */
+.s-head-bar { flex: 0 0 auto; display: flex; align-items: center; gap: 6px; height: 48px; padding: 0 14px 0 8px; }
+.s-back { background: none; border: none; color: var(--ink-2); display: inline-flex; padding: 8px; border-radius: 12px; cursor: pointer; }
+.s-title { font-family: var(--font-display); font-size: 20px; font-weight: 800; letter-spacing: -.02em; color: var(--ink); }
+.s-title-sub { margin-left: auto; font-size: 13px; color: var(--ink-4); font-variant-numeric: tabular-nums; }
+/* the box: a pill, with breathing room, not a hairline at the top edge */
+.s-bar { flex: 0 0 auto; display: flex; align-items: center; gap: 8px; margin: 4px 16px 6px; padding: 4px 6px 4px 14px; border-radius: 999px; background: var(--fill); border: 1.5px solid transparent; transition: border-color .15s, background .15s; }
+.s-bar:focus-within { border-color: color-mix(in srgb, var(--accent) 55%, transparent); background: var(--fill-2, var(--fill)); }
+.s-bar.listening { border-color: color-mix(in srgb, var(--accent) 55%, transparent); }
 .s-ico { color: var(--ink-3); display: inline-flex; flex: 0 0 auto; }
-.s-input { flex: 1; min-width: 0; background: none; border: none; outline: none; color: var(--ink); font: inherit; font-size: 17px; letter-spacing: -.01em; padding: 8px 0; }
+.s-input { flex: 1; min-width: 0; background: none; border: none; outline: none; color: var(--ink); font: inherit; font-size: 17px; letter-spacing: -.01em; padding: 10px 0; }
 .s-input::placeholder { color: var(--ink-4); }
 .s-clear { background: none; border: none; color: var(--ink-3); padding: 6px; display: inline-flex; cursor: pointer; border-radius: 8px; }
 .s-clear:hover { color: var(--ink); background: var(--fill); }
@@ -404,17 +412,19 @@
 }
 .s-voice.on.connecting { animation: vpulse 1.2s ease-in-out infinite; }
 .s-voice.on .stop { width: 14px; height: 14px; border-radius: 3px; background: currentColor; display: block; }
-.s-cancel { background: none; border: none; color: var(--accent); font: inherit; font-size: 14px; font-weight: 600; padding: 6px 2px 6px 6px; cursor: pointer; }
-.s-note { flex: 0 0 auto; padding: 8px 16px; font-size: 13.5px; color: var(--ink-3); border-bottom: 1px solid var(--line); line-height: 1.4; max-height: 64px; overflow: hidden; }
+.s-note { flex: 0 0 auto; padding: 4px 30px 8px; font-size: 13.5px; color: var(--ink-3); line-height: 1.4; max-height: 64px; overflow: hidden; }
 .s-note.err { color: var(--skip); }
 .s-note.heard { color: var(--ink-4); font-style: italic; }
-.s-body { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 14px 16px calc(24px + env(safe-area-inset-bottom)); }
+.s-body { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 10px 16px calc(24px + env(safe-area-inset-bottom)); }
+/* empty state: a real intro, then the chips */
+.s-intro { padding: 26px 4px 0; }
+.s-intro h2 { font-family: var(--font-display); font-size: clamp(22px, 6vw, 27px); font-weight: 800; letter-spacing: -.025em; line-height: 1.15; color: var(--ink); margin: 0 0 10px; max-width: 20ch; text-wrap: balance; }
+.s-intro p { font-size: 15px; line-height: 1.5; color: var(--ink-3); margin: 0 0 26px; max-width: 36ch; text-wrap: pretty; }
 .s-label { font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-4); margin: 2px 0 10px; }
 .s-dim { font-weight: 500; letter-spacing: 0; text-transform: none; }
 .s-try { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
 .s-try .chip { font-size: 13.5px; padding: 8px 13px; background: var(--fill); border: none; color: var(--ink-2); cursor: pointer; font-weight: 500; }
 .s-try .chip:hover { background: var(--fill-2); color: var(--ink); }
-.s-hint { font-size: 14px; color: var(--ink-3); line-height: 1.5; max-width: 34ch; }
 .s-empty { padding: 40px 0; text-align: center; color: var(--ink-2); font-size: 16px; line-height: 1.6; }
 .s-empty span { color: var(--ink-3); font-size: 14px; }
 .s-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }

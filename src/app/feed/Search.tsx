@@ -32,6 +32,7 @@ const fmt = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(n >= 10000 ? 0 : 1
 const TRY = ["mcp server", "local llm runtime", "e2e browser testing", "rust cli for logs", "voice agent framework", "terminal file manager"];
 
 const I = {
+  back: <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 5l-7 7 7 7" /></svg>,
   search: <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>,
   voice: <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M4 10v4" /><path d="M8 7v10" /><path d="M12 4v16" /><path d="M16 7v10" /><path d="M20 10v4" /></svg>,
   x: <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M6 6l12 12M18 6 6 18" /></svg>,
@@ -118,7 +119,12 @@ export function Search({ open, onClose, onPick, autoVoice }: { open: boolean; on
     <div className="search-host">
       <div className="scrim" onPointerDown={onClose} />
       <div className="search" role="dialog" aria-label="Search">
-        <div className="s-bar">
+        <header className="s-head-bar">
+          <button className="s-back" onClick={onClose} aria-label="Back to feed">{I.back}</button>
+          <span className="s-title">Search</span>
+          <span className="s-title-sub">{res && res.results.length > 0 ? `${res.results.length} result${res.results.length === 1 ? "" : "s"}` : "the whole corpus"}</span>
+        </header>
+        <div className={`s-bar${listening ? " listening" : ""}`}>
           <span className="s-ico">{I.search}</span>
           <input ref={inputRef} className="s-input" value={q} onChange={(e) => setQ(e.target.value)}
             placeholder={listening ? (voice.state === "connecting" ? "connecting…" : "listening…") : "a repo, or what you want to build"}
@@ -129,7 +135,6 @@ export function Search({ open, onClose, onPick, autoVoice }: { open: boolean; on
             onClick={toggleVoice} aria-label={listening ? "Stop listening" : "Search by voice"} title="Search by voice">
             {listening ? <span className="stop" aria-hidden /> : I.voice}
           </button>
-          <button className="s-cancel" onClick={onClose}>cancel</button>
         </div>
 
         {voice.error && <div className="s-note err">{voice.error}</div>}
@@ -138,11 +143,12 @@ export function Search({ open, onClose, onPick, autoVoice }: { open: boolean; on
 
         <div className="s-body">
           {showTry && (
-            <>
+            <div className="s-intro">
+              <h2>Find a project by name, or by what you need it to do.</h2>
+              <p>Searches names, pitches, tags — and meaning, so “something like playwright but for mobile” works. Tap the bars to say it instead.</p>
               <div className="s-label">try</div>
               <div className="s-try">{TRY.map((t) => <button key={t} className="chip" onClick={() => setQ(t)}>{t}</button>)}</div>
-              <div className="s-hint">Type a repo name, or describe what you want to build. Tap the bars to say it.</div>
-            </>
+            </div>
           )}
           {res && res.results.length === 0 && !busy && (
             <div className="s-empty">Nothing close to “{res.q}”.<br /><span>Try different words, or describe what it should do.</span></div>
@@ -150,7 +156,7 @@ export function Search({ open, onClose, onPick, autoVoice }: { open: boolean; on
           {res && res.results.length > 0 && (
             <>
               <div className="s-label">
-                {res.results.length} result{res.results.length === 1 ? "" : "s"}
+                for “{res.q}”
                 {res.semantic ? "" : <span className="s-dim"> · by name and tags</span>}
                 {busy && <span className="s-dim"> · updating…</span>}
               </div>

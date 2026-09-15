@@ -120,12 +120,28 @@ export interface RankOpts {
 // Nearest neighbours of a liked card reach .70–.78, so SPAN is set for p50 = 0 and cos .70 = 1: a
 // random card scores 0, the p90 card ≈ 0.5, a true neighbour ≈ 1. p10 ≈ −0.3, clamped at −0.5.
 const CENTER = 0.346, SPAN = 0.35;
+/** 0..1: how much to trust the taste vector. Full weight after ~6 reactions' worth of evidence. */
+export function tasteConfidence(taste: Taste | null | undefined): number {
+  return taste && taste.w > 0 ? Math.min(1, taste.w / 6) : 0;
+}
+
+/**
+ * Term fit and semantic fit, blended. The embedding's share ramps 0 → 60% with confidence, so the first like
+ * doesn't drop term weight from 100% to 40% in one step. A card with no vector can't be compared; it gets the
+ * term fit alone rather than a free 0 that outranks peers the taste actually dislikes.
+ */
+export function blendFit(termFit: number, v: Float32Array | undefined, taste: Taste | null | undefined): number {
+  if (!v) return termFit;
+  const conf = tasteConfidence(taste);
+  if (!conf) return termFit;
+  return termFit + conf * 0.6 * (tasteFit(v, taste) - termFit);
+}
+
+/** Raw semantic fit in −0.5..1, *not* confidence-scaled — rank() applies confidence to the blend weight instead. */
 export function tasteFit(v: Float32Array | undefined, taste: Taste | null | undefined): number {
   if (!v || !taste || taste.w <= 0) return 0;
   const cos = dot(v, taste.v);
-  const centered = (cos - CENTER) / SPAN;
-  const conf = Math.min(1, taste.w / 6);        // full weight after ~6 reactions
-  return Math.max(-0.5, Math.min(1, centered)) * conf;
+  return Math.max(-0.5, Math.min(1, (cos - CENTER) / SPAN));
 }
 
 export function rank(items: Item[], profile: Profile, opts: RankOpts): Ranked[] {
@@ -137,9 +153,9 @@ export function rank(items: Item[], profile: Profile, opts: RankOpts): Ranked[] 
     if (it.card.flags.some((f) => f === "spam-suspect" || f === "no-substance" || f === "star-farm-suspect")) continue;
     const b = baseScore(it);
     const f = fitScore(it, profile);
-    const t = tasteFit(opts.vectors?.get(it.repo.id), opts.taste);
-    // Blend: terms explain, embedding scores. When the embedding is confident it carries 60%.
-    const fit = opts.taste && opts.taste.w > 0 ? 0.4 * f.fit + 0.6 * t : f.fit;
+    const v = opts.vectors?.get(it.repo.id);
+    const t = v ? tasteFit(v, opts.taste) * tasteConfidence(opts.taste) : 0;   // for the "close to things you liked" line
+    const fit = blendFit(f.fit, v, opts.taste);   // terms explain, embedding scores
     const why = [...b.why];
     if (f.matched.length) why.unshift(`matches your interest in ${Array.from(new Set(f.matched)).slice(0, 2).join(", ")}`);
     else if (t > 0.35) why.unshift("close to things you liked");

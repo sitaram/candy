@@ -1,7 +1,7 @@
 import { allItems, getItem, type Item } from "../corpus/api";
 import { getEmbeddingsCached, tasteFrom } from "../embed";
 import { rank, type Ranked } from "./rank";
-import { loadUser, react as reactState, undo as undoState, unsave as unsaveState, type Action } from "./state";
+import { loadUser, react as reactState, undo as undoState, unsave as unsaveState, type Action, markSeen } from "./state";
 import { redis } from "../store/redis";
 
 export interface FeedItem {
@@ -30,6 +30,11 @@ export interface SinceLastVisit {
 export async function feed(uid: string, n = 30, exclude: string[] = []): Promise<Feed> {
   const [items, u] = await Promise.all([allItems(), loadUser(uid, { touch: true })]);
   const { profile, seen, saved } = u;
+  // `exclude` is what the client browsed past since its last call (dwell-seen, no reaction). Persist it: the
+  // server's seen set is otherwise only reactions, and the client had to resend its whole history each time —
+  // which hit the 200-id cap after ~200 cards, 400'd, and the rail silently stopped growing.
+  const fresh = exclude.filter((id) => !seen.has(id));
+  if (fresh.length) void markSeen(uid, fresh).catch(() => {});
   const taste = tasteFrom(u.tasteBuf, u.tasteW);
   const ex = new Set([...seen, ...exclude]);
   // Only pull vectors when there is a taste to compare against (cold users rank on terms + base).

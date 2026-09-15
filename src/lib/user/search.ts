@@ -14,7 +14,7 @@
  */
 import { allItems, type Item } from "../corpus/api";
 import { embedTexts, getEmbeddingsCached, tasteFrom, dot } from "../embed";
-import { baseScore, fitScore, tasteFit } from "./rank";
+import { baseScore, fitScore, blendFit, tasteFit, tasteConfidence } from "./rank";
 import { loadUser } from "./state";
 import type { FeedItem } from "./feed";
 
@@ -47,6 +47,9 @@ export function looksLikeName(q: string): boolean {
 
 interface Hit { it: Item; lex: number; sem: number; match: SearchResult["match"] }
 
+/** Query→card cosine below this is not a match. Card↔card p50 is .346; a real concept query lands .45+. */
+const SEM_FLOOR = 0.42;
+
 export async function search(uid: string, qRaw: string, limit = 20, opts: { semantic?: boolean } = {}): Promise<SearchResponse> {
   const q = qRaw.trim();
   if (q.length < 2) return { q, results: [], semantic: false, exact: null };
@@ -55,7 +58,9 @@ export async function search(uid: string, qRaw: string, limit = 20, opts: { sema
   const nameQuery = looksLikeName(q);
 
   // Start the OpenAI query embedding now so it overlaps the Redis reads instead of following them.
-  const semanticWanted = (opts.semantic ?? true) && (!nameQuery || q.includes(" "));
+  // Only an explicit owner/name skips it: a bare word ("transcription", "observability") is as often a concept
+  // as a repo name, and with no tag or text match it returned nothing. Exact/name hits still win on lex.
+  const semanticWanted = (opts.semantic ?? true) && !/^[\w.-]+\/[\w.-]+$/.test(q);
   const qvP = semanticWanted ? queryVector(q).catch((e: unknown) => { console.warn("[search] embed", (e as Error).message); return null; }) : Promise.resolve(null);
   const [items, u] = await Promise.all([allItems(), loadUser(uid)]);
   const { profile, saved: savedAll } = u;
@@ -107,9 +112,11 @@ export async function search(uid: string, qRaw: string, limit = 20, opts: { sema
         }
         scored.sort((a, b) => b.cos - a.cos);
         // Take the top band; below the 40th result or a cosine gap of 0.12 from the best, it's noise.
+        // And an absolute floor: semRel is relative to the best hit, so without this a nonsense query's
+        // best-of-a-bad-lot (cos .3) came back as a confident "close to what you described".
         const best = scored[0]?.cos ?? 0;
         for (const s of scored.slice(0, 40)) {
-          if (s.cos < best - 0.12) break;
+          if (s.cos < best - 0.12 || s.cos < SEM_FLOOR) break;
           const h = hits.get(s.it.repo.id);
           if (h) h.sem = s.cos;
           else hits.set(s.it.repo.id, { it: s.it, lex: 0, sem: s.cos, match: "semantic" });
@@ -134,8 +141,9 @@ export async function search(uid: string, qRaw: string, limit = 20, opts: { sema
     const rel = h.lex >= 4 ? 1 : h.sem > 0 ? 0.7 * semRel + 0.3 * lexRel : 0.6 * lexRel;
     const b = baseScore(h.it);
     const f = fitScore(h.it, profile);
-    const t = tasteFit(tasteVectors?.get(h.it.repo.id), taste);
-    const fit = taste && taste.w > 0 ? 0.4 * f.fit + 0.6 * t : f.fit;
+    const v = tasteVectors?.get(h.it.repo.id);
+    const t = v ? tasteFit(v, taste) * tasteConfidence(taste) : 0;
+    const fit = blendFit(f.fit, v, taste);
     // Relevance dominates; quality and fit break ties and reorder near-equals.
     const score = rel * rel * Math.pow(b.score, 0.35) * (1 + 0.5 * fit);
     // Which lane carried it: an exact/name hit, a strong keyword hit, or the embedding.

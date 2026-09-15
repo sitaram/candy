@@ -17,6 +17,26 @@ export type Reaction = "like" | "skip" | "save" | "dive";
 export type Action = Reaction | "unsave" | "undo";
 
 const DELTA: Record<Reaction, number> = { like: 1, save: 2, dive: 1.5, skip: -0.5 };
+
+/**
+ * One writer per user at a time. react/unsave/undo all read the profile, compute, and write it back;
+ * two beacons in flight together (dive from the sheet, then the swipe 200 ms later; a retried post) would
+ * each read the same "before" and the second write would erase the first. A short Redis lock serialises
+ * them; waiting is bounded, and on timeout we proceed anyway rather than drop the reaction — a rare
+ * lost update beats a rare lost reaction plus a stuck UI.
+ */
+async function withUserLock<T>(uid: string, fn: () => Promise<T>): Promise<T> {
+  const r = redis();
+  const key = `u:${uid}:lock`;
+  const token = Math.random().toString(36).slice(2);
+  const deadline = Date.now() + 1_500;
+  while (!(await r.set(key, token, "PX", 2_000, "NX"))) {
+    if (Date.now() > deadline) { console.warn(`[state] lock wait exceeded for ${uid.slice(0, 8)}; proceeding`); break; }
+    await new Promise((res) => setTimeout(res, 25 + Math.random() * 25));
+  }
+  try { return await fn(); }
+  finally { await r.eval(`if redis.call("get",KEYS[1])==ARGV[1] then return redis.call("del",KEYS[1]) end return 0`, 1, key, token).catch(() => {}); }
+}
 const DECAY_PER_DAY = 0.98;
 
 export const UK = {
@@ -105,57 +125,76 @@ function writeProfile(p: ReturnType<Redis["pipeline"]>, uid: string, profile: Pr
  * compounds on replay is both a correctness bug and a way to poison a taste from outside.
  */
 export async function react(uid: string, item: Item, kind: Reaction): Promise<void> {
-  const r = redis();
-  const id = item.repo.id;
-  const now = Date.now();
-  const [prev, savedScore] = await Promise.all([r.hget(UK.react(uid), id), kind === "save" ? r.zscore(UK.saved(uid), id) : null]);
-  if (kind === "save" ? savedScore != null : prev === kind) return;
-  const profile = await decayedProfile(uid, now);
-  applyDelta(profile, item, DELTA[kind]);
+  return withUserLock(uid, async () => {
+    const r = redis();
+    const id = item.repo.id;
+    const now = Date.now();
+    const [prevRaw, savedScore] = await Promise.all([r.hget(UK.react(uid), id), kind === "save" ? r.zscore(UK.saved(uid), id) : null]);
+    const prev = prevRaw as Reaction | null;
+    if (kind === "save" ? savedScore != null : prev === kind) return;
+    // A card has one reaction at a time. dive → skip must *replace* +1.5 with −0.5, not stack to +1.0 —
+    // the common path is open the sheet (dive), then swipe, and stacking taught the model to like what
+    // the user had just rejected. Save is a separate set and does not displace the reaction.
+    const replacing = kind !== "save" && prev && prev !== "save" ? prev : null;
+    const profile = await decayedProfile(uid, now);
+    if (replacing) applyDelta(profile, item, -DELTA[replacing]);
+    applyDelta(profile, item, DELTA[kind]);
 
-  const p = r.pipeline();
-  // Bookmarking does not dismiss the card, so it must not mark it seen.
-  if (kind !== "save") {
-    p.zadd(UK.seen(uid), now, id);
-    p.zremrangebyrank(UK.seen(uid), 0, -(SEEN_CAP + 1));   // keep the newest SEEN_CAP
-    p.hset(UK.react(uid), id, kind);
-  } else p.zadd(UK.saved(uid), now, id);
-  writeProfile(p, uid, profile, now);
-  p.hincrby(UK.meta(uid), "reactions", 1);
-  p.hincrby(UK.meta(uid), `n_${kind}`, 1);
-  await Promise.all([p.exec(), nudgeTaste(uid, id, DELTA[kind])]);
+    const p = r.pipeline();
+    // Bookmarking does not dismiss the card, so it must not mark it seen.
+    if (kind !== "save") {
+      p.zadd(UK.seen(uid), now, id);
+      p.zremrangebyrank(UK.seen(uid), 0, -(SEEN_CAP + 1));   // keep the newest SEEN_CAP
+      p.hset(UK.react(uid), id, kind);
+    } else p.zadd(UK.saved(uid), now, id);
+    writeProfile(p, uid, profile, now);
+    if (!replacing) p.hincrby(UK.meta(uid), "reactions", 1);
+    else p.hincrby(UK.meta(uid), `n_${replacing}`, -1);
+    p.hincrby(UK.meta(uid), `n_${kind}`, 1);
+    await p.exec();
+    if (replacing) await nudgeTaste(uid, id, -DELTA[replacing], { reverse: true });
+    await nudgeTaste(uid, id, DELTA[kind]);
+  });
 }
 
 /** Remove a bookmark and reverse its profile contribution. */
 export async function unsave(uid: string, item: Item): Promise<void> {
-  const r = redis();
-  const now = Date.now();
-  const profile = await decayedProfile(uid, now);
-  applyDelta(profile, item, -DELTA.save);
-  const p = r.pipeline();
-  p.zrem(UK.saved(uid), item.repo.id);
-  writeProfile(p, uid, profile, now);
-  p.hincrby(UK.meta(uid), "n_save", -1);
-  await Promise.all([p.exec(), nudgeTaste(uid, item.repo.id, -DELTA.save, { reverse: true })]);
+  return withUserLock(uid, async () => {
+    const r = redis();
+    const now = Date.now();
+    // Idempotent like react(): a replayed unsave, or one after resetTaste, must not push the terms to −2.
+    if ((await r.zscore(UK.saved(uid), item.repo.id)) == null) return;
+    const profile = await decayedProfile(uid, now);
+    applyDelta(profile, item, -DELTA.save);
+    const p = r.pipeline();
+    p.zrem(UK.saved(uid), item.repo.id);
+    writeProfile(p, uid, profile, now);
+    p.hincrby(UK.meta(uid), "n_save", -1);
+    await p.exec();
+    await nudgeTaste(uid, item.repo.id, -DELTA.save, { reverse: true });
+  });
 }
 
 /** Revert a like/skip: un-see the item, reverse the profile delta. */
 export async function undo(uid: string, item: Item): Promise<boolean> {
-  const r = redis();
-  const id = item.repo.id;
-  const prev = (await r.hget(UK.react(uid), id)) as Reaction | null;
-  if (prev !== "like" && prev !== "skip") return false;
-  const now = Date.now();
-  const profile = await decayedProfile(uid, now);
-  applyDelta(profile, item, -DELTA[prev]);
-  const p = r.pipeline();
-  p.zrem(UK.seen(uid), id);
-  p.hdel(UK.react(uid), id);
-  writeProfile(p, uid, profile, now);
-  p.hincrby(UK.meta(uid), "reactions", -1);
-  p.hincrby(UK.meta(uid), `n_${prev}`, -1);
-  await Promise.all([p.exec(), nudgeTaste(uid, id, -DELTA[prev], { reverse: true })]);
-  return true;
+  return withUserLock(uid, async () => {
+    const r = redis();
+    const id = item.repo.id;
+    const prev = (await r.hget(UK.react(uid), id)) as Reaction | null;
+    if (prev !== "like" && prev !== "skip") return false;
+    const now = Date.now();
+    const profile = await decayedProfile(uid, now);
+    applyDelta(profile, item, -DELTA[prev]);
+    const p = r.pipeline();
+    p.zrem(UK.seen(uid), id);
+    p.hdel(UK.react(uid), id);
+    writeProfile(p, uid, profile, now);
+    p.hincrby(UK.meta(uid), "reactions", -1);
+    p.hincrby(UK.meta(uid), `n_${prev}`, -1);
+    await p.exec();
+    await nudgeTaste(uid, id, -DELTA[prev], { reverse: true });
+    return true;
+  });
 }
 
 export async function isSaved(uid: string, ids: string[]): Promise<Set<string>> {

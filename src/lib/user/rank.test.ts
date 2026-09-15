@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeAll, afterAll } from "vitest";
-import { baseScore, fitScore, tasteFit, rank } from "./rank";
+import { baseScore, fitScore, tasteFit, tasteConfidence, blendFit, rank } from "./rank";
 import { itemTerms } from "./state";
 import { item, daysAgoIso, NOW, vec } from "@/test/fixtures";
 
@@ -106,9 +106,21 @@ describe("tasteFit", () => {
     expect(tasteFit(v, T)).toBeCloseTo(0, 5);
   });
   it("confidence ramps linearly to full at weight 6 so one swipe cannot swing the feed", () => {
-    expect(tasteFit(vec(0), { v: vec(0), w: 1 })).toBeCloseTo(1 / 6);
-    expect(tasteFit(vec(0), { v: vec(0), w: 3 })).toBeCloseTo(0.5);
-    expect(tasteFit(vec(0), { v: vec(0), w: 60 })).toBe(1);
+    expect(tasteConfidence({ v: vec(0), w: 1 })).toBeCloseTo(1 / 6);
+    expect(tasteConfidence({ v: vec(0), w: 3 })).toBeCloseTo(0.5);
+    expect(tasteConfidence({ v: vec(0), w: 60 })).toBe(1);
+    expect(tasteConfidence(null)).toBe(0);
+  });
+  it("blend ramps the embedding's share with confidence instead of jumping 100% → 40% on the first like", () => {
+    const T1 = { v: vec(0), w: 1 }, T6 = { v: vec(0), w: 6 };
+    // Perfect semantic match (t=1), no term fit (f=0):
+    expect(blendFit(0, vec(0), T1)).toBeCloseTo(0.6 / 6);   // 1/6 confidence × 60% share
+    expect(blendFit(0, vec(0), T6)).toBeCloseTo(0.6);
+    // Term fit 0.5 and a card the taste dislikes (t=−0.5), full confidence: 0.5 + 0.6·(−1) = −0.1.
+    expect(blendFit(0.5, vec(1), T6)).toBeCloseTo(-0.1);
+    // No vector: term fit alone, not a free zero.
+    expect(blendFit(0.5, undefined, T6)).toBe(0.5);
+    expect(blendFit(-0.2, undefined, T6)).toBe(-0.2);
   });
 });
 

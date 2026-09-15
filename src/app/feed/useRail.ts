@@ -40,6 +40,7 @@ export function useRail() {
   const [undo, setUndo] = useState<Undo | null>(null);
   const [vh, setVh] = useState(800);
   const seenRef = useRef<Set<string>>(new Set());
+  const sentSeen = useRef<Set<string>>(new Set());   // already reported to the server; it remembers
   const reacted = useRef<Map<string, Decision>>(new Map());
   const fetching = useRef(false);
   const busy = useRef(false);   // true while a page/decision animation runs
@@ -57,9 +58,11 @@ export function useRail() {
   const load = useCallback(async (initial = false) => {
     if (fetching.current) return;
     fetching.current = true;
-    const ex = Array.from(seenRef.current).map((id) => `exclude=${encodeURIComponent(id)}`).join("&");
+    // Only ids the server hasn't been told about (it persists them); capped well under the schema's 200.
+    const pending = Array.from(seenRef.current).filter((id) => !sentSeen.current.has(id)).slice(-150);
+    const ex = pending.map((id) => `exclude=${encodeURIComponent(id)}`).join("&");
     let f: Feed;
-    try { f = await api<Feed>(`/api/feed?n=30${ex ? "&" + ex : ""}`); }
+    try { f = await api<Feed>(`/api/feed?n=30${ex ? "&" + ex : ""}`); for (const id of pending) sentSeen.current.add(id); }
     catch (e) {
       // First load failing is a wall; later loads failing just means the rail stops growing — the user still has cards.
       report(e, "feed"); fetching.current = false;

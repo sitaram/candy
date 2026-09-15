@@ -86,9 +86,15 @@ export async function markUnfetchable(id: string): Promise<void> {
 }
 
 export async function addEdges(from: string, type: EdgeType, to: string[]): Promise<void> {
-  const ids = to.map(normId).filter((t) => t !== normId(from));
+  const f = normId(from);
+  const ids = to.map(normId).filter((t) => t !== f);
   if (!ids.length) return;
-  await redis().sadd(K.edges(normId(from), type), ...ids);
+  const p = redis().pipeline();
+  p.sadd(K.edges(f, type), ...ids);
+  // README links get their reverse: neighbors() reads `linked-by` for the "built on / used by" group, and
+  // for a long time nothing wrote it, so that group never appeared.
+  if (type === "links") for (const t of ids) p.sadd(K.edges(t, "linked-by"), f);
+  await p.exec();
 }
 
 export async function addAwesome(list: string, repos: string[]): Promise<void> {

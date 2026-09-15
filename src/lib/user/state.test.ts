@@ -38,14 +38,37 @@ describe("react", () => {
     await react(U, A, "dive");
     expect((await prof()).mcp).toBe(1.5);
   });
-  it("accumulates across reactions and prunes terms that decay to |w| < 0.05", async () => {
-    // Two cards with the same terms: like one, skip both. 1 − 0.5 − 0.5 = 0 → pruned. (Reacting to the
-    // same card twice with the same kind is a no-op now, so the second skip must come from a sibling.)
+  it("accumulates across cards and prunes terms that decay to |w| < 0.05", async () => {
+    // Like one card, skip two siblings with the same terms: 1 − 0.5 − 0.5 = 0 → pruned.
     const A2 = item("a/b2", { card: { tags: ["mcp", "cli", "node"], category: "dev-tools" }, repo: { language: "TypeScript" } });
+    const A3 = item("a/b3", { card: { tags: ["mcp", "cli", "node"], category: "dev-tools" }, repo: { language: "TypeScript" } });
     await react(U, A, "like");
-    await react(U, A, "skip");
     await react(U, A2, "skip");
+    await react(U, A3, "skip");
     expect(await prof()).toEqual({});
+  });
+  it("a card has one reaction: changing kind replaces the delta instead of stacking it", async () => {
+    // The common path: open the sheet (dive, +1.5) then swipe left (skip, −0.5). Stacking gave +1.0 —
+    // the model learned to like what the user had just rejected. Must net to the skip alone.
+    await react(U, A, "dive");
+    await react(U, A, "skip");
+    expect((await prof()).mcp).toBeCloseTo(-0.5, 4);
+    const m = await mockRedis.hgetall(UK.meta(U));
+    expect(Number(m.reactions)).toBe(1);
+    expect(Number(m.n_dive ?? 0)).toBe(0);
+    expect(Number(m.n_skip)).toBe(1);
+    // …and back to like: −0.5 → +1, not +0.5.
+    await react(U, A, "like");
+    expect((await prof()).mcp).toBeCloseTo(1, 4);
+    expect(Number((await mockRedis.hgetall(UK.meta(U))).reactions)).toBe(1);
+  });
+  it("unsave is idempotent: a replayed unsave, or one after the bookmark is gone, changes nothing", async () => {
+    await react(U, A, "save");
+    await unsave(U, A);
+    const after = await prof();
+    await unsave(U, A);
+    expect(await prof()).toEqual(after);
+    expect(Number((await mockRedis.hgetall(UK.meta(U))).n_save)).toBe(0);
   });
   it("decays the profile by 0.98/day between reactions", async () => {
     await react(U, A, "like");

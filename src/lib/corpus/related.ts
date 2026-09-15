@@ -218,6 +218,7 @@ export async function similar(id: string, limit = 10): Promise<{ item: Item; sco
     if (n.signals.shared.length) why.push(`shares ${n.signals.shared.slice(0, 3).join(", ")}`);
     if ((n.signals.cos ?? 0) > 0.6 && !why.length) why.push("close in meaning");
     if (n.signals.sameCategory && !why.length) why.push("same category");
+    if (!why.length) why.push("related");   // the UI renders why[0]; a neighbour admitted on cosine alone (.58–.60) had none
     return { item: n.item, score: n.score, why };
   });
 }

@@ -9,6 +9,7 @@
  * mentions:{id}          LIST  JSON Mention[] (who talked about it, where, when)
  * stars:{id}             ZSET  ts -> stars (velocity snapshots)
  * edges:{id}:{type}      SET   related repo ids. type: links | depends | awesome-sibling | same-author
+ * edges:{id}:linked-by   SET   reverse of links: repos whose README points at {id} (written with links)
  * awesome:{list}         SET   repo ids in that awesome list
  * tags:{id}              SET   awesome:{list}, lang:{x}, topic:{y}
  * corpus                 SET   all repo ids with repo:{id} populated
@@ -29,7 +30,7 @@ export const K = {
   tags: (id: string) => `tags:${id}`,
 } as const;
 
-export type EdgeType = "links" | "depends" | "awesome-sibling" | "same-author";
+export type EdgeType = "links" | "depends" | "awesome-sibling" | "same-author" | "linked-by";
 
 export function normId(id: string): string {
   return id.trim().toLowerCase().replace(/\.git$/, "");

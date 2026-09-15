@@ -76,17 +76,6 @@
 .feed-search + .feed-search { margin-left: 2px; }
 .feed-search svg { width: 20px; height: 20px; }
 
-/* voice status: sits just above the action row while a session is live; says exactly what the model is doing */
-.v-status { position: absolute; left: 50%; bottom: calc(var(--peek-h, 96px) + 104px); transform: translateX(-50%); z-index: 6; display: flex; align-items: center; gap: 8px; padding: 6px 8px 6px 12px; border-radius: 999px; background: color-mix(in srgb, var(--bg) 80%, var(--ink) 8%); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border: 1px solid var(--line); font-size: 13px; font-weight: 600; color: var(--ink-2); white-space: nowrap; pointer-events: auto; }
-.v-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ink-4); transition: transform .08s linear, background .2s; }
-.v-status.connecting .v-dot { background: var(--ink-3); animation: vblink 1s ease-in-out infinite; }
-.v-status.listening .v-dot { background: var(--like); transform: scale(calc(1 + var(--lvl, 0) * 1.6)); }   /* grows with your voice */
-.v-status.thinking .v-dot { background: var(--accent); animation: vblink .7s ease-in-out infinite; }
-.v-status.speaking .v-dot { background: var(--accent); transform: scale(calc(1 + var(--lvl, 0) * 1.6)); }
-@keyframes vblink { 0%, 100% { opacity: .35; } 50% { opacity: 1; } }
-.v-end { font: inherit; font-size: 12px; font-weight: 600; color: var(--ink-3); background: var(--fill); border: none; border-radius: 999px; padding: 3px 9px; cursor: pointer; margin-left: 2px; }
-.v-end:hover { color: var(--ink); }
-
 /* deck */
 .deck-wrap { flex: 1; min-height: 0; min-width: 0; width: 100%; display: flex; }
 .deck { flex: 1; min-width: 0; width: 100%; box-sizing: border-box; display: flex; flex-direction: column; position: relative; }
@@ -162,18 +151,10 @@
 .act:focus { outline: none; }
 .act:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .act.dive, .act.voice { width: 64px; height: 64px; color: var(--ink-2); }
-/* voice running: accent disc, stop glyph, a soft ring that breathes with the audio level */
-.act.voice.on {
-  color: var(--bg); background: var(--accent); border-color: transparent;
-  box-shadow: 0 0 0 calc(2px + var(--lvl, 0) * 14px) color-mix(in srgb, var(--accent) 22%, transparent);
-  transition: transform .12s, box-shadow .09s linear;
-}
+/* voice running: one state — accent disc with a stop glyph. No level ring, no per-state colour, nothing moves. */
+.act.voice.on { color: var(--bg); background: var(--accent); border-color: transparent; }
 @media (hover: hover) { .act.voice.on:hover { background: var(--accent); color: var(--bg); } }
-.act.voice.on.listening { background: var(--like); box-shadow: 0 0 0 calc(2px + var(--lvl, 0) * 18px) color-mix(in srgb, var(--like) 26%, transparent); }
-@media (hover: hover) { .act.voice.on.listening:hover { background: var(--like); } }
-.act.voice.on.thinking { animation: vpulse 1.2s ease-in-out infinite; }
-.act.voice.on.connecting { animation: vpulse 1.2s ease-in-out infinite; }
-@keyframes vpulse { 0%, 100% { box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 22%, transparent); } 50% { box-shadow: 0 0 0 10px color-mix(in srgb, var(--accent) 10%, transparent); } }
+.act.voice.on.connecting { opacity: .55; }
 .act.voice.on .stop { width: 20px; height: 20px; border-radius: 4px; background: currentColor; display: block; }
 .toast.err { background: var(--skip); color: #fff; }
 .toast.err button { color: #fff; }

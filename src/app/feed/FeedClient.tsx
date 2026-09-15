@@ -147,7 +147,7 @@ function Card({
 
       <div className="fcard-actions" onPointerDown={stop}>
         <button className="act dive" onClick={onOpen} aria-label="Deep dive" title="Deep dive (enter, or tap the card)">{I.open}</button>
-        <button className={`act voice${voice && voice.state !== "idle" ? ` on ${voice.state}` : ""}`} style={{ "--lvl": voice?.level ?? 0 } as CSSProperties}
+        <button className={`act voice${voice && voice.state !== "idle" ? ` on ${voice.state}` : ""}`}
           onClick={(e) => { e.stopPropagation(); onVoice?.(); }} aria-label={voice && voice.state !== "idle" ? "End conversation" : "Talk about this"} title="Talk about this (v)">
           {voice && voice.state !== "idle" ? <span className="stop" aria-hidden /> : I.voice}
         </button>
@@ -631,17 +631,6 @@ export function FeedClient() {
                   <Card f={ghost.item} style={ghost.style} saved={saved.has(ghost.item.id)} />
                 </div>
               )}
-            </div>
-          )}
-          {voice.active && (
-            <div className={`v-status ${voice.state}`} style={{ "--lvl": voice.state === "listening" ? voice.micLevel : voice.level } as CSSProperties} aria-live="polite">
-              <span className="v-dot" />
-              {voice.state === "connecting" ? "connecting…"
-                : voice.state === "listening" ? (voice.micLevel > 0.08 ? "hearing you" : "listening")
-                : voice.state === "thinking" ? "thinking…"
-                : voice.state === "speaking" ? "speaking"
-                : voice.state}
-              <button className="v-end" onClick={() => voice.stop()} aria-label="End conversation">end</button>
             </div>
           )}
           {voice.error && <div className="toast err">{voice.error}<button onClick={() => voice.stop()}>ok</button></div>}

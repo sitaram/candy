@@ -181,6 +181,28 @@
 .sp-more { font-size: 13px; color: var(--accent); text-decoration: none; font-weight: 600; white-space: nowrap; }
 .fcard.splash.rail .sp-start { visibility: hidden; }
 
+/* gesture reminder: lean right (green), lean left (red), lift (peek), settle. ~3 s, once a minute. */
+.drag-layer.breathing { animation: breathe 3s cubic-bezier(.45,.05,.35,1) both; }   /* on the layer: the card's inline transform is the drag, this composes with it */
+@keyframes breathe {
+  0%   { transform: translate(0,0) rotate(0); }
+  18%  { transform: translate(34px, 0) rotate(1.8deg); }
+  34%  { transform: translate(0,0) rotate(0); }
+  52%  { transform: translate(-34px, 0) rotate(-1.8deg); }
+  68%  { transform: translate(0,0) rotate(0); }
+  84%  { transform: translate(0,-28px); }
+  100% { transform: translate(0,0); }
+}
+.drag-layer.breathing::after { animation: breathe-glow 3s cubic-bezier(.45,.05,.35,1) both; opacity: 1 !important; }
+@keyframes breathe-glow {
+  0%, 34%, 68%, 100% { background: transparent; }
+  18% { background: linear-gradient(90deg, transparent 55%, color-mix(in srgb, var(--like) 22%, transparent)); }
+  52% { background: linear-gradient(270deg, transparent 55%, color-mix(in srgb, var(--skip) 22%, transparent)); }
+  84% { background: linear-gradient(0deg, color-mix(in srgb, var(--ink) 6%, transparent), transparent 40%); }
+}
+.drag-layer.breathing ~ .peek-strip, .stack:has(.breathing) .peek-strip { animation: breathe-peek 3s cubic-bezier(.45,.05,.35,1) both; }
+@keyframes breathe-peek { 0%, 68%, 100% { transform: translateY(0); } 84% { transform: translateY(-14px); } }
+@media (prefers-reduced-motion: reduce) { .drag-layer.breathing, .drag-layer.breathing::after, .stack:has(.breathing) .peek-strip { animation: none; } }
+
 /* swipe feedback */
 .drag-layer::after { content: ""; position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity .1s; }
 .drag-layer.hint-like::after { opacity: var(--p); background: linear-gradient(90deg, transparent 35%, color-mix(in srgb, var(--like) 28%, transparent)); }

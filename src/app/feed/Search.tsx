@@ -37,7 +37,7 @@ const I = {
   x: <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M6 6l12 12M18 6 6 18" /></svg>,
 };
 
-export function Search({ open, onClose, onPick }: { open: boolean; onClose: () => void; onPick: (r: SearchResult) => void }) {
+export function Search({ open, onClose, onPick, autoVoice }: { open: boolean; onClose: () => void; onPick: (r: SearchResult) => void; autoVoice?: boolean }) {
   const [q, setQ] = useState("");
   const [res, setRes] = useState<SearchResponse | null>(null);
   const [busy, setBusy] = useState(false);
@@ -75,9 +75,12 @@ export function Search({ open, onClose, onPick }: { open: boolean; onClose: () =
 
   // Focus on open; reset on close.
   useEffect(() => {
-    if (open) setTimeout(() => inputRef.current?.focus(), 60);
-    else { setQ(""); setRes(null); setHeard(""); ranFor.current = null; }
-  }, [open]);
+    if (open) {
+      // Opened from the header's voice button: skip the keyboard and start listening at once.
+      if (autoVoice) void voice.start({ mode: "search" });
+      else setTimeout(() => inputRef.current?.focus(), 60);
+    } else { setQ(""); setRes(null); setHeard(""); ranFor.current = null; }
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* ---- voice: same transport, search mode ---- */
   const voice = useVoice({

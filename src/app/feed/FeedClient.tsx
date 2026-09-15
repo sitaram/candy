@@ -439,7 +439,10 @@ export function FeedClient() {
   }, [voice, cur]);
   /* ---- search: results hand a card to the rail, right after the current one ---- */
   const [searchOpen, setSearchOpen] = useState(false);
-  const openSearch = useCallback(() => { if (voice.active) voice.stop(); setSearchOpen(true); }, [voice]);
+  const [searchVoice, setSearchVoice] = useState(false);
+  const openSearch = useCallback(() => { if (voice.active) voice.stop(); setSearchVoice(false); setSearchOpen(true); }, [voice]);
+  /** Header voice: straight into a listening search — one tap, no keyboard. */
+  const openVoiceSearch = useCallback(() => { if (voice.active) voice.stop(); setSearchVoice(true); setSearchOpen(true); }, [voice]);
   const pickResult = useCallback((r: SearchResult) => { setSearchOpen(false); insertAndGo(r); }, [insertAndGo]);
 
   // Swiping while talking: tell the model what's on screen now (but not for tool-driven changes, which return the brief themselves).
@@ -553,6 +556,7 @@ export function FeedClient() {
           ) : profileSize === 0 ? "swipe a few and it learns" : ""}
         </span>
         <button className="icon-btn feed-search" onClick={openSearch} aria-label="Search" title="Search (/)">{I.search}</button>
+        <button className="icon-btn feed-search" onClick={openVoiceSearch} aria-label="Ask by voice" title="Ask by voice">{I.voice}</button>
         <a href="/me" className="icon-btn feed-me" aria-label="Your profile" title="You">
           {count.like + count.skip > 0 && <span className="feed-tally"><b className="lk">{count.like}</b><b className="pk">{count.skip}</b></span>}
           {I.me}
@@ -626,7 +630,7 @@ export function FeedClient() {
           <div className="keyhints">← pass · → like · ↑ ↓ browse · enter deep dive · v voice · / search · b bookmark · z undo</div>
         </div>
 
-        <Search open={searchOpen} onClose={() => setSearchOpen(false)} onPick={pickResult} />
+        <Search open={searchOpen} autoVoice={searchVoice} onClose={() => setSearchOpen(false)} onPick={pickResult} />
         {open && (
           <div className="detail-host">
             {/* pointerdown, not click: a tap on the card opens the sheet on pointerup, and the browser's

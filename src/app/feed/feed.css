@@ -60,19 +60,20 @@
 }
 
 /* top bar */
-.feed-head { flex: 0 0 auto; display: flex; align-items: center; gap: 12px; height: 48px; padding: 0 24px; box-sizing: border-box; font-size: 14px; color: var(--ink-3); }
+.feed-head { flex: 0 0 auto; display: flex; align-items: center; gap: 14px; height: 48px; padding: 0 24px; box-sizing: border-box; font-size: 14px; color: var(--ink-3); }
 .feed-head .brand { line-height: 1; }
 .brand { font-family: var(--font-display); font-weight: 800; color: var(--ink); text-decoration: none; font-size: 19px; letter-spacing: -.02em; }
 .feed-since { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .feed-since b { color: var(--accent); }
-.feed-me { color: var(--ink-3); text-decoration: none; white-space: nowrap; display: inline-flex; align-items: center; gap: 8px; margin-right: -6px; }
+.feed-me { color: var(--ink-3); text-decoration: none; white-space: nowrap; display: inline-flex; align-items: center; gap: 8px; margin-right: -6px; margin-left: 2px; }
 .feed-me svg { width: 21px; height: 21px; }
 .feed-me:hover { color: var(--ink); }
 /* session tally: green likes · red passes, tabular so it doesn't jitter */
 .feed-tally { display: inline-flex; gap: 6px; font-size: 12.5px; font-variant-numeric: tabular-nums; font-weight: 600; }
 .feed-tally .lk { color: var(--like); }
 .feed-tally .pk { color: var(--skip); }
-.feed-search { margin-right: -4px; color: var(--ink-3); }
+.feed-search { color: var(--ink-3); }
+.feed-search + .feed-search { margin-left: 2px; }
 .feed-search svg { width: 20px; height: 20px; }
 
 /* voice status: sits just above the action row while a session is live; says exactly what the model is doing */

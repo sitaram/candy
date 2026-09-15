@@ -183,9 +183,9 @@ function Splash({ style, onStart }: { style?: CSSProperties; onStart: () => void
       </div>
 
       <ul className="sp-claims">
-        <li><b>Discover.</b> New and rising projects from GitHub, Hacker News, newsletters, and the awesome lists. Scroll like TikTok, swipe like Tinder — it learns what you like.</li>
-        <li><b>Understand.</b> Every card says why it’s here. Open one for what it does, what it competes with, and what just shipped.</li>
-        <li><b>Ask.</b> Say what you’re building — “a CLI that syncs notes to S3” — and it finds the projects to use. Or ask any repo a hard question; it has read the README so you don’t have to.</li>
+        <li><b>Discover.</b> New and rising, from GitHub, Hacker News, newsletters, and the awesome lists. Swipe right to like, left to pass — it learns your taste.</li>
+        <li><b>Search.</b> Building something? Say what you need, typed or spoken, and find the repos that fit.</li>
+        <li><b>Ask.</b> Any repo, all the way down. It reads the full README and release notes to answer hard questions — on screen or out loud.</li>
       </ul>
 
       <div className="sp-bottom">
@@ -193,7 +193,7 @@ function Splash({ style, onStart }: { style?: CSSProperties; onStart: () => void
           <div><b>↑ ↓</b><span>browse</span></div>
           <div><b><i className="lk">→</i> <i className="pk">←</i></b><span>like · pass</span></div>
           <div><b>tap</b><span>deep dive</span></div>
-          <div><b>talk</b><span>ask about it</span></div>
+          <div><b>talk</b><span>ask</span></div>
         </div>
         <a className="sp-more" href="/about" onPointerDown={stop}>How it works →</a>
         <button className="sp-start" onClick={onStart}><span className="sp-arrow">↑</span>swipe up to start</button>

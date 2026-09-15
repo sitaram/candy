@@ -10,7 +10,7 @@ Meanwhile, consumer software solved these exact problems for other things:
 
 None of this has been brought to software itself.
 
-**Idea.** Bring it. Candy is a deck you swipe, a guide you talk to, and a reason under every recommendation, built on a corpus that knows why each project matters. It asks for ten minutes a day and gives back a personal, navigable, deep view of what is moving in open source.
+**Idea.** The opportunity is to bring those patterns to open source. Candy is a deck you swipe, a guide you talk to, and a reason under every recommendation, built on a corpus that knows why each project matters. It asks for ten minutes a day and gives back a personal, navigable, deep view of what is moving in open source.
 
 It does three things with one corpus:
 

@@ -24,8 +24,6 @@ Two modalities carry all three. You swipe when you have a screen and talk when y
 
 GitHub knows *what* a repo is. Nobody has built the layer that knows **why it matters, to whom, and what it relates to**, and nobody has put a consumer interface on that layer. Both halves are the product: the form, and the corpus that makes the form honest.
 
-**Two swipe grammars on one deck.** Up and down browse, the way TikTok does. You can go back, and nothing is judged. Left and right decide, the way Tinder does: like or pass. Nobody has combined the two. TikTok has no "no" and Tinder has no "back". Together they make browsing free and deciding cheap. The card teaches the gestures itself. On first arrival, and again after a minute idle, it breathes: a small lift, then a lean to each side with the colour of that decision showing at the edge.
-
 **Signal fusion.** Six sources that never meet, each weak and biased on its own. A repo seen by three of them is a strong signal. Trending pages have one source.
 
 | Source | Pulled so far | Contributes |
@@ -38,6 +36,8 @@ GitHub knows *what* a repo is. Nobody has built the layer that knows **why it ma
 | The crawl itself | 3,524 README→repo links | The graph; the tail finds itself |
 
 The corpus holds 1,225 carded repos. Thirty percent came from more than one source and thirteen percent carry a live human endorsement. Machine sources outnumber human ones six to one, so widening the corpus means adding humans, not more of GitHub. A weekly job re-pulls everything in eleven minutes for $0.43, and the feed never waits on it. Weekly is also the honest cadence for a ten-minutes-a-day habit: "released this week" is true at that resolution, and a week of arrivals is about what one person can swipe through.
+
+**Two swipe grammars on one deck.** Up and down browse, the way TikTok does. You can go back, and nothing is judged. Left and right decide, the way Tinder does: like or pass. Nobody has combined the two. TikTok has no "no" and Tinder has no "back". Together they make browsing free and deciding cheap. The card teaches the gestures itself. On first arrival, and again after a minute idle, it breathes: a small lift, then a lean to each side with the colour of that decision showing at the edge.
 
 **Interestingness as typed metadata.** Each card is not a summary but a schema of reasons: momentum, event (a release, a license change, a first HN thread), provenance, novelty, maturity, audience, and spam flags. A small model with a strict schema extracts these once per repo, and every surface ranks and explains from the same fields. Ranking multiplies interest, personal fit, recency and social proof, so every item carries a list of reasons in plain words, and that list is also the voice script. Crawl priority and interest are kept apart. Popularity decides what to fetch first; the card decides what to show.
 

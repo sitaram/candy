@@ -34,3 +34,16 @@ describe("rateLimit", () => {
     spy.mockRestore(); warn.mockRestore();
   });
 });
+
+describe("ip ceiling", () => {
+  it("a fresh uid does not escape the per-IP cap on paid buckets", async () => {
+    const { ip } = RATE_LIMITS.voice;
+    let refused = 0;
+    for (let i = 0; i < ip! + 5; i++) if (!(await rateLimit("voice", `uid${i}`, "1.2.3.4")).ok) refused++;
+    expect(refused).toBe(5);
+    expect((await rateLimit("voice", "uidX", "5.6.7.8")).ok).toBe(true);   // other IP unaffected
+  });
+  it("read has no ip cap: many uids behind one NAT are fine", async () => {
+    for (let i = 0; i < 500; i++) expect((await rateLimit("read", `u${i}`, "1.2.3.4")).ok).toBe(true);
+  });
+});

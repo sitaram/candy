@@ -11,6 +11,8 @@
  * - `post()` is fire-and-forget for reactions: reported, never thrown at gesture code.
  * - `report()` is the single sink for client failures. Console today; a real reporter hangs off it.
  */
+import { ship } from "./errship";
+
 export class ApiError extends Error {
   constructor(public status: number, message: string, public rid?: string, public retryAfter?: number) { super(message); this.name = "ApiError"; }
   get isNetwork() { return this.status === 0; }
@@ -59,10 +61,21 @@ export function post(url: string, body?: unknown): void {
   api(url, { method: "POST", body }).catch((e) => report(e, url));
 }
 
-/** One sink for client-side failures. */
+/**
+ * One sink for client-side failures: console for the developer, POST /api/err for the ring buffer.
+ * A 4xx is the user's or our schema's doing, and the server already has it; only 0 (network) and
+ * 5xx from ApiError are shipped, plus every non-ApiError (those are bugs).
+ */
 export function report(e: unknown, where: string): void {
-  if (e instanceof ApiError) console.error(`[candy] ${where}: ${e.status} ${e.message}${e.rid ? ` rid=${e.rid}` : ""}`);
-  else console.error(`[candy] ${where}:`, e);
+  if (e instanceof ApiError) {
+    console.error(`[candy] ${where}: ${e.status} ${e.message}${e.rid ? ` rid=${e.rid}` : ""}`);
+    if (e.status === 0 || e.status >= 500) ship({ where, msg: e.message, rid: e.rid, status: e.status });
+    return;
+  }
+  const err = e as Error;
+  if (err?.name === "AbortError") return;
+  console.error(`[candy] ${where}:`, e);
+  ship({ where, msg: err?.message ?? String(e), stack: err?.stack });
 }
 
 function humanize(status: number, serverMsg: string | undefined, retryAfter: number): string {

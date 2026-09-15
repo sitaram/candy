@@ -1,4 +1,4 @@
-import { HttpError, route } from "@/lib/api/guard";
+import { HttpError, ipOf, route } from "@/lib/api/guard";
 import { rateLimit } from "@/lib/api/ratelimit";
 import { ItemParams, RepoId } from "@/lib/api/schemas";
 import { getItemDetail } from "@/lib/corpus/api";
@@ -15,12 +15,12 @@ export const dynamic = "force-dynamic";
  * has *heard of* — frontier, README link, named alternative — and under the tight `fetch` bucket.
  * Anything else is a plain 404, so walking /api/items/* with a wordlist cannot spend money.
  */
-export const GET = route({ params: ItemParams, limit: "read" }, async ({ uid, params }) => {
+export const GET = route({ params: ItemParams, limit: "read" }, async ({ uid, params, req }) => {
   const id = RepoId.parse(`${params.owner}/${params.name}`);
   const known = await isKnown(id);
   if (known === "absent") throw new HttpError(404, "not found");
   if (known === "frontier") {
-    const rl = await rateLimit("fetch", uid);
+    const rl = await rateLimit("fetch", uid, ipOf(req));
     if (!rl.ok) throw new HttpError(429, "too many new repos; try again shortly", { "Retry-After": String(rl.retryAfter) });
   }
   const ens = await ensureItem(id);

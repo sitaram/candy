@@ -9,7 +9,10 @@ import Redis from "ioredis";
 
 const url = process.env.TEST_REDIS_URL ?? "redis://127.0.0.1:6390";
 if (/6379\b/.test(url) && !process.env.I_KNOW_THIS_FLUSHES_6379) throw new Error("refusing to run tests against the default Redis port");
-const client = new Redis(url, { maxRetriesPerRequest: 2, lazyConnect: false });
+// Vitest runs files in parallel workers. Each worker gets its own logical DB (0-15) so one file's
+// flushdb cannot wipe another mid-test. VITEST_POOL_ID is 1-based.
+const db = (Number(process.env.VITEST_POOL_ID ?? 1) - 1) % 16;
+const client = new Redis(url, { db, maxRetriesPerRequest: 2, lazyConnect: false });
 client.on("error", () => { /* surfaced by the first command */ });
 
 vi.mock("@/lib/store/redis", () => ({ redis: () => client, closeRedis: async () => {} }));

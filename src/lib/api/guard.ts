@@ -20,6 +20,7 @@ import type { ZodTypeAny, z } from "zod";
 import { ZodError } from "zod";
 import { UID_COOKIE } from "@/lib/user/uid";
 import { rateLimit, type Bucket } from "./ratelimit";
+import { recordServer } from "@/lib/errors";
 
 export class HttpError extends Error {
   constructor(public status: number, message: string, public headers: Record<string, string> = {}) { super(message); }
@@ -63,7 +64,7 @@ export function route<Q extends ZodTypeAny | undefined = undefined, B extends Zo
       if (uid && !/^[a-z0-9]{8,40}$/i.test(uid)) throw new HttpError(400, "bad session cookie");
 
       if (spec.limit) {
-        const rl = await rateLimit(spec.limit, uid || ipOf(req));
+        const rl = await rateLimit(spec.limit, uid || ipOf(req), ipOf(req));
         if (!rl.ok) throw new HttpError(429, `rate limited: ${spec.limit}`, { "Retry-After": String(rl.retryAfter) });
       }
 
@@ -96,7 +97,9 @@ function toResponse(e: unknown, rid: string, req: Request): Response {
     return Response.json({ error: `${where}${i.message}`, rid }, { status: 400 });
   }
   // Unknown: log the real thing with the id, tell the client only the id.
-  console.error(`[api] ${rid} ${req.method} ${new URL(req.url).pathname} threw`, e);
+  const path = new URL(req.url).pathname;
+  console.error(`[api] ${rid} ${req.method} ${path} threw`, e);
+  recordServer(`api:${path}`, e, { rid, status: 500, url: path });
   return Response.json({ error: "internal error", rid }, { status: 500 });
 }
 
@@ -120,6 +123,6 @@ async function readBody(req: Request, max: number): Promise<string> {
   return raw;
 }
 
-function ipOf(req: Request): string {
+export function ipOf(req: Request): string {
   return (req.headers.get("x-forwarded-for") ?? "").split(",")[0].trim() || req.headers.get("x-real-ip") || "ip:unknown";
 }

@@ -1,5 +1,6 @@
 "use client";
 import { useEffect } from "react";
+import { ship } from "./feed/errship";
 
 /**
  * Route error boundary. Replaces Next's opaque "Application error" with the actual message and a
@@ -7,7 +8,7 @@ import { useEffect } from "react";
  * (Safari → Develop → iPhone) or pasted from the screen.
  */
 export default function Error({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
-  useEffect(() => { console.error("[candy] route error", error); }, [error]);
+  useEffect(() => { console.error("[candy] route error", error); ship({ where: "error-boundary", msg: error.message, stack: error.stack, extra: error.digest ? { digest: error.digest } : undefined }); }, [error]);
   const stack = (error.stack ?? "").split("\n").slice(0, 6).join("\n");
   return (
     <main style={{ minHeight: "100dvh", padding: "calc(24px + env(safe-area-inset-top)) 22px 40px", background: "#0b0b0f", color: "#e8e8ec", fontFamily: "-apple-system, system-ui, sans-serif" }}>

@@ -100,3 +100,14 @@ export const VoiceTrace = z.object({
   endedAt: z.number().optional(),
   entries: z.array(z.unknown()).max(5_000).optional(),
 });
+
+/** Client error beacon. Everything bounded; the client is not trusted to be brief. */
+export const ClientError = z.object({
+  where: Text(80),
+  msg: Text(600),
+  stack: Text(3000).optional(),
+  rid: z.string().max(16).optional(),
+  status: z.number().int().min(0).max(999).optional(),
+  url: Text(300).optional(),
+  extra: z.unknown().optional(),
+});

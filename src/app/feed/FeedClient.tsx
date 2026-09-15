@@ -218,7 +218,7 @@ export function FeedClient() {
     catch (e) {
       // First load failing is a wall; later loads failing just means the rail stops growing — the user still has cards.
       report(e, "feed"); fetching.current = false;
-      if (initial || !itemsRef.current.length) { setLoadErr(e instanceof ApiError ? e.message : "Couldn’t load the feed."); setLoading(false); }
+      if (initial || !itemsRef.current.length) { setLoadErr(e instanceof ApiError ? e.human : "Couldn’t load the feed."); setLoading(false); }
       return;
     }
     setLoadErr(null);

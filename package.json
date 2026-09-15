@@ -23,7 +23,8 @@
     "voice:trace": "node --env-file-if-exists=.env.local --import tsx scripts/voice-trace.mts",
     "test": "scripts/test-redis.sh && vitest run",
     "test:watch": "scripts/test-redis.sh && vitest",
-    "test:cov": "scripts/test-redis.sh && vitest run --coverage"
+    "test:cov": "scripts/test-redis.sh && vitest run --coverage",
+    "errors": "node --env-file-if-exists=.env.local --import tsx scripts/errors.mts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.124.0",

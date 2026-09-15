@@ -9,7 +9,8 @@ describe("keywords", () => {
     expect(keywords("e2e-testing node.js owner/repo")).toEqual(["e2e-testing", "node.js", "owner/repo"]);
   });
   it("strips punctuation that is not part of an identifier", () => {
-    expect(keywords("what's the best (rust) framework?")).toEqual(["what", "rust"]);
+    // The apostrophe becomes a space, and "what"/"best"/"framework" are stop-words; only the identifier survives.
+    expect(keywords("what's the best (rust) framework?")).toEqual(["rust"]);
   });
 });
 

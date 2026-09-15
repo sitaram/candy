@@ -2,23 +2,23 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
 /**
- * Discoverability tooltip for icon buttons. On a pointer device it appears on hover/focus like a native
- * title (which we keep for good measure). On touch there is no hover, so each tip introduces itself once:
- * it shows for a few seconds the first time its control is on screen, then never again on that device.
- * `key` names the tip; the once-shown state lives in localStorage under it.
+ * Discoverability tooltip — for controls whose icon alone doesn't say what they do (the voice buttons).
+ * Not a general tooltip system: obvious controls keep a plain `title` and nothing more.
+ * Pointer devices: hover/focus. Touch has no hover, so the tip introduces itself once — a few seconds the
+ * first time its control is on screen — then is remembered in localStorage under `tipKey`.
+ * `active={false}` removes the tip entirely (e.g. once a voice session is live, the button is self-evidently "stop").
  *
- *   <Tip label="Hear a summary of this page" tipKey="about-voice" side="bottom"><button …/></Tip>
+ *   <Tip label="Hear this page summarized, then ask about it" tipKey="about-voice"><button …/></Tip>
  */
-export function Tip({ label, tipKey, side = "bottom", align = "center", intro = true, delay = 900, children }: {
+export function Tip({ label, tipKey, side = "bottom", align = "center", active = true, delay = 900, children }: {
   label: ReactNode; tipKey: string; side?: "top" | "bottom"; align?: "start" | "center" | "end";
-  /** Show once unprompted on touch devices. Off for tips that only make sense in a transient state (e.g. "end"). */
-  intro?: boolean; delay?: number; children: ReactNode;
+  active?: boolean; delay?: number; children: ReactNode;
 }) {
   const [shown, setShown] = useState(false);
   const wrap = useRef<HTMLSpanElement>(null);
 
   useEffect(() => {
-    if (!intro) return;
+    if (!active) return;
     const touch = matchMedia("(hover: none)").matches;
     if (!touch) return;
     const k = `candy:tip:${tipKey}`;
@@ -37,12 +37,12 @@ export function Tip({ label, tipKey, side = "bottom", align = "center", intro = 
     }, { threshold: 0.9 });
     io.observe(el);
     return () => { io.disconnect(); clearTimeout(t1); clearTimeout(t2); };
-  }, [tipKey, intro, delay]);
+  }, [tipKey, active, delay]);
 
   return (
     <span ref={wrap} className={`tip-wrap${shown ? " shown" : ""}`} data-side={side} data-align={align} onPointerDown={() => setShown(false)}>
       {children}
-      <span className="tip" role="tooltip">{label}</span>
+      {active && <span className="tip" role="tooltip">{label}</span>}
     </span>
   );
 }

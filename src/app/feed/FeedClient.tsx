@@ -147,7 +147,7 @@ export function FeedClient() {
             </>
           ) : "discover open source"}
         </span>
-        <Tip label="Search the corpus" tipKey="search" intro={false}><button className="icon-btn feed-search" onClick={openSearch} aria-label="Search" title="Search (/)">{I.search}</button></Tip>
+        <button className="icon-btn feed-search" onClick={openSearch} aria-label="Search" title="Search (/)">{I.search}</button>
         <Tip label="Ask for a project by voice" tipKey="header-voice" delay={2600}><button className="hv" onClick={openVoiceSearch} aria-label="Ask by voice" title="Ask by voice">{I.voice}</button></Tip>
         <a href="/me" className="icon-btn feed-me" aria-label="Your profile" title="You">
           {count.like + count.skip > 0 && <span className="feed-tally"><b className="lk">{count.like}</b><b className="pk">{count.skip}</b></span>}

@@ -17,13 +17,11 @@ function Inner() {
     <span className="doc-voice">
       {/* Left of the main button: this cluster is right-anchored, so the main button stays put when mute appears. */}
       {on && (
-        <Tip label={voice.muted ? "Unmute" : "Mute your mic"} tipKey="mute" intro={false} align="end">
-          <button className={`hv sub${voice.muted ? " off" : ""}`} onClick={voice.toggleMute} aria-label="Mute microphone" aria-pressed={voice.muted} title={voice.muted ? "Unmute" : "Mute"}>
-            {voice.muted ? I.micOff : I.mic}
-          </button>
-        </Tip>
+        <button className={`hv sub${voice.muted ? " off" : ""}`} onClick={voice.toggleMute} aria-label="Mute microphone" aria-pressed={voice.muted} title={voice.muted ? "Unmute" : "Mute"}>
+          {voice.muted ? I.micOff : I.mic}
+        </button>
       )}
-      <Tip label={on ? "End the conversation" : "Hear this page summarized, then ask about it"} tipKey="about-voice" intro={!on} align="end">
+      <Tip label="Hear this page summarized, then ask about it" tipKey="about-voice" active={!on} align="end">
         <button
           className={`hv${on ? ` on ${voice.state}` : ""}`}
           style={{ "--lvl": voice.level } as React.CSSProperties}

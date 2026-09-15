@@ -109,10 +109,10 @@ export function Card({
       {debug && <div className="fcard-dbg">score {f.score} · fit {f.fit}</div>}
 
       <div className="fcard-actions" onPointerDown={stop}>
-        <Tip label="Deep dive" tipKey="dive" side="top" intro={false}><button className="act dive" onClick={onOpen} aria-label="Deep dive" title="Deep dive (enter, or tap the card)">{I.open}</button></Tip>
+        <button className="act dive" onClick={onOpen} aria-label="Deep dive" title="Deep dive (enter, or tap the card)">{I.open}</button>
         <VoiceBoundary where="card-actions" fallback={<button className="act voice" disabled aria-label="Voice unavailable" title="Voice unavailable">{I.voice}</button>}>
         <div className={`voice-cluster${voice && voice.state !== "idle" ? " on" : ""}`}>
-          <Tip label={voice && voice.state !== "idle" ? "End the conversation" : "Talk about this project"} tipKey="card-voice" side="top" intro={!(voice && voice.state !== "idle")} delay={1800}>
+          <Tip label="Talk about this project" tipKey="card-voice" side="top" active={!(voice && voice.state !== "idle")} delay={1800}>
             <button className={`act voice${voice && voice.state !== "idle" ? ` on ${voice.state}` : ""}`}
               onClick={(e) => { e.stopPropagation(); onVoice?.(); }} aria-label={voice && voice.state !== "idle" ? "End conversation" : "Talk about this"} title={voice && voice.state !== "idle" ? "End (v)" : "Talk about this (v)"}>
               {voice && voice.state !== "idle" ? <span className="stop" aria-hidden /> : I.voice}

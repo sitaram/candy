@@ -60,7 +60,7 @@ Or let it run itself: `pnpm pipeline` loops discover → crawl → enrich; `pnpm
 | `VOYAGE_API_KEY` | Embedding fallback | Optional |
 | `SESSION_SECRET` | Anonymous session cookie | Any long random string |
 | `CANDY_DAILY_USD` / `_UID` / `_IP` | Spend caps per day: global, per user, per IP | Default 25 / 3 / 8 |
-| `CANDY_ADMIN_TOKEN` | Spend metrics on `/api/health` | Optional |
+| `CANDY_ADMIN_TOKEN` | Spend metrics on `/api/health` | Send as `x-candy-admin` header |
 | `CANDY_ALERT_WEBHOOK` | Slack/Discord alerts on spend cap or error spikes | Optional |
 
 Secrets stay in `.env.local` and are never logged.

@@ -145,7 +145,7 @@ export function FeedClient() {
               {since.newInYourAreas > 0 ? <b>{since.newInYourAreas} new in your areas</b> : <>{since.newInCorpus} new</>}
               {since.releasesOnSaved.length > 0 && <>{since.newInYourAreas > 0 || since.newInCorpus > 0 ? " · " : ""}{since.releasesOnSaved.length} saved released</>}
             </>
-          ) : "· open source"}
+          ) : "open source"}
         </span>
         <button className="icon-btn feed-search" onClick={openSearch} aria-label="Search" title="Search (/)">{I.search}</button>
         <Tip label="Ask for a project by voice" tipKey="header-voice" delay={2600}><button className="hv" onClick={openVoiceSearch} aria-label="Ask by voice" title="Ask by voice">{I.voice}</button></Tip>

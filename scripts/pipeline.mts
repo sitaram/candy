@@ -66,15 +66,16 @@ async function cycle(): Promise<void> {
     await log(`enrich: skipped, daily budget $${LLM_USD_PER_DAY} reached`);
   }
 
+  // Rebuild the read snapshot every process serves from — per cycle, not at exit. In loop mode the exit
+  // never came, so new cards never reached the product until the pipeline was restarted. And *before* embed:
+  // embedMissing reads allItems(), which is this snapshot; with the cycle's 50 new cards not yet in it the
+  // weekly run reported "embed: 0 new vectors" and search/tasteFit never saw them.
+  await invalidate();
   if (weekly) {
-    // New cards need vectors; idempotent, skips what is already embedded.
     const { embedMissing } = await import("./embed-lib.ts");
     await log(`embed: ${await embedMissing()} new vectors`);
     await r.set("pipeline:lastWeekly", Date.now());
   }
-  // Rebuild the read snapshot every process serves from — per cycle, not at exit. In loop mode the exit
-  // never came, so new cards never reached the product until the pipeline was restarted.
-  await invalidate();
   await log(`stats ${JSON.stringify(await stats())}`);
 }
 

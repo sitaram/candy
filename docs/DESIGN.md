@@ -28,14 +28,14 @@ GitHub knows *what* a repo is. Nobody has built the layer that knows **why it ma
 
 | Source | Pulled so far | Contributes |
 |---|---|---|
-| GitHub search + 19 topic pages | 21,935 discovered · 865 fetched · 4,761 releases | The universe: momentum, age, activity |
-| Hacker News | 70 stories on corpus repos | Live peer endorsement |
-| 8 newsletters | 87 issues | Editorial curation |
-| 20 awesome lists + 5 niche | 275 placements | The canon, slowly |
+| GitHub search + 19 topic pages | 24,435 discovered · 1,660 fetched · 7,892 releases | The universe: momentum, age, activity |
+| Hacker News | 68 carded repos with a story | Live peer endorsement |
+| 8 newsletters | 55 carded repos mentioned | Editorial curation |
+| 20 awesome lists + 5 niche | 313 carded repos listed | The canon, slowly |
 | Lobsters | 2 | Tiny; kept for the tail |
-| The crawl itself | 3,524 README→repo links | The graph; the tail finds itself |
+| The crawl itself | 6,947 README→repo links | The graph; the tail finds itself |
 
-The corpus holds 1,225 carded repos. Thirty percent came from more than one source and thirteen percent carry a live human endorsement. Machine sources outnumber human ones six to one, so widening the corpus means adding humans, not more of GitHub. A GitHub Actions job re-pulls everything weekly, in eleven minutes for $0.43, and the feed never waits on it. Weekly is also the honest cadence for a ten-minutes-a-day habit: "released this week" is true at that resolution, and a week of arrivals is about what one person can swipe through.
+The corpus holds 882 carded repos. Forty percent came from more than one source and thirteen percent carry a live human endorsement (HN, a newsletter, Lobsters). Machine-sourced repos outnumber human-sourced ones three to two, so widening the corpus means adding humans, not more of GitHub. A GitHub Actions job re-pulls everything weekly, in eleven minutes for $0.43, and the feed never waits on it. Weekly is also the honest cadence for a ten-minutes-a-day habit: "released this week" is true at that resolution, and a week of arrivals is about what one person can swipe through.
 
 **Two swipe grammars on one deck.** Looking at a card should cost nothing, and judging it should cost one flick. So up and down browse, the way TikTok does: you can go back, and nothing is judged. Left and right decide, the way Tinder does: like or pass. Nobody has combined the two. TikTok has no "no" and Tinder has no "back". The card teaches the gestures itself. On first arrival, and again after a minute idle, it breathes: a small lift, then a lean to each side with the colour of that decision showing at the edge.
 
@@ -114,7 +114,7 @@ It lives in two places:
 - **A picture.** Put the README's first screenshot or demo on the card. Most projects have one and nobody surfaces it.
 - **Readable by machines.** The cards are typed already. Offer an endpoint an agent can call before it picks a dependency, so the default is not whatever the vendor suggests.
 - **Plain language.** Add a second register for the card that says what the project lets you do rather than what it is, for the person in marketing or the artist who could get much further than today's tools let them.
-- **More humans.** Add newsletters, Reddit and podcasts. Machine sources outnumber human ones six to one, and the human ones are the signal.
+- **More humans.** Add newsletters, Reddit and podcasts. Machine-sourced repos outnumber human-sourced ones three to two, and the human ones are the signal.
 
 ## Robustness
 

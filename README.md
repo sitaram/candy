@@ -97,7 +97,7 @@ docs/DESIGN.md      the essay: problem, idea, what's novel, learnings
 
 ## Status
 
-Personal project, actively developed. Corpus: ~1,200 carded repos from ~22k discovered. Tested on iOS Safari and desktop Chrome; voice needs a microphone and a network that allows WebRTC.
+Personal project, actively developed. Corpus: ~880 carded repos from ~24k discovered. Tested on iOS Safari and desktop Chrome; voice needs a microphone and a network that allows WebRTC.
 
 ## License
 
